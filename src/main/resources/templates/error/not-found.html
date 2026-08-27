@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('Not Found', ~{::section})}">
+<body>
+<section>
+    <div class="panel">
+        <div class="empty">
+            <span class="empty-art" aria-hidden="true">🕵️</span>
+            <h3>Bug not found</h3>
+            <p th:text="${errorMessage}" id="error-message">No bug found.</p>
+            <div class="actions">
+                <a class="btn btn-primary" th:href="@{/bugs}">Back to all bugs</a>
+                <a class="btn" th:href="@{/bugs/new}">Raise a bug</a>
+            </div>
+        </div>
+    </div>
+</section>
+</body>
+</html>

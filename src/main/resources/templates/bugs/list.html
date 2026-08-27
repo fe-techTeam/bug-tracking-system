@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('All Bugs', ~{::section})}">
+<body>
+<section class="stack" th:with="total=${statusSummary.get('Total')}">
+
+    <div class="page-head">
+        <div>
+            <span class="eyebrow">Dashboard</span>
+            <h1>All Bugs</h1>
+            <p class="sub">
+                <span th:text="${#lists.size(bugs)}">4</span> shown
+                <span th:if="${#lists.size(bugs) != total}" th:text="'of ' + ${total} + ' total'">of 4 total</span>
+                <span th:unless="${#lists.size(bugs) != total}">— the whole board</span>
+            </p>
+        </div>
+        <div class="page-head-actions">
+            <a class="btn btn-primary" th:href="@{/bugs/new}">＋ Raise Bug</a>
+        </div>
+    </div>
+
+    <!-- Overview: one big number, then the shape of the queue as a single bar. -->
+    <div class="panel overview">
+        <div class="overview-total">
+            <span class="total-value num" th:attr="data-count=${total}" th:text="${total}">4</span>
+            <span class="total-label">bugs on the board</span>
+        </div>
+
+        <div class="overview-body">
+            <div class="dist" th:if="${total > 0}" role="img" aria-label="Bugs by status">
+                <span th:each="s,st : ${statuses}"
+                      th:if="${statusSummary.get(s.label) > 0}"
+                      th:classappend="'st-' + ${s}"
+                      th:style="'--w:' + ${#numbers.formatDecimal(statusSummary.get(s.label) * 100.0 / total, 1, 2, 'POINT')} + '%; --i:' + ${st.index}"
+                      th:title="${s.label + ': ' + statusSummary.get(s.label)}"></span>
+            </div>
+
+            <!-- Each chip is also a filter. Click a colour, see those bugs. -->
+            <div class="legend">
+                <a class="legend-item" th:each="s,st : ${statuses}"
+                   th:href="@{/bugs(status=${s == selectedStatus} ? null : ${s}, severity=${selectedSeverity}, keyword=${keyword})}"
+                   th:classappend="'st-' + ${s} + (${s == selectedStatus} ? ' is-active' : '')"
+                   th:style="'--i:' + ${st.index}"
+                   th:title="${s == selectedStatus} ? 'Clear this filter' : 'Show only ' + ${s.label}">
+                    <span class="dot" th:classappend="${s.name() == 'OPEN' or s.name() == 'REOPENED'} ? 'is-live' : ''"></span>
+                    <span th:text="${s.label}">Open</span>
+                    <b th:text="${statusSummary.get(s.label)}">1</b>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Severity: colour AND bar count both say how bad. -->
+    <div class="heat">
+        <div class="heat-card" th:each="sev,st : ${severities}"
+             th:classappend="'sev-' + ${sev}"
+             th:style="'--i:' + ${st.index}">
+            <span class="heat-value num" th:attr="data-count=${severitySummary.get(sev.label)}"
+                  th:text="${severitySummary.get(sev.label)}">1</span>
+            <span class="heat-label">
+                <span class="meter" th:classappend="'sev-' + ${sev}" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i>
+                </span>
+                <span th:text="${sev.label}">Critical</span>
+            </span>
+            <span class="fill" th:if="${total > 0}"
+                  th:style="'--w:' + ${#numbers.formatDecimal(severitySummary.get(sev.label) * 100.0 / total, 1, 2, 'POINT')} + '%'"></span>
+        </div>
+    </div>
+
+    <form class="panel filters" method="get" th:action="@{/bugs}" id="filter-form">
+        <label>
+            Status
+            <select name="status" id="filter-status">
+                <option value="">Any status</option>
+                <option th:each="s : ${statuses}"
+                        th:value="${s}"
+                        th:text="${s.label}"
+                        th:selected="${s == selectedStatus}">Open</option>
+            </select>
+        </label>
+        <label>
+            Severity
+            <select name="severity" id="filter-severity">
+                <option value="">Any severity</option>
+                <option th:each="s : ${severities}"
+                        th:value="${s}"
+                        th:text="${s.label}"
+                        th:selected="${s == selectedSeverity}">High</option>
+            </select>
+        </label>
+        <label style="flex: 2 1 260px">
+            Search
+            <span class="search-wrap">
+                <input type="text" name="keyword" id="filter-keyword"
+                       placeholder="title, description, module or client"
+                       th:value="${keyword}" autocomplete="off">
+                <span class="kbd">/</span>
+            </span>
+        </label>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary" id="apply-filters">Apply</button>
+            <a class="btn btn-ghost" th:href="@{/bugs}" id="clear-filters">Clear</a>
+        </div>
+    </form>
+
+    <div class="panel" th:if="${#lists.isEmpty(bugs)}">
+        <div class="empty" id="no-bugs">
+            <span class="empty-art" aria-hidden="true">🔍</span>
+            <h3>Nothing matches</h3>
+            <p>No bug fits these filters. Loosen them, or file the one you just found.</p>
+            <div class="actions">
+                <a class="btn" th:href="@{/bugs}">Clear filters</a>
+                <a class="btn btn-primary" th:href="@{/bugs/new}">Raise a bug</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel table-wrap" th:unless="${#lists.isEmpty(bugs)}">
+        <table class="bug-table" id="bug-table">
+            <thead>
+            <tr>
+                <th><span class="sr-only"></span></th>
+                <th>ID</th>
+                <th>Bug</th>
+                <th>Client</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Assigned To</th>
+                <th>Reported</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="bug,rs : ${bugs}"
+                th:style="'--i:' + ${rs.index} + '; --c: var(--sev-' + ${bug.severity} + ')'">
+
+                <td class="rail" aria-hidden="true"></td>
+
+                <td class="bug-id" th:text="'#' + ${bug.id}">#1</td>
+
+                <td>
+                    <a class="bug-link" th:href="@{/bugs/{id}(id=${bug.id})}" th:text="${bug.title}">Bug title</a>
+                    <span class="cell-sub" th:if="${bug.module}" th:text="${bug.module}">Module</span>
+                </td>
+
+                <td>
+                    <span class="client-chip" th:if="${bug.client}">
+                        <span class="avatar" th:attr="data-client=${bug.client}" aria-hidden="true"></span>
+                        <span class="client-name" th:text="${bug.client}">Client</span>
+                    </span>
+                    <span class="muted" th:unless="${bug.client}">—</span>
+                </td>
+
+                <td>
+                    <span class="badge" th:classappend="'sev-' + ${bug.severity}"
+                          th:text="${bug.severity.label}">High</span>
+                </td>
+
+                <td>
+                    <span class="badge" th:classappend="'st-' + ${bug.status}"
+                          th:text="${bug.status.label}">Open</span>
+                </td>
+
+                <td>
+                    <span class="tag" th:if="${bug.assignedTo}" th:text="${bug.assignedTo}">dev-team</span>
+                    <span class="muted" th:unless="${bug.assignedTo}">Unassigned</span>
+                </td>
+
+                <td>
+                    <span class="when" th:attr="data-time=${bug.createdAt}"
+                          th:text="${#temporals.format(bug.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan 2026</span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('Bug Detail', ~{::section})}">
+<body>
+<section class="stack">
+
+    <!-- Hero: the rail down the left is the severity colour, so the seriousness
+         of the bug registers before you have read a single word. -->
+    <div class="panel detail-hero" th:style="'--c: var(--sev-' + ${bug.severity} + ')'">
+        <div class="id-line">
+            <span class="bug-id" th:text="'BUG-' + ${bug.id}">BUG-1</span>
+            <span class="muted">·</span>
+            <span class="when" th:attr="data-time=${bug.createdAt}"
+                  th:text="${#temporals.format(bug.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan 2026</span>
+        </div>
+
+        <h1 id="bug-title" th:text="${bug.title}">Bug title</h1>
+
+        <div class="detail-badges">
+            <span class="badge badge-lg" th:classappend="'sev-' + ${bug.severity}"
+                  th:text="${bug.severity.label}" id="bug-severity">High</span>
+            <span class="meter" th:classappend="'sev-' + ${bug.severity}"
+                  th:title="${bug.severity.label + ' severity'}">
+                <i></i><i></i><i></i><i></i>
+            </span>
+            <span class="badge badge-lg" th:classappend="'st-' + ${bug.status}"
+                  th:text="${bug.status.label}" id="bug-status">Open</span>
+            <span class="client-chip" th:if="${bug.client}">
+                <span class="avatar" th:attr="data-client=${bug.client}" aria-hidden="true"></span>
+                <span class="client-name" th:text="${bug.client}">Client</span>
+            </span>
+        </div>
+
+        <!-- How far along the track this bug has travelled. -->
+        <ol class="stepper"
+            th:style="'--c: var(--st-' + ${bug.status} + ')'"
+            th:with="pos=${bug.status.name() == 'IN_PROGRESS' ? 1 : (bug.status.name() == 'FIXED' ? 2 : (bug.status.name() == 'CLOSED' ? 3 : 0))}">
+            <li th:each="label,it : ${ {'Open','In Progress','Fixed','Closed'} }"
+                th:classappend="${it.index &lt; pos} ? 'is-done' : (${it.index == pos} ? 'is-done is-current' : '')"
+                th:text="${label}">Open</li>
+        </ol>
+
+        <span class="reopened-note" th:if="${bug.status.name() == 'REOPENED'}">
+            ↻ Reopened — this one came back after being closed out.
+        </span>
+    </div>
+
+    <dl class="facts">
+        <div class="fact" style="--i:0">
+            <dt>Client</dt>
+            <dd id="bug-client">
+                <span class="avatar" th:if="${bug.client}" th:attr="data-client=${bug.client}" aria-hidden="true"></span>
+                <span th:text="${bug.client} ?: '—'">Client</span>
+            </dd>
+        </div>
+        <div class="fact" style="--i:1">
+            <dt>Module</dt>
+            <dd th:text="${bug.module} ?: '—'">Module</dd>
+        </div>
+        <div class="fact" style="--i:2">
+            <dt>Reported By</dt>
+            <dd th:text="${bug.reportedBy} ?: '—'">Reporter</dd>
+        </div>
+        <div class="fact" style="--i:3">
+            <dt>Assigned To</dt>
+            <dd>
+                <span th:if="${bug.assignedTo}" th:text="${bug.assignedTo}">dev-team</span>
+                <span class="muted" th:unless="${bug.assignedTo}">Unassigned</span>
+            </dd>
+        </div>
+        <div class="fact" style="--i:4">
+            <dt>Last Updated</dt>
+            <dd>
+                <span class="when" th:attr="data-time=${bug.updatedAt}"
+                      th:text="${#temporals.format(bug.updatedAt, 'dd MMM yyyy, HH:mm')}">01 Jan 2026</span>
+            </dd>
+        </div>
+    </dl>
+
+    <div class="panel">
+        <div class="panel-head"><h2>Description</h2></div>
+        <div class="panel-pad">
+            <p class="pre" th:text="${bug.description} ?: 'No description provided.'">Description</p>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><h2>Steps to Reproduce</h2></div>
+        <div class="panel-pad">
+            <div class="steps" th:text="${bug.stepsToReproduce} ?: 'No steps provided.'">Steps</div>
+        </div>
+    </div>
+
+    <!-- Green for what should happen, red for what does. The mismatch is the bug. -->
+    <div class="compare">
+        <div class="compare-card compare-expected">
+            <header><span aria-hidden="true">✓</span> Expected</header>
+            <div class="body" th:text="${bug.expectedResult} ?: '—'">Expected</div>
+        </div>
+        <div class="compare-card compare-actual">
+            <header><span aria-hidden="true">✕</span> Actual</header>
+            <div class="body" th:text="${bug.actualResult} ?: '—'">Actual</div>
+        </div>
+    </div>
+
+    <div class="panel panel-pad">
+        <div class="actions">
+            <form method="post" th:action="@{/bugs/{id}/status(id=${bug.id})}" class="inline-form">
+                <select name="status" id="change-status">
+                    <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.label}"
+                            th:selected="${s == bug.status}">Open</option>
+                </select>
+                <button type="submit" class="btn" id="update-status">Update Status</button>
+            </form>
+
+            <a class="btn" th:href="@{/bugs/{id}/edit(id=${bug.id})}" id="edit-bug">✎ Edit</a>
+
+            <span class="spacer"></span>
+
+            <a class="btn btn-ghost" th:href="@{/bugs}">← Back to list</a>
+
+            <form method="post" th:action="@{/bugs/{id}/delete(id=${bug.id})}" class="inline-form"
+                  onsubmit="return confirm('Delete this bug?');">
+                <button type="submit" class="btn btn-danger" id="delete-bug">Delete</button>
+            </form>
+        </div>
+    </div>
+</section>
+</body>
+</html>

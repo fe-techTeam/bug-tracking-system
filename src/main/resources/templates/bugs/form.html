@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('Raise Bug', ~{::section})}">
+<body>
+<section class="stack">
+
+    <div class="page-head">
+        <div>
+            <span class="eyebrow" th:text="${bug.id == null} ? 'New report' : 'Editing'">New report</span>
+            <h1 th:text="${bug.id == null} ? 'Raise a Bug' : 'Edit BUG-' + ${bug.id}">Raise a Bug</h1>
+            <p class="sub">Four short sections. Only Title, Client and Severity are required.</p>
+        </div>
+        <div class="page-head-actions">
+            <a class="btn btn-ghost" th:href="@{/bugs}">Cancel</a>
+        </div>
+    </div>
+
+    <div class="form-grid">
+        <form class="panel bug-form" method="post" id="bug-form"
+              th:action="${bug.id == null} ? @{/bugs} : @{/bugs/{id}(id=${bug.id})}"
+              th:object="${bug}">
+
+            <div class="form-section">
+                <div class="form-section-head">
+                    <span class="step-num">1</span>
+                    <h2>What broke</h2>
+                </div>
+
+                <label>
+                    <span>Title <span class="req">*</span></span>
+                    <input type="text" th:field="*{title}" id="title" autocomplete="off"
+                           placeholder="Short summary of what is broken">
+                    <span class="field-error" th:if="${#fields.hasErrors('title')}"
+                          th:errors="*{title}">Title error</span>
+                </label>
+
+                <label>
+                    <span>Description <span class="hint">— what happens, and where</span></span>
+                    <textarea rows="3" th:field="*{description}" id="description"
+                              placeholder="On the sign-in page the first click is ignored..."></textarea>
+                </label>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-head">
+                    <span class="step-num">2</span>
+                    <h2>Who it affects, and how badly</h2>
+                </div>
+
+                <div class="row">
+                    <label>
+                        <span>Client <span class="req">*</span></span>
+                        <select th:field="*{client}" id="client">
+                            <option value="">— Select client —</option>
+                            <option th:each="c : ${clients}" th:value="${c}" th:text="${c}">Acme Capital</option>
+                        </select>
+                        <span class="field-error" th:if="${#fields.hasErrors('client')}"
+                              th:errors="*{client}">Client error</span>
+                    </label>
+                    <label>
+                        <span>Severity <span class="req">*</span></span>
+                        <select th:field="*{severity}" id="severity">
+                            <option th:each="s : ${severities}" th:value="${s}" th:text="${s.label}">High</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="row">
+                    <label>
+                        <span>Status <span class="req">*</span></span>
+                        <select th:field="*{status}" id="status">
+                            <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.label}">Open</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Module <span class="hint">— optional</span></span>
+                        <input type="text" th:field="*{module}" id="module"
+                               placeholder="e.g. Authentication" autocomplete="off">
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-head">
+                    <span class="step-num">3</span>
+                    <h2>How to see it happen</h2>
+                </div>
+
+                <label>
+                    <span>Steps to Reproduce</span>
+                    <textarea rows="5" th:field="*{stepsToReproduce}" id="stepsToReproduce"
+                              placeholder="1. Open ...&#10;2. Click ...&#10;3. Observe ..."></textarea>
+                </label>
+
+                <div class="row">
+                    <label>
+                        <span>Expected Result</span>
+                        <textarea rows="3" th:field="*{expectedResult}" id="expectedResult"
+                                  placeholder="What should have happened"></textarea>
+                    </label>
+                    <label>
+                        <span>Actual Result</span>
+                        <textarea rows="3" th:field="*{actualResult}" id="actualResult"
+                                  placeholder="What happened instead"></textarea>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-head">
+                    <span class="step-num">4</span>
+                    <h2>People</h2>
+                </div>
+
+                <div class="row">
+                    <label>
+                        <span>Reported By</span>
+                        <input type="text" th:field="*{reportedBy}" id="reportedBy"
+                               placeholder="your name" autocomplete="off">
+                    </label>
+                    <label>
+                        <span>Assigned To <span class="hint">— leave blank for triage</span></span>
+                        <input type="text" th:field="*{assignedTo}" id="assignedTo"
+                               placeholder="dev-team" autocomplete="off">
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-foot">
+                <button type="submit" class="btn btn-primary" id="submit-bug">
+                    <span th:text="${bug.id == null} ? 'Raise Bug' : 'Save Changes'">Raise Bug</span>
+                </button>
+                <a class="btn btn-ghost" th:href="@{/bugs}">Cancel</a>
+            </div>
+        </form>
+
+        <!-- Live preview: you see the row you are about to create, before you create it. -->
+        <aside class="panel preview">
+            <h2>Preview</h2>
+
+            <div class="preview-title preview-empty" id="preview-title">Untitled bug</div>
+
+            <div class="detail-badges">
+                <span class="badge" id="preview-severity" th:classappend="'sev-' + ${bug.severity}"
+                      th:text="${bug.severity != null} ? ${bug.severity.label} : 'Medium'">Medium</span>
+                <span class="meter" id="preview-meter" th:classappend="'sev-' + ${bug.severity}" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i>
+                </span>
+            </div>
+
+            <div class="client-chip">
+                <span class="avatar" id="preview-client" hidden aria-hidden="true"></span>
+                <span class="client-name muted" id="preview-client-name">No client picked yet</span>
+            </div>
+
+            <div class="impact" id="preview-impact" th:classappend="'sev-' + ${bug.severity}">
+                Pick a severity to see what it means.
+            </div>
+        </aside>
+    </div>
+</section>
+</body>
+</html>

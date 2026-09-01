@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+
+<!-- The notification bell. Lives in the top bar on every page, so the count is
+     in the same place whatever you are looking at. -->
+<a th:fragment="bell" class="bell" th:href="@{/notifications}" id="notifications-link"
+   th:classappend="${unreadNotifications > 0} ? 'has-unread' : ''"
+   th:title="${unreadNotifications > 0}
+             ? ${unreadNotifications} + ' unread notification' + (${unreadNotifications == 1} ? '' : 's')
+             : 'Notifications'"
+   aria-label="Notifications">
+    <svg class="i" aria-hidden="true"><use href="#i-bell"/></svg>
+    <span class="bell-count num" th:if="${unreadNotifications > 0}" id="notification-count"
+          th:text="${unreadNotifications > 99} ? '99+' : ${unreadNotifications}">3</span>
+</a>
+
+</body>
+</html>

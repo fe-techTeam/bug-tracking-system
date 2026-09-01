@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('Team', ~{::section})}">
+<body>
+<section th:with="me=${#authentication.name}">
+
+    <header class="topbar">
+        <h1 class="topbar-title">Team</h1>
+        <span class="topbar-sub">
+            <span th:text="${#lists.size(members)}">18</span> people — what each one raised, and what is on their plate
+        </span>
+        <div class="topbar-actions">
+            <div th:replace="~{fragments :: bell}"></div>
+            <a class="btn btn-sm" th:href="@{/bugs(assignee=${me})}">
+                <svg class="i" aria-hidden="true"><use href="#i-inbox"/></svg>
+                <span>My queue</span>
+            </a>
+        </div>
+    </header>
+
+    <div class="content">
+    <div class="stack">
+
+        <div class="member-grid">
+            <article class="member-card" th:each="m,rs : ${members}"
+                     th:style="'--i:' + ${rs.index}"
+                     th:with="load=${workload.get(m.id)}"
+                     th:classappend="(${m.active} ? '' : 'is-inactive ') + (${m.name == me} ? 'is-me' : '')">
+
+                <div class="member-head">
+                    <span class="avatar avatar-lg" th:attr="data-avatar=${m.name}" aria-hidden="true"></span>
+                    <span class="member-id">
+                        <a class="member-name" th:href="@{/team/{id}(id=${m.id})}" th:text="${m.name}">Nishana R</a>
+                        <a class="member-mail" th:href="'mailto:' + ${m.email}" th:text="${m.email}">a@b.com</a>
+                    </span>
+                    <span class="member-you" th:if="${m.name == me}">You</span>
+                </div>
+
+                <!-- Three numbers, each a link straight to that slice of the board. -->
+                <div class="member-stats">
+                    <a class="stat-tile" style="--c: var(--st-ASSIGNED)"
+                       th:classappend="${load.reported == 0} ? 'is-zero' : ''"
+                       th:href="@{/bugs(reporter=${m.name})}"
+                       th:title="'Bugs raised by ' + ${m.name}">
+                        <span class="stat-value num" th:text="${load.reported}">12</span>
+                        <span class="stat-name">Raised</span>
+                    </a>
+                    <a class="stat-tile" style="--c: var(--st-IN_PROGRESS)"
+                       th:classappend="${load.assigned == 0} ? 'is-zero' : ''"
+                       th:href="@{/bugs(assignee=${m.name})}"
+                       th:title="'Bugs assigned to ' + ${m.name}">
+                        <span class="stat-value num" th:text="${load.assigned}">7</span>
+                        <span class="stat-name">Assigned</span>
+                    </a>
+                    <a class="stat-tile" style="--c: var(--pri-P1)"
+                       th:classappend="${load.open == 0} ? 'is-zero' : ''"
+                       th:href="@{/bugs(assignee=${m.name})}"
+                       th:title="'Still open for ' + ${m.name}">
+                        <span class="stat-value num" th:text="${load.open}">3</span>
+                        <span class="stat-name">Still open</span>
+                    </a>
+                </div>
+
+                <!-- How much of their queue is live, at a glance. -->
+                <div class="load-bar" th:if="${load.assigned > 0}"
+                     th:title="${load.open} + ' of ' + ${load.assigned} + ' still open'">
+                    <i style="background: var(--st-IN_PROGRESS)"
+                       th:style="'background: var(--st-IN_PROGRESS); --w:' + ${#numbers.formatDecimal(load.openShare(), 1, 1, 'POINT')} + '%; width:' + ${#numbers.formatDecimal(load.openShare(), 1, 1, 'POINT')} + '%'"></i>
+                    <i style="background: var(--st-CLOSED)"
+                       th:style="'background: var(--st-CLOSED); --w:' + ${#numbers.formatDecimal(100.0 - load.openShare(), 1, 1, 'POINT')} + '%; width:' + ${#numbers.formatDecimal(100.0 - load.openShare(), 1, 1, 'POINT')} + '%'"></i>
+                </div>
+
+                <div class="member-foot">
+                    <span class="badge" th:if="${load.urgent > 0}" style="--c: var(--pri-P1)"
+                          th:text="${load.urgent} + ' urgent'">2 urgent</span>
+                    <span class="badge" th:if="${load.critical > 0}" style="--c: var(--sev-CRITICAL)"
+                          th:text="${load.critical} + ' critical'">1 critical</span>
+                    <span class="tag" th:unless="${m.active}">Hidden</span>
+                    <span class="spacer"></span>
+
+                    <a class="btn btn-sm btn-ghost" th:href="@{/team/{id}(id=${m.id})}">View</a>
+
+                    <form method="post" th:action="@{/team/{id}/active(id=${m.id})}" class="inline-form">
+                        <input type="hidden" name="active" th:value="${m.active} ? 'false' : 'true'">
+                        <button type="submit" class="btn btn-sm btn-ghost"
+                                th:text="${m.active} ? 'Hide' : 'Restore'">Hide</button>
+                    </form>
+                    <!-- Removal only for someone with no history to break. -->
+                    <form method="post" th:if="${load.touched() == 0}"
+                          th:action="@{/team/{id}/delete(id=${m.id})}" class="inline-form"
+                          onsubmit="return confirm('Remove this team member?');">
+                        <button type="submit" class="btn btn-sm btn-ghost">Remove</button>
+                    </form>
+                </div>
+            </article>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head"><h2>Add a team member</h2></div>
+            <div class="panel-pad">
+                <form class="row row-inline" method="post" th:action="@{/team}" id="team-form">
+                    <label>
+                        <span>Name</span>
+                        <input type="text" name="name" id="member-name" required
+                               placeholder="Full name" autocomplete="off">
+                    </label>
+                    <label>
+                        <span>Email</span>
+                        <input type="text" name="email" id="member-email" required
+                               placeholder="name@firsteconomy.com" autocomplete="off">
+                    </label>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn btn-primary" id="add-member">Add member</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <p class="hint">
+            Hiding somebody keeps every bug they raised or were assigned exactly as it is — they just
+            stop appearing as a choice for new ones.
+        </p>
+    </div>
+    </div>
+</section>
+</body>
+</html>

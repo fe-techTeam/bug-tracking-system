@@ -3,6 +3,13 @@
       th:replace="~{layout :: page('Not Found', ~{::section})}">
 <body>
 <section>
+    <header class="topbar">
+        <h1 class="topbar-title">Not found</h1>
+        <div class="topbar-actions">
+            <div th:replace="~{fragments :: bell}"></div>
+        </div>
+    </header>
+    <div class="content">
     <div class="panel">
         <div class="empty">
             <span class="empty-art" aria-hidden="true">🕵️</span>
@@ -13,6 +20,7 @@
                 <a class="btn" th:href="@{/bugs/new}">Raise a bug</a>
             </div>
         </div>
+    </div>
     </div>
 </section>
 </body>

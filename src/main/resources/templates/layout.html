@@ -4,45 +4,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="${title} + ' | Bug Tracking'">Bug Tracking</title>
+    <title th:text="${title} + ' · Bug Tracking'">Bug Tracking</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400..600&display=swap">
     <link rel="stylesheet" th:href="@{/css/style.css}">
-    <!-- Applied before first paint so a dark-theme choice never flashes white. -->
+
+    <!-- Applied before first paint: a dark theme never flashes white, and the
+         sidebar never opens wide and then snaps shut. -->
     <script>
-        try {
-            var t = localStorage.getItem("bugtracking.theme");
-            if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
-        } catch (e) { /* private mode: fall back to the system theme */ }
+        (function () {
+            var root = document.documentElement;
+            root.classList.add("js");
+            try {
+                var t = localStorage.getItem("bugtracking.theme");
+                if (t === "light" || t === "dark") root.setAttribute("data-theme", t);
+            } catch (e) { /* private mode: fall back to the system theme */ }
+            try {
+                var s = localStorage.getItem("bugtracking.sidebar");
+                root.setAttribute("data-sidebar", s === "expanded" ? "expanded" : "collapsed");
+            } catch (e) { root.setAttribute("data-sidebar", "collapsed"); }
+        })();
     </script>
 </head>
 <body>
-<header class="topbar">
-    <a class="brand" th:href="@{/bugs}">
-        <span class="brand-mark" aria-hidden="true">🐞</span>
-        <span>Bug Tracking</span>
-    </a>
-    <nav>
-        <a class="navlink" th:href="@{/bugs}">All Bugs</a>
-        <button type="button" class="icon-btn" id="theme-toggle" title="Switch theme" aria-label="Switch theme">☾</button>
-        <a class="btn btn-primary" th:href="@{/bugs/new}" id="raise-bug-link">
-            <span aria-hidden="true">＋</span> Raise Bug
-        </a>
-    </nav>
-</header>
+
+<!-- One sprite for the whole app: stroked line icons, sized alongside their text. -->
+<svg width="0" height="0" class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-board" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
+        <rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
+    </symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24">
+        <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+    </symbol>
+    <symbol id="i-users" viewBox="0 0 24 24">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24">
+        <path d="M22 12h-6l-2 3h-4l-2-3H2"/>
+        <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"/>
+    </symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+    </symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24">
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+    </symbol>
+    <symbol id="i-panel" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>
+    </symbol>
+    <symbol id="i-chevrons-right" viewBox="0 0 24 24"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-selector" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24">
+        <path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/>
+        <path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>
+    </symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="16" rx="1"/>
+        <rect x="16" y="4" width="5" height="16" rx="1"/>
+    </symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/>
+        <path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/>
+        <path d="m19.1 4.9-1.4 1.4"/>
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+    </symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24">
+        <path d="M21.4 11.05 12.2 20.2a5 5 0 0 1-7.1-7.1l9.2-9.15a3.33 3.33 0 0 1 4.7 4.7l-9.2 9.15a1.67 1.67 0 0 1-2.35-2.35l8.5-8.45"/>
+    </symbol>
+    <symbol id="i-message" viewBox="0 0 24 24">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/>
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+</svg>
+
+<div class="app">
+
+    <!-- ================= sidebar: a column, not a floating panel ================= -->
+    <aside class="sidebar" id="sidebar">
+
+        <div class="sidebar-head">
+            <a class="brand" th:href="@{/bugs}" id="sidebar-brand">
+                <span class="brand-mark" aria-hidden="true">B</span>
+                <span class="lbl">Bug Tracking</span>
+            </a>
+            <!-- Visible in both states: collapsed it is an arrow pointing the way
+                 the rail will open, expanded it is the panel it will close. -->
+            <button type="button" class="icon-btn sidebar-toggle" id="sidebar-toggle"
+                    title="Collapse sidebar" aria-label="Collapse sidebar">
+                <svg class="i ico-collapse" aria-hidden="true"><use href="#i-panel"/></svg>
+                <svg class="i ico-expand" aria-hidden="true"><use href="#i-chevrons-right"/></svg>
+            </button>
+        </div>
+
+        <!-- The project switcher. Closed by default; opens as a dropdown, and
+             beside the rail when the sidebar is collapsed. -->
+        <div class="sidebar-section">
+            <div class="switcher" id="project-switcher"
+                 th:with="shown=${selectedProject != null ? selectedProject : currentProject}">
+                <button type="button" class="switcher-btn" id="switcher-btn"
+                        aria-expanded="false" aria-haspopup="listbox" aria-controls="switcher-menu"
+                        th:data-tip="${shown} ?: 'Switch project'">
+                    <span class="avatar" th:if="${shown}"
+                          th:attr="data-avatar=${shown}" aria-hidden="true"></span>
+                    <span class="avatar" th:unless="${shown}" aria-hidden="true">–</span>
+                    <span class="switcher-text">
+                        <span class="switcher-label">Project</span>
+                        <span class="switcher-name" th:text="${shown} ?: 'Select a project'">Godrej</span>
+                    </span>
+                    <svg class="i switcher-chev" aria-hidden="true"><use href="#i-selector"/></svg>
+                </button>
+
+                <div class="switcher-menu" id="switcher-menu" role="listbox" hidden>
+                    <div class="switcher-search" th:if="${projectCounts != null and projectCounts.size() > 6}">
+                        <input type="text" id="switcher-filter" placeholder="Find a project…"
+                               autocomplete="off" aria-label="Find a project">
+                    </div>
+
+                    <div class="switcher-list" id="switcher-list">
+                        <a class="switcher-item" th:each="entry : ${projectCounts}"
+                           th:href="@{/bugs(project=${entry.key})}"
+                           th:classappend="${entry.key == shown} ? 'is-active' : ''"
+                           th:data-name="${entry.key}" role="option"
+                           th:attr="aria-selected=${entry.key == shown}">
+                            <span class="avatar avatar-sm" th:attr="data-avatar=${entry.key}" aria-hidden="true"></span>
+                            <span class="switcher-item-name" th:text="${entry.key}">Godrej</span>
+                            <span class="switcher-item-count num" th:text="${entry.value}">4</span>
+                        </a>
+                    </div>
+
+                    <p class="switcher-empty" th:if="${projectCounts == null or projectCounts.isEmpty()}">
+                        No projects yet.
+                    </p>
+
+                    <div class="switcher-foot">
+                        <a th:href="@{/projects}">Manage projects</a>
+                        <a th:href="@{/projects}" aria-label="Add a project">+ New</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="sidebar-section sidenav">
+            <span class="sidebar-caption">Workspace</span>
+
+            <a class="sidenav-item" th:href="@{/bugs}" id="board-link" data-tip="Board"
+               th:classappend="${currentPath != null and #strings.startsWith(currentPath, '/bugs')} ? 'is-active' : ''">
+                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-board"/></svg></span>
+                <span class="lbl">Board</span>
+            </a>
+
+            <a class="sidenav-item" th:href="@{/projects}" id="projects-link" data-tip="Projects"
+               th:classappend="${currentPath != null and #strings.startsWith(currentPath, '/projects')} ? 'is-active' : ''">
+                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-folder"/></svg></span>
+                <span class="lbl">Projects</span>
+            </a>
+
+            <a class="sidenav-item" th:href="@{/team}" id="team-link" data-tip="Team"
+               th:classappend="${currentPath != null and #strings.startsWith(currentPath, '/team')} ? 'is-active' : ''">
+                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-users"/></svg></span>
+                <span class="lbl">Team</span>
+            </a>
+        </nav>
+
+        <!-- The two views a developer opens first thing in the morning. Both reach
+             across projects on purpose: your work does not stop at a project line. -->
+        <nav class="sidebar-section sidenav">
+            <span class="sidebar-caption">My work</span>
+
+            <a class="sidenav-item" id="my-assigned"
+               th:href="@{/bugs(assignee=${#authentication.name})}"
+               th:data-tip="'Assigned to ' + ${#authentication.name}"
+               th:classappend="${assignee != null and assignee == #authentication.name} ? 'is-active' : ''">
+                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-inbox"/></svg></span>
+                <span class="lbl">Assigned to me</span>
+            </a>
+
+            <a class="sidenav-item" id="my-reported"
+               th:href="@{/bugs(reporter=${#authentication.name})}"
+               th:data-tip="'Raised by ' + ${#authentication.name}"
+               th:classappend="${reporter != null and reporter == #authentication.name} ? 'is-active' : ''">
+                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-pen"/></svg></span>
+                <span class="lbl">Raised by me</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-foot">
+            <!-- Whoever is signed in. Their name is what lands on comments,
+                 status changes and the history trail. -->
+            <span class="sidebar-user" id="current-user"
+                  th:attr="data-tip=${#authentication.name}"
+                  th:title="'Signed in — your name is recorded on comments, status changes and history'">
+                <span class="avatar avatar-sm" th:attr="data-avatar=${#authentication.name}" aria-hidden="true"></span>
+                <span class="sidebar-user-name" th:text="${#authentication.name}">Nishana R</span>
+            </span>
+
+            <button type="button" class="icon-btn" id="theme-toggle" data-tip="Theme"
+                    title="Switch theme" aria-label="Switch theme">
+                <svg class="i" aria-hidden="true"><use href="#i-moon"/></svg>
+            </button>
+
+            <form method="post" th:action="@{/logout}" class="inline-form">
+                <button type="submit" class="icon-btn" id="logout-button" data-tip="Sign out"
+                        title="Sign out" aria-label="Sign out">
+                    <svg class="i" aria-hidden="true"><use href="#i-logout"/></svg>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- ================= everything else ================= -->
+    <div class="app-body">
+        <div th:replace="${content}">Page content goes here</div>
+    </div>
+</div>
 
 <div class="toast" th:if="${message}" id="flash-message" role="status">
     <span class="toast-dot" aria-hidden="true">✓</span>
     <span th:text="${message}">Saved.</span>
 </div>
-
-<main class="container">
-    <div th:replace="${content}">Page content goes here</div>
-</main>
-
-<footer class="footer">
-    <span>Bug Tracking — Spring Boot + H2</span>
-    <span>Press <b>/</b> to search · <b>n</b> to raise a bug</span>
-    <a th:href="@{/h2-console}">Database</a>
-</footer>
 
 <script th:src="@{/js/app.js}"></script>
 </body>

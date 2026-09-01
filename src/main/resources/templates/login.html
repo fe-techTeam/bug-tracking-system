@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in · Bug Tracking</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <!-- Applied before first paint so a dark-theme choice never flashes white. -->
+    <script>
+        try {
+            var t = localStorage.getItem("bugtracking.theme");
+            if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) { /* private mode: fall back to the system theme */ }
+    </script>
+</head>
+<body class="login-page">
+
+<main class="login-shell">
+    <div class="login-card">
+        <a class="brand login-brand" th:href="@{/login}">
+            <span class="brand-mark" aria-hidden="true">B</span>
+            <span>Bug Tracking</span>
+        </a>
+
+        <h1>Sign in</h1>
+        <p class="sub">Use your work email to get to the board.</p>
+
+        <p class="login-alert is-error" th:if="${loginError}" th:text="${loginError}" id="login-error">
+            That email and password do not match.</p>
+        <p class="login-alert is-ok" th:if="${loginNotice}" th:text="${loginNotice}" id="login-notice">
+            You are signed out.</p>
+
+        <form method="post" th:action="@{/login}" id="login-form">
+            <label>
+                <span>Email</span>
+                <input type="email" name="email" id="email" required autofocus
+                       autocomplete="username" placeholder="you@firsteconomy.com">
+            </label>
+
+            <label>
+                <span>Password</span>
+                <input type="password" name="password" id="password" required
+                       autocomplete="current-password" placeholder="••••••••">
+            </label>
+
+            <button type="submit" class="btn btn-primary login-submit" id="login-button">Sign in</button>
+        </form>
+    </div>
+
+    <p class="login-foot">Bug Tracking — Spring Boot + H2</p>
+</main>
+
+</body>
+</html>

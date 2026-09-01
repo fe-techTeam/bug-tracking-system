@@ -2,18 +2,19 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout :: page('Raise Bug', ~{::section})}">
 <body>
-<section class="stack">
+<section>
 
-    <div class="page-head">
-        <div>
-            <span class="eyebrow" th:text="${bug.id == null} ? 'New report' : 'Editing'">New report</span>
-            <h1 th:text="${bug.id == null} ? 'Raise a Bug' : 'Edit BUG-' + ${bug.id}">Raise a Bug</h1>
-            <p class="sub">Four short sections. Only Title, Client and Severity are required.</p>
+    <header class="topbar">
+        <h1 class="topbar-title"
+            th:text="${bug.id == null} ? 'Raise a bug' : 'Edit BUG-' + ${bug.id}">Raise a bug</h1>
+        <span class="topbar-sub">Only Title, Project, Severity, Priority and Environment are required.</span>
+        <div class="topbar-actions">
+            <div th:replace="~{fragments :: bell}"></div>
+            <a class="btn btn-sm btn-ghost" th:href="@{/bugs(project=${bug.project})}">Cancel</a>
         </div>
-        <div class="page-head-actions">
-            <a class="btn btn-ghost" th:href="@{/bugs}">Cancel</a>
-        </div>
-    </div>
+    </header>
+
+    <div class="content">
 
     <div class="form-grid">
         <form class="panel bug-form" method="post" id="bug-form"
@@ -49,19 +50,28 @@
 
                 <div class="row">
                     <label>
-                        <span>Client <span class="req">*</span></span>
-                        <select th:field="*{client}" id="client">
-                            <option value="">— Select client —</option>
-                            <option th:each="c : ${clients}" th:value="${c}" th:text="${c}">Acme Capital</option>
+                        <span>Project <span class="req">*</span></span>
+                        <select th:field="*{project}" id="project">
+                            <option value="">— Select project —</option>
+                            <option th:each="p : ${projectOptions}" th:value="${p}" th:text="${p}">Godrej</option>
                         </select>
-                        <span class="field-error" th:if="${#fields.hasErrors('client')}"
-                              th:errors="*{client}">Client error</span>
+                        <span class="field-error" th:if="${#fields.hasErrors('project')}"
+                              th:errors="*{project}">Project error</span>
                     </label>
                     <label>
-                        <span>Severity <span class="req">*</span></span>
+                        <span>Severity <span class="req">*</span> <span class="hint">— impact</span></span>
                         <select th:field="*{severity}" id="severity">
                             <option th:each="s : ${severities}" th:value="${s}" th:text="${s.label}">High</option>
                         </select>
+                    </label>
+                    <label>
+                        <span>Priority <span class="req">*</span> <span class="hint">— urgency</span></span>
+                        <select th:field="*{priority}" id="priority">
+                            <option th:each="p : ${priorities}" th:value="${p}"
+                                    th:text="${p.label + ' — ' + p.description}">P1</option>
+                        </select>
+                        <span class="field-error" th:if="${#fields.hasErrors('priority')}"
+                              th:errors="*{priority}">Priority error</span>
                     </label>
                 </div>
 
@@ -71,6 +81,14 @@
                         <select th:field="*{status}" id="status">
                             <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.label}">Open</option>
                         </select>
+                    </label>
+                    <label>
+                        <span>Environment <span class="req">*</span></span>
+                        <select th:field="*{environment}" id="environment">
+                            <option th:each="e : ${environments}" th:value="${e}" th:text="${e.label}">QA</option>
+                        </select>
+                        <span class="field-error" th:if="${#fields.hasErrors('environment')}"
+                              th:errors="*{environment}">Environment error</span>
                     </label>
                     <label>
                         <span>Module <span class="hint">— optional</span></span>
@@ -115,16 +133,26 @@
                 <div class="row">
                     <label>
                         <span>Reported By</span>
-                        <input type="text" th:field="*{reportedBy}" id="reportedBy"
-                               placeholder="your name" autocomplete="off">
+                        <select th:field="*{reportedBy}" id="reportedBy">
+                            <option value="">— Nobody selected —</option>
+                            <option th:each="p : ${people}" th:value="${p}" th:text="${p}">Nishana R</option>
+                        </select>
                     </label>
                     <label>
                         <span>Assigned To <span class="hint">— leave blank for triage</span></span>
-                        <input type="text" th:field="*{assignedTo}" id="assignedTo"
-                               placeholder="dev-team" autocomplete="off">
+                        <select th:field="*{assignedTo}" id="assignedTo">
+                            <option value="">— Unassigned —</option>
+                            <option th:each="p : ${people}" th:value="${p}" th:text="${p}">Vatsal Motiani</option>
+                        </select>
                     </label>
                 </div>
+                <p class="hint">
+                    Names come from the <a th:href="@{/team}">team list</a>.
+                </p>
             </div>
+
+            <!-- Stamped with whoever the top bar says you are, for the history trail. -->
+            <input type="hidden" name="actor" class="actor-field">
 
             <div class="form-foot">
                 <button type="submit" class="btn btn-primary" id="submit-bug">
@@ -146,17 +174,24 @@
                 <span class="meter" id="preview-meter" th:classappend="'sev-' + ${bug.severity}" aria-hidden="true">
                     <i></i><i></i><i></i><i></i>
                 </span>
+                <span class="badge badge-square" id="preview-priority"
+                      th:classappend="'pri-' + ${bug.priority}"
+                      th:text="${bug.priority != null} ? ${bug.priority.label} : 'P3'">P3</span>
+                <span class="tag env-tag" id="preview-environment"
+                      th:classappend="'env-' + ${bug.environment}"
+                      th:text="${bug.environment != null} ? ${bug.environment.label} : 'QA'">QA</span>
             </div>
 
             <div class="client-chip">
-                <span class="avatar" id="preview-client" hidden aria-hidden="true"></span>
-                <span class="client-name muted" id="preview-client-name">No client picked yet</span>
+                <span class="avatar" id="preview-project" hidden aria-hidden="true"></span>
+                <span class="client-name muted" id="preview-project-name">No project picked yet</span>
             </div>
 
             <div class="impact" id="preview-impact" th:classappend="'sev-' + ${bug.severity}">
                 Pick a severity to see what it means.
             </div>
         </aside>
+    </div>
     </div>
 </section>
 </body>

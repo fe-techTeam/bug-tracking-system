@@ -1,5 +1,10 @@
 package com.bugtracking.model;
 
+import java.time.LocalDateTime;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,8 +18,6 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-
-import java.time.LocalDateTime;
 
 /** One reported bug. */
 @Entity
@@ -46,27 +49,54 @@ public class Bug {
     @Column(name = "actual_result", length = 1000)
     private String actualResult;
 
+    /*
+     * The @JdbcTypeCode on every enum below is deliberate. Left to itself,
+     * Hibernate maps an enum to H2's native ENUM type, which pins the column to
+     * the constants that existed when the table was created - adding a new
+     * status later is then rejected at runtime. Plain VARCHAR has no such
+     * memory. SchemaUpgrade converts columns created the old way.
+     */
     @NotNull(message = "Severity is required")
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private Severity severity = Severity.MEDIUM;
 
     @NotNull(message = "Status is required")
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private Status status = Status.OPEN;
 
     /**
-     * The client the bug was raised for. Picked from the list in
-     * {@code bugtracking.clients}, but stored as plain text so renaming a client
-     * later never invalidates old bugs. Left nullable in the database so the
-     * column can be added to an existing table; "required" is enforced by
-     * validation on the way in.
+     * Business urgency, kept separate from severity on purpose. Defaults to P3
+     * so bugs raised before this field existed - and any caller that omits it -
+     * still have a usable value.
      */
-    @NotBlank(message = "Client is required")
-    @Size(max = 80, message = "Client name must be 80 characters or fewer")
+    @NotNull(message = "Priority is required")
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(length = 10)
+    private Priority priority = Priority.P3;
+
+    /** Where the bug was seen: QA, UAT or Production. */
+    @NotNull(message = "Environment is required")
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(length = 20)
+    private Environment environment = Environment.QA;
+
+    /**
+     * The project the bug belongs to — the top-level way the board is split.
+     * Chosen from the {@code projects} table but stored as plain text, so
+     * renaming or retiring a project never invalidates old bugs. Left nullable
+     * in the database so the column could be added to an existing table;
+     * "required" is enforced by validation on the way in.
+     */
+    @NotBlank(message = "Project is required")
+    @Size(max = 80, message = "Project name must be 80 characters or fewer")
     @Column(length = 80)
-    private String client;
+    private String project;
 
     @Size(max = 80, message = "Module name must be 80 characters or fewer")
     @Column(length = 80)
@@ -163,12 +193,28 @@ public class Bug {
         this.status = status;
     }
 
-    public String getClient() {
-        return client;
+    public Priority getPriority() {
+        return priority;
     }
 
-    public void setClient(String client) {
-        this.client = client;
+    public void setPriority(Priority priority) {
+        this.priority = priority;
+    }
+
+    public Environment getEnvironment() {
+        return environment;
+    }
+
+    public void setEnvironment(Environment environment) {
+        this.environment = environment;
+    }
+
+    public String getProject() {
+        return project;
+    }
+
+    public void setProject(String project) {
+        this.project = project;
     }
 
     public String getModule() {

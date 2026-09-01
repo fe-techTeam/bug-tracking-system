@@ -46,6 +46,18 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
+    <!-- Login, logout, password hashing, CSRF -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <!-- sec:authorize / sec:authentication in Thymeleaf templates -->
+    <dependency>
+      <groupId>org.thymeleaf.extras</groupId>
+      <artifactId>thymeleaf-extras-springsecurity6</artifactId>
+    </dependency>
+
     <!-- File-based H2 database, no install needed -->
     <dependency>
       <groupId>com.h2database</groupId>

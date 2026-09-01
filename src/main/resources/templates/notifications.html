@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('Notifications', ~{::section})}">
+<body>
+<section>
+
+    <header class="topbar">
+        <h1 class="topbar-title">Notifications</h1>
+        <span class="topbar-sub">Raised when a bug is assigned, fixed, reopened or closed.</span>
+        <div class="topbar-actions">
+            <div th:replace="~{fragments :: bell}"></div>
+            <form method="post" th:action="@{/notifications/read-all}">
+                <button type="submit" class="btn btn-sm" id="mark-all-read">Mark all read</button>
+            </form>
+        </div>
+    </header>
+
+    <div class="content">
+    <div class="stack">
+
+    <div class="panel" th:if="${#lists.isEmpty(notifications)}">
+        <div class="empty" id="no-notifications">
+            <span class="empty-art" aria-hidden="true">🔔</span>
+            <h3>Nothing to report</h3>
+            <p>Assign a bug, mark one fixed, or reopen one, and it will show up here.</p>
+            <a class="btn btn-primary" th:href="@{/bugs}">Back to bugs</a>
+        </div>
+    </div>
+
+    <div class="panel" th:unless="${#lists.isEmpty(notifications)}">
+        <ol class="notif-list" id="notification-list">
+            <li th:each="n,st : ${notifications}"
+                th:classappend="'nt-' + ${n.type} + (${n.read} ? ' is-read' : ' is-unread')"
+                th:style="'--i:' + ${st.index}">
+                <span class="notif-icon" aria-hidden="true" th:switch="${n.type}">
+                    <span th:case="'assigned'">👤</span>
+                    <span th:case="'fixed'">✓</span>
+                    <span th:case="'reopened'">↻</span>
+                    <span th:case="'closed'">🏁</span>
+                    <span th:case="*">•</span>
+                </span>
+
+                <div class="notif-body">
+                    <a class="notif-message" th:href="@{/bugs/{id}(id=${n.bugId})}"
+                       th:text="${n.message}">BUG-1 was assigned to you</a>
+                    <div class="notif-meta">
+                        <span class="tag" th:text="${n.recipient}">dev-team</span>
+                        <span class="when" th:attr="data-time=${n.createdAt}"
+                              th:text="${#temporals.format(n.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+                    </div>
+                </div>
+
+                <form method="post" th:if="${!n.read}"
+                      th:action="@{/notifications/{id}/read(id=${n.id})}" class="inline-form">
+                    <button type="submit" class="btn btn-sm btn-ghost">Mark read</button>
+                </form>
+                <span class="muted" th:if="${n.read}">read</span>
+            </li>
+        </ol>
+    </div>
+    </div>
+    </div>
+</section>
+</body>
+</html>

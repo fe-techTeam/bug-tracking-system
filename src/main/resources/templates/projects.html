@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('Projects', ~{::section})}">
+<body>
+<section>
+
+    <header class="topbar">
+        <h1 class="topbar-title">Projects</h1>
+        <span class="topbar-sub">
+            <span th:text="${#lists.size(projects)}">4</span> in the switcher, and in the
+            Project dropdown when raising a bug
+        </span>
+        <div class="topbar-actions">
+            <div th:replace="~{fragments :: bell}"></div>
+        </div>
+    </header>
+
+    <div class="content">
+    <div class="stack">
+
+    <div class="panel">
+        <div class="panel-head"><h2>Add a project</h2></div>
+        <div class="panel-pad">
+            <form class="row row-inline" method="post" th:action="@{/projects}" id="project-form">
+                <label style="flex: 3 1 260px">
+                    <span>Project name</span>
+                    <input type="text" name="name" id="project-name" required
+                           placeholder="e.g. Mahindra Mutual Fund" autocomplete="off">
+                </label>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary" id="add-project">Add project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="panel table-wrap">
+        <table class="bug-table team-table" id="project-table">
+            <thead>
+            <tr>
+                <th>Project</th>
+                <th>Bugs</th>
+                <th>On the board</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="p,rs : ${projects}" th:style="'--i:' + ${rs.index}"
+                th:classappend="${p.active} ? '' : 'is-inactive'">
+                <td>
+                    <span class="client-chip">
+                        <span class="avatar" th:attr="data-avatar=${p.name}" aria-hidden="true"></span>
+                        <a class="client-name" th:href="@{/bugs(project=${p.name})}"
+                           th:text="${p.name}">Godrej</a>
+                    </span>
+                </td>
+                <td th:with="used=${usage.get(p.id)}">
+                    <a class="tag" th:if="${used > 0}" th:href="@{/bugs(project=${p.name})}"
+                       th:text="${used}">3</a>
+                    <span class="muted" th:unless="${used > 0}">none</span>
+                </td>
+                <td>
+                    <span class="badge" th:if="${p.active}" style="--c: var(--st-FIXED)">Shown</span>
+                    <span class="badge" th:unless="${p.active}" style="--c: var(--muted)">Hidden</span>
+                </td>
+                <td style="text-align:right" th:with="used=${usage.get(p.id)}">
+                    <div class="inline-form" style="justify-content:flex-end">
+                        <form method="post" th:action="@{/projects/{id}/active(id=${p.id})}" class="inline-form">
+                            <input type="hidden" name="active" th:value="${p.active} ? 'false' : 'true'">
+                            <button type="submit" class="btn btn-sm btn-ghost"
+                                    th:text="${p.active} ? 'Hide' : 'Restore'">Hide</button>
+                        </form>
+                        <!-- Removal only for a project nothing was raised against. -->
+                        <form method="post" th:if="${used == 0}"
+                              th:action="@{/projects/{id}/delete(id=${p.id})}" class="inline-form"
+                              onsubmit="return confirm('Remove this project?');">
+                            <button type="submit" class="btn btn-sm btn-ghost">Remove</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p class="hint">
+        Hiding a project keeps every bug on it exactly as it is — it just stops being offered for new
+        ones. A project with bugs cannot be removed, only hidden.
+    </p>
+    </div>
+    </div>
+</section>
+</body>
+</html>

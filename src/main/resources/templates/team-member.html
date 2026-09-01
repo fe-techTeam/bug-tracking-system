@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(${member.name}, ~{::section})}">
+<body>
+<section th:with="me=${#authentication.name}">
+
+    <header class="topbar">
+        <span class="avatar" th:attr="data-avatar=${member.name}" aria-hidden="true"></span>
+        <h1 class="topbar-title" th:text="${member.name}">Nishana R</h1>
+        <span class="member-you" th:if="${member.name == me}">You</span>
+        <span class="topbar-sub" th:unless="${member.active}">Hidden from the dropdowns</span>
+
+        <div class="topbar-actions">
+            <div th:replace="~{fragments :: bell}"></div>
+            <a class="btn btn-sm" th:href="'mailto:' + ${member.email}" th:text="${member.email}">a@b.com</a>
+            <a class="btn btn-sm btn-ghost" th:href="@{/team}">Back to team</a>
+        </div>
+    </header>
+
+    <div class="content">
+    <div class="stack">
+
+        <!-- Who they are, and the four numbers that describe their week. -->
+        <div class="panel person-hero">
+            <span class="avatar avatar-xl" th:attr="data-avatar=${member.name}" aria-hidden="true"></span>
+            <div class="person-id">
+                <h1 th:text="${member.name}">Nishana R</h1>
+                <a class="person-mail" th:href="'mailto:' + ${member.email}" th:text="${member.email}">a@b.com</a>
+            </div>
+
+            <div class="kpi-row">
+                <a class="kpi" style="--i:0; --c: var(--st-ASSIGNED)" th:href="@{/bugs(reporter=${member.name})}">
+                    <span class="kpi-value num" th:attr="data-count=${load.reported}" th:text="${load.reported}">12</span>
+                    <span class="kpi-label">Raised</span>
+                </a>
+                <a class="kpi" style="--i:1; --c: var(--st-IN_PROGRESS)" th:href="@{/bugs(assignee=${member.name})}">
+                    <span class="kpi-value num" th:attr="data-count=${load.assigned}" th:text="${load.assigned}">7</span>
+                    <span class="kpi-label">Assigned</span>
+                </a>
+                <div class="kpi" style="--i:2; --c: var(--st-RETEST)">
+                    <span class="kpi-value num" th:attr="data-count=${load.open}" th:text="${load.open}">3</span>
+                    <span class="kpi-label">Still open</span>
+                </div>
+                <a class="kpi" style="--i:3; --c: var(--pri-P1)"
+                   th:href="@{/bugs(assignee=${member.name}, priority='P1')}"
+                   th:classappend="${load.urgent > 0} ? 'is-hot' : ''">
+                    <span class="kpi-value num" th:attr="data-count=${load.urgent}" th:text="${load.urgent}">2</span>
+                    <span class="kpi-label">
+                        <span class="dot" th:classappend="${load.urgent > 0} ? 'is-live' : ''"></span>
+                        Urgent open
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="two-col">
+
+            <!-- ---------- what is on their plate ---------- -->
+            <div class="panel">
+                <div class="panel-head">
+                    <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-inbox"/></svg>
+                    <h2>Assigned to <span th:text="${member.name}">them</span></h2>
+                    <span class="count-pill" th:text="${#lists.size(assigned)}">7</span>
+                    <a class="btn btn-sm btn-ghost" th:href="@{/bugs(assignee=${member.name})}">Open on board</a>
+                </div>
+
+                <ol class="mini-list" th:unless="${#lists.isEmpty(assigned)}">
+                    <li class="mini-row" th:each="bug,rs : ${assigned}"
+                        th:style="'--i:' + ${rs.index} + '; --c: var(--sev-' + ${bug.severity} + ')'">
+                        <span class="meter" th:classappend="'sev-' + ${bug.severity}"
+                              th:title="${bug.severity.label + ' severity'}" aria-hidden="true">
+                            <i></i><i></i><i></i><i></i>
+                        </span>
+                        <span class="bug-id" th:text="'BUG-' + ${bug.id}">BUG-1</span>
+                        <a class="mini-title" th:href="@{/bugs/{id}(id=${bug.id})}" th:text="${bug.title}">Title</a>
+                        <span class="badge badge-square" th:if="${bug.priority}"
+                              th:classappend="'pri-' + ${bug.priority}" th:text="${bug.priority.label}">P1</span>
+                        <span class="badge" th:classappend="'st-' + ${bug.status}"
+                              th:text="${bug.status.label}">Open</span>
+                    </li>
+                </ol>
+
+                <div class="empty" th:if="${#lists.isEmpty(assigned)}">
+                    <span class="empty-art" aria-hidden="true">
+                        <svg class="i" style="width:19px;height:19px"><use href="#i-inbox"/></svg>
+                    </span>
+                    <h3>Nothing assigned</h3>
+                    <p>A clean plate. Pick something off the board, or hand them one from a bug page.</p>
+                </div>
+            </div>
+
+            <!-- ---------- what they found ---------- -->
+            <div class="panel">
+                <div class="panel-head">
+                    <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-pen"/></svg>
+                    <h2>Raised by <span th:text="${member.name}">them</span></h2>
+                    <span class="count-pill" th:text="${#lists.size(reported)}">12</span>
+                    <a class="btn btn-sm btn-ghost" th:href="@{/bugs(reporter=${member.name})}">Open on board</a>
+                </div>
+
+                <ol class="mini-list" th:unless="${#lists.isEmpty(reported)}">
+                    <li class="mini-row" th:each="bug,rs : ${reported}"
+                        th:style="'--i:' + ${rs.index} + '; --c: var(--sev-' + ${bug.severity} + ')'">
+                        <span class="meter" th:classappend="'sev-' + ${bug.severity}"
+                              th:title="${bug.severity.label + ' severity'}" aria-hidden="true">
+                            <i></i><i></i><i></i><i></i>
+                        </span>
+                        <span class="bug-id" th:text="'BUG-' + ${bug.id}">BUG-1</span>
+                        <a class="mini-title" th:href="@{/bugs/{id}(id=${bug.id})}" th:text="${bug.title}">Title</a>
+                        <span class="avatar avatar-sm" th:if="${bug.assignedTo}"
+                              th:attr="data-avatar=${bug.assignedTo}"
+                              th:title="'Assigned to ' + ${bug.assignedTo}"></span>
+                        <span class="badge" th:classappend="'st-' + ${bug.status}"
+                              th:text="${bug.status.label}">Open</span>
+                    </li>
+                </ol>
+
+                <div class="empty" th:if="${#lists.isEmpty(reported)}">
+                    <span class="empty-art" aria-hidden="true">
+                        <svg class="i" style="width:19px;height:19px"><use href="#i-pen"/></svg>
+                    </span>
+                    <h3>Nothing raised yet</h3>
+                    <p>Bugs they file will be listed here, newest first.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</section>
+</body>
+</html>

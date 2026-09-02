@@ -68,9 +68,12 @@ find_java_home() {
   fi
 
   # 2. macOS's own registry (finds Temurin, Oracle, Zulu installers).
+  # With no 21 installed it answers with the default JVM rather than failing.
   if [[ -x /usr/libexec/java_home ]]; then
     candidate=$(/usr/libexec/java_home -v 21 2>/dev/null || true)
-    [[ -n "$candidate" ]] && { printf '%s' "$candidate"; return 0; }
+    if [[ -n "$candidate" && "$(java_major "$candidate")" -ge 21 ]] 2>/dev/null; then
+      printf '%s' "$candidate"; return 0
+    fi
   fi
 
   # 3. Homebrew, which keeps openjdk@21 unlinked so it cannot shadow other JDKs.

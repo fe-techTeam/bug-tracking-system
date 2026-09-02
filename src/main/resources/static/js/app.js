@@ -826,6 +826,49 @@
         });
     })();
 
+    /* ---------- the sign-in heading cycles through the configured accounts ---------- */
+    (function () {
+        var heading = document.getElementById("welcome-heading");
+        var emailField = document.getElementById("email");
+        var passwordField = document.getElementById("password");
+        if (!heading || !emailField || !passwordField) return;
+
+        var accounts;
+        try { accounts = JSON.parse(heading.getAttribute("data-accounts") || "[]"); }
+        catch (e) { return; }
+        if (!accounts || !accounts.length) return;
+
+        var note = document.getElementById("login-switch-note");
+        var at = -1;
+
+        // Built here, not in the template: with no JS there is nothing to click.
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "welcome-switch";
+        button.textContent = heading.textContent.trim();
+        button.title = accounts.length > 1 ? "Fill in the next sign-in" : "Fill in the sign-in";
+        button.setAttribute("aria-label", button.title);
+        heading.textContent = "";
+        heading.appendChild(button);
+
+        button.addEventListener("click", function () {
+            at = (at + 1) % accounts.length;
+            var account = accounts[at];
+            emailField.value = account.email || "";
+            passwordField.value = account.password || "";
+            if (!note) return;
+
+            var who = document.createElement("b");
+            who.textContent = account.name || account.email || "";
+            note.textContent = "Filled in for ";
+            note.appendChild(who);
+            if (accounts.length > 1) {
+                note.appendChild(document.createTextNode(" · " + (at + 1) + " of " + accounts.length));
+            }
+            note.hidden = false;
+        });
+    })();
+
     /* ---------- a toast, for things that happen without a page load ---------- */
     function flash(text) {
         var existing = document.getElementById("flash-message");

@@ -2195,6 +2195,28 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
 }
 .login-card form { display: grid; gap: 15px; }
 
+/* The heading doubles as a switch between the configured sign-ins. */
+.welcome-switch {
+    padding: 0;
+    border: 0;
+    border-bottom: 1px dashed transparent;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.welcome-switch:hover {
+    color: var(--accent);
+    border-bottom-color: color-mix(in oklab, var(--accent) 45%, transparent);
+}
+.welcome-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-sm); }
+
+.login-switch-note { margin: 0 0 16px; color: var(--muted); font-size: 12px; text-align: center; }
+.login-switch-note b { color: var(--text-2); font-weight: 560; }
+.login-card .sub:has(+ .login-switch-note:not([hidden])) { margin-bottom: 11px; }
+
 /* An input with an icon sitting inside its left edge. */
 .field-icon { position: relative; display: block; }
 .field-icon > svg.i {

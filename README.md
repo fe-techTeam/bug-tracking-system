@@ -82,18 +82,28 @@ Also still open from the BRD: user management (§6), and the future-enhancement 
 
 ## Signing in
 
-Everything except the JSON API is behind a login. One account, set in
-`application.properties`:
+Everything except the JSON API is behind a login. The accounts are set in
+`application.properties`, one indexed block each:
 
 ```properties
-bugtracking.security.email=nishana@firsteconomy.com
-bugtracking.security.password=Pass@2026
+bugtracking.security.accounts[0].email=nishana@firsteconomy.com
+bugtracking.security.accounts[0].password=Pass@2026
+bugtracking.security.accounts[1].email=aakash@firsteconomy.com
+bugtracking.security.accounts[1].password=Pass@2026
 ```
 
-The password is plain text there only because this is a local app with a single account — it is
-hashed with **BCrypt** when the account is built at startup, and the hash is what any comparison
-runs against. Before this is used anywhere shared, move accounts into the database with stored
-hashes.
+Adding a login is appending the next index. Passwords are plain text there only because this is a
+local app — each is hashed with **BCrypt** when the accounts are built at startup, and the hash is
+what any comparison runs against. Before this is used anywhere shared, move accounts into the
+database with stored hashes.
+
+Clicking **Welcome back** on the sign-in page fills the form with the next account in that list and
+names whoever it belongs to, so switching between people takes a click rather than a retype. That
+writes the passwords into the page's HTML, so it is off with one line:
+
+```properties
+bugtracking.security.quick-fill=false
+```
 
 You sign in with the **email**, but the name shown in the top bar and recorded against your work is
 the **display name from the team table** ("Nishana R"), looked up by that email. Comments, status

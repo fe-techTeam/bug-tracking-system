@@ -51,8 +51,10 @@
         </a>
 
         <div class="login-body">
-            <h1>Welcome back</h1>
+            <!-- app.js turns this into a button; without it, a plain heading. -->
+            <h1 id="welcome-heading" th:attr="data-accounts=${quickFillAccounts}">Welcome back</h1>
             <p class="sub">Sign in to pick up your board, your queue and everything raised since you left.</p>
+            <p class="login-switch-note" id="login-switch-note" role="status" hidden></p>
 
             <p class="login-alert is-error" th:if="${loginError}" th:text="${loginError}" id="login-error">
                 That email and password do not match.</p>

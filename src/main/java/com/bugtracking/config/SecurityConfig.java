@@ -1,5 +1,6 @@
 package com.bugtracking.config;
 
+import com.bugtracking.model.TeamMember;
 import com.bugtracking.repository.TeamMemberRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,11 +12,15 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+
 /**
  * Sign-in for the web pages.
  *
- * <p>One account, configured in {@code bugtracking.security}. You sign in with
- * an email address, but the principal's name is the person's <em>display
+ * <p>The accounts are configured in {@code bugtracking.security}. You sign in
+ * with an email address, but the principal's name is the person's <em>display
  * name</em> from the team table — so comments, status changes and the history
  * trail read "Nishana R" rather than an email address.
  */
@@ -28,24 +33,31 @@ public class SecurityConfig {
     }
 
     /**
-     * The one account. Looks the display name up in the team table so the
-     * signed-in person matches who they are everywhere else in the app.
+     * The configured accounts, keyed by email. The display name is looked up at
+     * sign-in rather than here, because the team table is seeded by a
+     * CommandLineRunner that has not run while this bean is being built.
      */
     @Bean
     UserDetailsService userDetailsService(SecurityProperties properties,
                                           TeamMemberRepository team,
                                           PasswordEncoder encoder) {
-        String configured = properties.getEmail().trim();
-        String hash = encoder.encode(properties.getPassword());
-
-        String displayName = team.findByEmailIgnoreCase(configured)
-                .map(m -> m.getName())
-                .orElse(configured);
+        Map<String, String> hashes = new LinkedHashMap<>();
+        for (SecurityProperties.Account account : properties.getAccounts()) {
+            String email = account.getEmail() == null ? "" : account.getEmail().trim();
+            if (!email.isEmpty()) {
+                hashes.put(email.toLowerCase(Locale.ROOT), encoder.encode(account.getPassword()));
+            }
+        }
 
         return email -> {
-            if (email == null || !email.trim().equalsIgnoreCase(configured)) {
+            String key = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+            String hash = hashes.get(key);
+            if (hash == null) {
                 throw new UsernameNotFoundException("No account for " + email);
             }
+            String displayName = team.findByEmailIgnoreCase(key)
+                    .map(TeamMember::getName)
+                    .orElse(key);
             // getUsername() becomes Authentication.getName(), hence the display name.
             return User.withUsername(displayName).password(hash).roles("USER").build();
         };

@@ -66,10 +66,12 @@ public class BoardColumnController {
     /**
      * Saves a column. Anything left out is kept as it was, so the rename box on
      * the board can post a name alone without resetting the colour.
+     * Every field is optional for that reason — a colour swatch posts a colour
+     * and nothing else, and a required "label" turned that into a 400.
      */
     @PostMapping("/{id}")
     public String edit(@PathVariable Long id,
-                       @RequestParam String label,
+                       @RequestParam(required = false) String label,
                        @RequestParam(required = false) String colour,
                        @RequestParam(required = false) Boolean done,
                        @RequestParam(required = false) String notify,

@@ -53,17 +53,22 @@
                 </div>
 
                 <div class="report-sec">
-                    <h3>Description</h3>
-                    <p class="pre" th:text="${bug.description} ?: 'No description provided.'">Description</p>
+                    <h3>Bug details</h3>
+                    <p class="pre" th:text="${#strings.isEmpty(bug.description)} ? 'No details provided.' : ${bug.description}">Description</p>
                 </div>
 
-                <div class="report-sec">
+                <!-- Steps, expected and actual are no longer asked for separately: the
+                     report is one box now. They still show for the bugs raised while
+                     they were, which is why each of these is rendered only when it
+                     holds something rather than printing an empty placeholder. -->
+                <div class="report-sec" th:if="${!#strings.isEmpty(bug.stepsToReproduce)}">
                     <h3>Steps to reproduce</h3>
-                    <div class="steps" th:text="${bug.stepsToReproduce} ?: 'No steps provided.'">Steps</div>
+                    <div class="steps" th:text="${bug.stepsToReproduce}">Steps</div>
                 </div>
 
                 <!-- Green for what should happen, red for what does. The mismatch is the bug. -->
-                <div class="report-sec">
+                <div class="report-sec"
+                     th:if="${!#strings.isEmpty(bug.expectedResult) or !#strings.isEmpty(bug.actualResult)}">
                     <h3>Expected vs actual</h3>
                     <div class="compare">
                         <div class="compare-card compare-expected">

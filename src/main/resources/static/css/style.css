@@ -854,6 +854,10 @@ a.kpi:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var
    ========================================================================== */
 .btn {
     display: inline-flex;
+    /* Stated, not inherited: the bare `label` rule below sets flex-direction:
+       column, and a <label class="btn"> (the upload picker) would stack its
+       icon over its text. */
+    flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 6px;
@@ -1005,7 +1009,9 @@ select {
 
 .search-wrap { position: relative; flex: 0 1 236px; min-width: 160px; }
 /* padding-left clears the submit button sitting inside the field's left edge. */
-.search-wrap input { height: 30px; padding-left: 36px; padding-right: 26px; font-size: 13px; }
+/* padding-right is the ordinary 10px again: the 26px slot was holding the "/"
+   badge, and nothing sits there now. */
+.search-wrap input { height: 30px; padding-left: 36px; padding-right: 10px; font-size: 13px; }
 /* That button's slot. It used to be an inline style on the board's button and
    nothing at all on the documents page, where the magnifier was left in normal
    flow — so it sat outside the field while the input went on reserving the
@@ -1016,22 +1022,6 @@ select {
     top: 50%;
     transform: translateY(-50%);
 }
-.kbd {
-    position: absolute;
-    right: 6px; top: 50%;
-    transform: translateY(-50%);
-    padding: 1px 5px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    background: var(--surface-2);
-    color: var(--muted);
-    font-size: 10.5px;
-    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-    pointer-events: none;
-    transition: opacity var(--fast) var(--ease);
-}
-.search-wrap input:focus ~ .kbd { opacity: 0; }
-
 .toolbar-divider { width: 1px; height: 20px; background: var(--line); }
 .toolbar-count { margin-left: auto; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .toolbar-count b { color: var(--text); font-weight: 650; }
@@ -2688,6 +2678,17 @@ html:not(.js) .js-only { display: none; }
 
 .input-lg { height: 40px; font-size: 15px; font-weight: 500; }
 
+/* The one box the whole report goes in. It replaced four fields, so it gets
+   the height they had between them and type you can write paragraphs in.
+   Height, not .input-lg: that rule pins a 40px box and would crush this. */
+.detail-box {
+    min-height: 340px;
+    padding: 12px 14px;
+    font-size: 14.5px;
+    line-height: 1.6;
+    resize: vertical;
+}
+
 /* Fields that wrap instead of overflowing, at any count. */
 .field-row {
     display: grid;
@@ -3887,7 +3888,25 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 
 .sheet-tools { row-gap: 4px; }
 
+/* A standing label for the dropdowns beside it. They carried sr-only labels
+   only, which left "13" and "Automatic" reading as unlabelled fields to anyone
+   looking at the bar rather than hearing it. Row direction is stated because
+   the bare `label` rule stacks its children. */
+.tool-label {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    margin-left: 2px;
+    font-size: 11.5px;
+    font-weight: 520;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
 .tool-select {
+    /* The base `select` rule is width: 100%, which in this flex toolbar makes
+       each dropdown claim a whole row and breaks the bar into stripes. */
+    width: auto;
     height: 27px;
     min-width: 62px;
     padding: 0 22px 0 7px;
@@ -3934,7 +3953,11 @@ body.is-resizing { cursor: col-resize; user-select: none; }
     gap: 6px;
     padding: 10px 12px;
 }
-.swatch {
+/* Scoped to its own container: an unscoped `.swatch` here has the same
+   weight as the column-palette one above but comes later, so it was
+   painting every board and settings swatch with --sw (unset there,
+   hence transparent) instead of --c. */
+.swatches .swatch {
     width: 100%;
     aspect-ratio: 1;
     display: grid;
@@ -3945,7 +3968,7 @@ body.is-resizing { cursor: col-resize; user-select: none; }
     cursor: pointer;
     transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
 }
-.swatch:hover { transform: scale(1.12); box-shadow: var(--shadow-2); }
+.swatches .swatch:hover { transform: scale(1.12); box-shadow: var(--shadow-2); }
 .swatch-off { font-size: 11px; color: var(--muted); }
 
 .swatch-custom {

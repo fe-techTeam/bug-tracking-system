@@ -578,8 +578,11 @@ WebDriver tests. The ids survive redesigns and feature work — they are part of
   `filter-environment`, `filter-assignee`, `filter-keyword`, `sort-by`, `apply-filters`,
   `clear-filters`, `no-bugs`
 - **Form:** `bug-form`, `title`, `project`, `severity`, `environment`, `status`, `files`,
-  `module`, `description`, `stepsToReproduce`, `expectedResult`, `actualResult`, `reportedBy`,
-  `assignedTo`, `submit-bug`
+  `module`, `description`, `reportedBy`, `assignedTo`, `submit-bug`
+  — `stepsToReproduce`, `expectedResult` and `actualResult` were retired when the report
+  became a single box: `description` is now the whole report. The columns and the getters
+  stay, bugs raised before the change still show those sections on the detail page, and an
+  update that does not post them leaves them as they were.
 - **Trash:** `trash-link`, `trash-count`, `trash-table`, `no-trash`, `restore-{id}`, `purge-{id}`,
   `undo-delete`
 - **Detail:** `bug-title`, `bug-facts`, `bug-severity`, `bug-status`, `bug-environment`, `back-to-board`,

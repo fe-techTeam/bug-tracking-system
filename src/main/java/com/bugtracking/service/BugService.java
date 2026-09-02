@@ -201,9 +201,19 @@ public class BugService {
 
         existing.setTitle(changes.getTitle());
         existing.setDescription(changes.getDescription());
-        existing.setStepsToReproduce(changes.getStepsToReproduce());
-        existing.setExpectedResult(changes.getExpectedResult());
-        existing.setActualResult(changes.getActualResult());
+        // The report is one box now, and the form no longer posts these three.
+        // An absent field arrives as null, so assigning it straight across would
+        // wipe the steps and results off every bug raised before the change the
+        // first time anyone edited it. Only a value actually sent replaces one.
+        if (changes.getStepsToReproduce() != null) {
+            existing.setStepsToReproduce(changes.getStepsToReproduce());
+        }
+        if (changes.getExpectedResult() != null) {
+            existing.setExpectedResult(changes.getExpectedResult());
+        }
+        if (changes.getActualResult() != null) {
+            existing.setActualResult(changes.getActualResult());
+        }
         existing.setSeverity(changes.getSeverity());
         existing.setEnvironment(changes.getEnvironment());
         existing.setStatus(changes.getStatus());

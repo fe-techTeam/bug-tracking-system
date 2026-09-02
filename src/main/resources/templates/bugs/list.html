@@ -210,7 +210,6 @@
                    th:value="${keyword}" autocomplete="off"
                    inputmode="search" enterkeyhint="search"
                    autocapitalize="none" autocorrect="off" spellcheck="false">
-            <span class="kbd">/</span>
         </form>
 
         <span class="toolbar-divider" aria-hidden="true"></span>
@@ -542,21 +541,19 @@
 
                         <div class="fmenu-sep"></div>
 
-                        <!-- Removing a column has to say where its bugs go. The
-                             last column will not delete: a board needs one. -->
+                        <!-- Removing a column still has to say where its bugs go, but the
+                             board no longer asks: they follow the board's own order to the
+                             first other column, and the confirm names it before anything
+                             moves. Settings -> Board keeps the full chooser for the times
+                             that default is not the one you want.
+                             The last column will not delete: a board needs one. -->
                         <form method="post" th:action="@{/columns/{id}/delete(id=${col.key.id})}"
                               class="kcol-remove" th:if="${#lists.size(boardColumns) > 1}"
-                              th:attr="onsubmit='return confirm(\'Remove the ' + ${col.key.label} + ' column?\');'">
+                              th:with="target=${boardColumns.?[id != __${col.key.id}__][0]},
+                                       held=${#lists.size(col.value)}"
+                              th:attr="onsubmit=|return confirm('Remove the ${col.key.label} column?${held == 0 ? '' : ' Its ' + held + (held == 1 ? ' bug moves to ' : ' bugs move to ') + target.label + '.'}');|">
                             <input type="hidden" name="from" value="board">
-                            <label th:if="${!#lists.isEmpty(col.value)}">
-                                <span class="hint" th:text="'Move its ' + ${#lists.size(col.value)} + ' bug'
-                                      + (${#lists.size(col.value) == 1} ? '' : 's') + ' to'">Move its bugs to</span>
-                                <select name="moveTo" required>
-                                    <option th:each="other : ${boardColumns}"
-                                            th:if="${other.id != col.key.id}"
-                                            th:value="${other.id}" th:text="${other.label}">Open</option>
-                                </select>
-                            </label>
+                            <input type="hidden" name="moveTo" th:if="${held > 0}" th:value="${target.id}">
                             <button type="submit" class="btn btn-sm btn-danger btn-block"
                                     th:attr="aria-label='Remove the ' + ${col.key.label} + ' column'">
                                 Remove column

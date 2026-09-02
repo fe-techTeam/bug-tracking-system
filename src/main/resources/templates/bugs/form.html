@@ -36,13 +36,18 @@
                           th:errors="*{title}">Title error</span>
                 </label>
 
-                <!-- Every capped field says its cap and shows what came back from the
-                     server. Without the error line a paste over the limit was thrown
-                     away on save with nothing on screen to say why. -->
+                <!-- One box for the whole report. Steps, expected and actual used to be
+                     three more fields below; people wrote the story here anyway, so this
+                     is the story. Bugs raised before the change keep those fields and the
+                     detail page still shows them. The cap is the column width, and the
+                     error line is what tells you a long paste was cut rather than saved. -->
                 <label style="margin-top:12px">
-                    <span>Description <span class="hint">— up to 4000 characters</span></span>
-                    <textarea rows="3" th:field="*{description}" id="description"
-                              placeholder="What happens, and where"
+                    <span>Bug details
+                        <span class="hint">— what happens, where, how to see it, and what you expected instead
+                              (up to 4000 characters)</span></span>
+                    <textarea rows="16" th:field="*{description}" id="description"
+                              class="detail-box"
+                              placeholder="What happens, and where.&#10;&#10;How to see it:&#10;1. Open ...&#10;2. Click ...&#10;3. Observe ...&#10;&#10;Expected: ...&#10;Actual: ..."
                               autocapitalize="sentences"></textarea>
                     <span class="field-error" th:if="${#fields.hasErrors('description')}"
                           th:errors="*{description}">Description error</span>
@@ -131,39 +136,6 @@
                             </div>
                         </details>
                     </div>
-                </div>
-            </div>
-
-            <!-- ---------- reproduction ---------- -->
-            <div class="report-sec">
-                <h3>How to see it happen</h3>
-                <label>
-                    <span>Steps to reproduce <span class="hint">— up to 4000 characters</span></span>
-                    <textarea rows="4" th:field="*{stepsToReproduce}" id="stepsToReproduce"
-                              placeholder="1. Open ...&#10;2. Click ...&#10;3. Observe ..."
-                              autocapitalize="sentences"></textarea>
-                    <span class="field-error" th:if="${#fields.hasErrors('stepsToReproduce')}"
-                          th:errors="*{stepsToReproduce}">Steps error</span>
-                </label>
-                <div class="field-row" style="margin-top:12px">
-                    <!-- 1000, not 4000: a pasted stack trace clears this cap easily,
-                         which is exactly the edit that used to vanish on save. -->
-                    <label>
-                        <span>Expected result <span class="hint">— up to 1000 characters</span></span>
-                        <textarea rows="2" th:field="*{expectedResult}" id="expectedResult"
-                                  placeholder="What should have happened"
-                                  autocapitalize="sentences"></textarea>
-                        <span class="field-error" th:if="${#fields.hasErrors('expectedResult')}"
-                              th:errors="*{expectedResult}">Expected result error</span>
-                    </label>
-                    <label>
-                        <span>Actual result <span class="hint">— up to 1000 characters</span></span>
-                        <textarea rows="2" th:field="*{actualResult}" id="actualResult"
-                                  placeholder="What happened instead"
-                                  autocapitalize="sentences"></textarea>
-                        <span class="field-error" th:if="${#fields.hasErrors('actualResult')}"
-                              th:errors="*{actualResult}">Actual result error</span>
-                    </label>
                 </div>
             </div>
 

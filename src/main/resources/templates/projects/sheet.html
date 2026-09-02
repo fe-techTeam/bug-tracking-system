@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(${doc.name}, ~{::section})}">
+<body>
+<!--
+  A sheet in a project's documents area.
+
+  The grid on screen is the model: every cell is a real <input>, which is what
+  makes the no-JavaScript form post work, and the editor reads and writes the
+  table rather than keeping a second copy of it. Formatting — which cells are
+  bold, what colour they are, how numbers are shown, which are merged, how wide
+  the columns are — is the one thing a grid of inputs cannot post, so it rides
+  in the hidden "content" field as JSON. The server prefers that field when it
+  is there and falls back to the loose cells when it is not, which is exactly
+  the difference between having scripting and not.
+
+  data-sheet hands the editor the stored formatting. The values are not in it —
+  they are in the inputs, and one source of truth for a cell's text is worth
+  more than saving a parse.
+-->
+<section class="doc-page sheet-page">
+
+    <header class="topbar">
+        <a class="back-link"
+           th:href="@{/projects/{p}/docs(p=${project.id},folder=${doc.parentId})}"
+           title="Back to the documents" aria-label="Back to the documents">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span th:text="${#lists.isEmpty(trail)} ? 'Documents' : ${trail[#lists.size(trail) - 1].name}">Documents</span>
+        </a>
+
+        <span class="badge badge-square" th:style="'--c: var(--doc-' + ${doc.kind} + ')'"
+              th:text="${doc.kind.label}">Sheet</span>
+        <h1 class="topbar-title" th:text="${project.name}">Godrej</h1>
+        <span class="topbar-sub"
+              th:text="${#lists.isEmpty(trail)} ? 'Top level'
+                       : ${#strings.listJoin(trail.![name], ' / ')}">Design / Specs</span>
+
+        <div class="topbar-actions">
+            <a class="btn btn-sm" id="export-doc"
+               th:href="@{/projects/{p}/docs/{id}/export(p=${project.id},id=${doc.id})}"
+               title="Download as .csv">
+                <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>
+                <span>Download</span>
+            </a>
+
+            <form method="post" class="inline-form"
+                  th:action="@{/projects/{p}/docs/{id}/delete(p=${project.id},id=${doc.id})}"
+                  th:attr="data-confirm=|Delete ${doc.name}? This cannot be undone.|">
+                <input type="hidden" name="actor" class="actor-field">
+                <input type="hidden" name="back" th:value="${doc.parentId}">
+                <button type="submit" class="btn btn-sm btn-danger" id="delete-doc">
+                    <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
+                    <span>Delete</span>
+                </button>
+            </form>
+
+            <div th:replace="~{fragments :: bell}"></div>
+        </div>
+    </header>
+
+    <div class="content">
+        <form class="panel doc-shell" method="post" id="doc-form"
+              th:action="@{/projects/{p}/docs/{id}(p=${project.id},id=${doc.id})}"
+              th:attr="data-autosave=@{/projects/{p}/docs/{id}/autosave(p=${project.id},id=${doc.id})},
+                       data-people=${#strings.listJoin(people, '|')}">
+            <input type="hidden" name="actor" class="actor-field">
+
+            <div class="doc-bar">
+                <label class="sr-only" for="doc-title">Sheet name</label>
+                <input type="text" id="doc-title" name="name" class="doc-title" required
+                       th:value="${doc.name}" th:placeholder="${doc.kind.defaultName}"
+                       maxlength="200" autocomplete="off">
+
+                <!-- Which cell you are in, the way a spreadsheet says it. -->
+                <span class="cell-ref mono js-only" id="cell-ref" aria-live="off">A1</span>
+
+                <span class="doc-state" id="doc-state" role="status" aria-live="polite">
+                    <span>Saved</span>
+                    <span class="when" th:attr="data-time=${doc.updatedAt}"
+                          th:text="${#temporals.format(doc.updatedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+                </span>
+
+                <button type="submit" class="btn btn-sm btn-primary" id="save-doc">Save</button>
+            </div>
+
+            <!-- ================= the formatting bar ================= -->
+            <div class="doc-tools sheet-tools js-only" role="toolbar" aria-label="Cell formatting">
+                <button type="button" class="mdbtn" id="sh-undo" title="Undo (Ctrl+Z)" aria-label="Undo">
+                    <svg class="i" aria-hidden="true"><use href="#i-undo"/></svg>
+                </button>
+                <button type="button" class="mdbtn" id="sh-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+                    <svg class="i" aria-hidden="true"><use href="#i-redo"/></svg>
+                </button>
+                <span class="tool-sep" aria-hidden="true"></span>
+
+                <label class="sr-only" for="sh-size">Font size</label>
+                <select class="tool-select" id="sh-size" title="Font size">
+                    <option value="">Size</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="13" selected>13</option>
+                    <option value="15">15</option>
+                    <option value="18">18</option>
+                    <option value="24">24</option>
+                </select>
+
+                <button type="button" class="mdbtn" id="sh-bold" data-flag="b"
+                        title="Bold (Ctrl+B)" aria-label="Bold" aria-pressed="false"><b>B</b></button>
+                <button type="button" class="mdbtn" id="sh-italic" data-flag="i"
+                        title="Italic (Ctrl+I)" aria-label="Italic" aria-pressed="false"><i>I</i></button>
+                <button type="button" class="mdbtn" id="sh-underline" data-flag="u"
+                        title="Underline (Ctrl+U)" aria-label="Underline" aria-pressed="false"><u>U</u></button>
+                <button type="button" class="mdbtn" id="sh-strike" data-flag="s"
+                        title="Strikethrough" aria-label="Strikethrough" aria-pressed="false"><s>S</s></button>
+                <span class="tool-sep" aria-hidden="true"></span>
+
+                <!-- The two colour menus. The swatch hexes are content — the
+                     palette a person picks from — not theme tokens, which is
+                     why they are literals here and nowhere in the stylesheet. -->
+                <details class="pop-wrap swatch-wrap" id="sh-fg">
+                    <summary title="Text colour" aria-label="Text colour">
+                        <span class="mdbtn swatch-btn">
+                            <b>A</b><span class="swatch-bar" id="fg-now" style="background:#0d1f1c"></span>
+                        </span>
+                    </summary>
+                    <div class="pop pop-swatches">
+                        <div class="pop-head"><span>Text colour</span></div>
+                        <div class="swatches" data-target="fg">
+                            <button type="button" class="swatch" data-colour="" title="Default"
+                                    aria-label="Default colour"><span class="swatch-off">✕</span></button>
+                            <button type="button" class="swatch" style="--sw:#0d1f1c" data-colour="#0d1f1c" aria-label="Ink"></button>
+                            <button type="button" class="swatch" style="--sw:#5f7873" data-colour="#5f7873" aria-label="Grey"></button>
+                            <button type="button" class="swatch" style="--sw:#dc2626" data-colour="#dc2626" aria-label="Red"></button>
+                            <button type="button" class="swatch" style="--sw:#ea580c" data-colour="#ea580c" aria-label="Orange"></button>
+                            <button type="button" class="swatch" style="--sw:#d97706" data-colour="#d97706" aria-label="Amber"></button>
+                            <button type="button" class="swatch" style="--sw:#059669" data-colour="#059669" aria-label="Green"></button>
+                            <button type="button" class="swatch" style="--sw:#0d9488" data-colour="#0d9488" aria-label="Teal"></button>
+                            <button type="button" class="swatch" style="--sw:#2563eb" data-colour="#2563eb" aria-label="Blue"></button>
+                            <button type="button" class="swatch" style="--sw:#8b5cf6" data-colour="#8b5cf6" aria-label="Violet"></button>
+                        </div>
+                        <label class="swatch-custom">
+                            <span>Custom</span>
+                            <input type="color" id="fg-custom" value="#0d1f1c">
+                        </label>
+                    </div>
+                </details>
+
+                <details class="pop-wrap swatch-wrap" id="sh-bg">
+                    <summary title="Fill colour" aria-label="Fill colour">
+                        <span class="mdbtn swatch-btn">
+                            <svg class="i" aria-hidden="true"><use href="#i-paint"/></svg>
+                            <span class="swatch-bar" id="bg-now" style="background:#fde68a"></span>
+                        </span>
+                    </summary>
+                    <div class="pop pop-swatches">
+                        <div class="pop-head"><span>Fill colour</span></div>
+                        <div class="swatches" data-target="bg">
+                            <button type="button" class="swatch" data-colour="" title="No fill"
+                                    aria-label="No fill"><span class="swatch-off">✕</span></button>
+                            <button type="button" class="swatch" style="--sw:#fee2e2" data-colour="#fee2e2" aria-label="Red tint"></button>
+                            <button type="button" class="swatch" style="--sw:#ffedd5" data-colour="#ffedd5" aria-label="Orange tint"></button>
+                            <button type="button" class="swatch" style="--sw:#fef3c7" data-colour="#fef3c7" aria-label="Amber tint"></button>
+                            <button type="button" class="swatch" style="--sw:#dcfce7" data-colour="#dcfce7" aria-label="Green tint"></button>
+                            <button type="button" class="swatch" style="--sw:#ccfbf1" data-colour="#ccfbf1" aria-label="Teal tint"></button>
+                            <button type="button" class="swatch" style="--sw:#dbeafe" data-colour="#dbeafe" aria-label="Blue tint"></button>
+                            <button type="button" class="swatch" style="--sw:#ede9fe" data-colour="#ede9fe" aria-label="Violet tint"></button>
+                            <button type="button" class="swatch" style="--sw:#e2e8f0" data-colour="#e2e8f0" aria-label="Grey tint"></button>
+                            <button type="button" class="swatch" style="--sw:#0d1f1c" data-colour="#0d1f1c" aria-label="Ink"></button>
+                        </div>
+                        <label class="swatch-custom">
+                            <span>Custom</span>
+                            <input type="color" id="bg-custom" value="#fef3c7">
+                        </label>
+                    </div>
+                </details>
+                <span class="tool-sep" aria-hidden="true"></span>
+
+                <button type="button" class="mdbtn" id="sh-align-left" data-align="left"
+                        title="Align left" aria-label="Align left" aria-pressed="false">
+                    <svg class="i" aria-hidden="true"><use href="#i-align-left"/></svg>
+                </button>
+                <button type="button" class="mdbtn" id="sh-align-center" data-align="center"
+                        title="Align centre" aria-label="Align centre" aria-pressed="false">
+                    <svg class="i" aria-hidden="true"><use href="#i-align-center"/></svg>
+                </button>
+                <button type="button" class="mdbtn" id="sh-align-right" data-align="right"
+                        title="Align right" aria-label="Align right" aria-pressed="false">
+                    <svg class="i" aria-hidden="true"><use href="#i-align-right"/></svg>
+                </button>
+                <button type="button" class="mdbtn" id="sh-wrap" data-flag="w"
+                        title="Wrap text" aria-label="Wrap text" aria-pressed="false">
+                    <svg class="i" aria-hidden="true"><use href="#i-wrap"/></svg>
+                </button>
+                <button type="button" class="mdbtn" id="sh-border" data-flag="br"
+                        title="Outline the cell" aria-label="Outline the cell" aria-pressed="false">
+                    <svg class="i" aria-hidden="true"><use href="#i-table"/></svg>
+                </button>
+                <button type="button" class="mdbtn" id="sh-merge"
+                        title="Merge the selected cells" aria-label="Merge cells" aria-pressed="false">
+                    <svg class="i" aria-hidden="true"><use href="#i-merge"/></svg>
+                </button>
+                <span class="tool-sep" aria-hidden="true"></span>
+
+                <label class="sr-only" for="sh-format">Number format</label>
+                <select class="tool-select tool-select-wide" id="sh-format" title="How numbers are shown">
+                    <option value="auto">Automatic</option>
+                    <option value="text">Plain text</option>
+                    <option value="number">Number  1234.6</option>
+                    <option value="comma">Thousands  1,234.57</option>
+                    <option value="currency">Currency  ₹1,234.57</option>
+                    <option value="percent">Percent  12.34%</option>
+                    <option value="date">Date  02 Sep 2026</option>
+                    <option value="time">Time  14:30</option>
+                    <option value="datetime">Date and time</option>
+                </select>
+
+                <button type="button" class="mdbtn" id="sh-clear"
+                        title="Clear formatting" aria-label="Clear formatting">
+                    <svg class="i" aria-hidden="true"><use href="#i-eraser"/></svg>
+                </button>
+            </div>
+
+            <!-- ================= rows, columns and panes ================= -->
+            <div class="doc-tools sheet-struct">
+                <!-- Submit buttons, so the grid still grows without JS. The
+                     editor intercepts them and does it in the page instead. -->
+                <button type="submit" class="btn btn-sm" name="op" value="add-row" id="add-row">
+                    <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+                    <span>Row</span>
+                </button>
+                <button type="submit" class="btn btn-sm" name="op" value="add-col" id="add-col">
+                    <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+                    <span>Column</span>
+                </button>
+                <span class="tool-sep js-only" aria-hidden="true"></span>
+                <button type="button" class="btn btn-sm btn-ghost js-only" id="del-row">Delete row</button>
+                <button type="button" class="btn btn-sm btn-ghost js-only" id="del-col">Delete column</button>
+                <span class="tool-sep js-only" aria-hidden="true"></span>
+                <button type="button" class="btn btn-sm btn-ghost js-only" id="sh-freeze"
+                        aria-pressed="false" title="Keep the top row on screen while you scroll">
+                    <svg class="i" aria-hidden="true"><use href="#i-pin"/></svg>
+                    <span>Freeze header</span>
+                </button>
+
+                <span class="spacer"></span>
+                <span class="hint js-only" id="sheet-hint">
+                    Paste straight from Excel. <code>=SUM(A1:A9)</code> works. Type <code>@</code> to tag someone.
+                </span>
+            </div>
+
+            <div class="sheet-wrap" id="sheet-wrap">
+                <!-- id="gsheet", not "sheet": doc-editor.js claims #sheet for
+                     the bug editor's plain grid, and this one is driven by
+                     sheet-editor.js instead. Both files load here. -->
+                <table class="sheet gsheet" id="gsheet"
+                       th:attr="data-sheet=${doc.content}">
+                    <thead>
+                        <tr>
+                            <th class="sheet-corner" scope="col"><span class="sr-only">Row</span></th>
+                            <th th:each="c,cs : ${colLabels}" scope="col"
+                                th:style="${sheet.widths.containsKey(cs.index)
+                                           ? 'width:' + sheet.widths.get(cs.index) + 'px' : null}">
+                                <span class="col-label" th:text="${c}">A</span>
+                                <button type="submit" class="cell-x js-off" name="op"
+                                        th:value="'del-col:' + ${cs.index}"
+                                        th:title="'Delete column ' + ${c}"
+                                        th:attr="aria-label='Delete column ' + ${c}">&times;</button>
+                            </th>
+                            <th class="sheet-corner js-off" scope="col"><span class="sr-only">Remove</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="row,rs : ${sheet.rows}">
+                            <th class="sheet-rowno" scope="row" th:text="${rs.index + 1}">1</th>
+                            <td th:each="cell,cs : ${row}">
+                                <input type="text" name="cell" class="cell" th:value="${cell}"
+                                       autocomplete="off" spellcheck="false"
+                                       th:attr="aria-label=${colLabels[cs.index]} + ${rs.index + 1}">
+                            </td>
+                            <td class="js-off">
+                                <button type="submit" class="cell-x" name="op"
+                                        th:value="'del-row:' + ${rs.index}"
+                                        th:title="'Delete row ' + ${rs.index + 1}"
+                                        th:attr="aria-label='Delete row ' + ${rs.index + 1}">&times;</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- How wide the grid is, for the server that folds the flat list of
+                 cells back into rows when there is no editor running. -->
+            <input type="hidden" name="cols" id="sheet-cols" th:value="${sheet.cols}">
+            <!-- The whole sheet, formatting included. Empty until the editor
+                 fills it, which is what makes the cells above the fallback. -->
+            <input type="hidden" name="content" id="sheet-json" value="">
+        </form>
+    </div>
+
+    <script th:src="@{/js/sheet-formula.js}"></script>
+    <script th:src="@{/js/doc-editor.js}"></script>
+    <script th:src="@{/js/sheet-editor.js}"></script>
+</section>
+</body>
+</html>

@@ -17,37 +17,60 @@
 /* ---------- tokens: light ---------- */
 :root {
     /* the scene */
-    --bg:          #f2f5f9;
-    --bg-far:      #e9eef6;
-    --tint-a:      #0d9488;                  /* teal wash, top left */
-    --tint-b:      #4f46e5;                  /* indigo wash, top right */
-    --tint-c:      #0ea5e9;                  /* sky wash, bottom */
+    --bg:          #eef4f2;
+    --bg-far:      #e1ebe7;
+    --tint-a:      #0b7d73;                  /* peacock wash, top left */
+    --tint-b:      #0a6a6d;                  /* deep peacock, top right */
+    --tint-c:      #17968a;                  /* light peacock, bottom */
+
+    /* How strongly those washes read. Dark gets a fraction of light: on a dark
+       ground the same percentage stops being a tint and becomes the room. */
+    --wash-1: 16%;
+    --wash-2: 14%;
+    --wash-3: 11%;
 
     /* frosted surfaces: alpha on purpose, so the scene shows through */
     --surface:     rgba(255, 255, 255, .82);
-    --surface-2:   rgba(241, 245, 249, .78);
-    --surface-3:   rgba(226, 232, 240, .85);
+    --surface-2:   rgba(237, 245, 242, .80);
+    --surface-3:   rgba(219, 233, 228, .85);
     --surface-flat:#ffffff;                  /* where text density needs opacity */
     --surface-pop: rgba(255, 255, 255, .97); /* menus: readable over anything */
-    --line:        rgba(15, 23, 42, .09);
-    --line-strong: rgba(15, 23, 42, .17);
+    --line:        rgba(12, 45, 40, .10);
+    --line-strong: rgba(12, 45, 40, .18);
 
-    --text:        #0f172a;
-    --text-2:      #475569;
-    --muted:       #64748b;
+    --text:        #0d1f1c;
+    --text-2:      #425652;
+    --muted:       #5f7873;
 
-    --accent:      #0d9488;
+    --accent:      #0b7d73;
     --accent-ink:  #ffffff;
-    --accent-soft: rgba(13, 148, 136, .10);
+    --accent-soft: rgba(11, 125, 115, .11);
 
-    /* status: the lifecycle, left to right */
-    --st-OPEN:        #64748b;               /* untouched */
-    --st-REOPENED:    #e11d48;               /* it came back */
-    --st-ASSIGNED:    #8b5cf6;               /* somebody owns it */
-    --st-IN_PROGRESS: #2563eb;               /* in flight */
-    --st-FIXED:       #0d9488;               /* dev says done */
-    --st-RETEST:      #f59e0b;               /* over to QA */
-    --st-CLOSED:      #059669;               /* actually done */
+    /* Board columns.
+       Rule 1 is that status reads as a journey — cool while it waits, warm when
+       it needs a person, green when it is done. Columns are editable now, so
+       the palette is named by colour rather than by status and a column points
+       at one of these (see ColumnColour); the template writes the token into
+       --c. Rose is the last stop for an ending that is not a success. A free
+       hex field here is exactly how rule 1 would die. */
+    --col-SLATE:  #64748b;                   /* waiting */
+    --col-BLUE:   #2563eb;                   /* in flight */
+    --col-INDIGO: #4f46e5;                   /* in flight, further along */
+    --col-VIOLET: #8b5cf6;                   /* parked on something else */
+    --col-TEAL:   #0d9488;                   /* dev says done */
+    --col-AMBER:  #f59e0b;                   /* over to QA */
+    --col-GREEN:  #059669;                   /* actually done */
+    --col-ROSE:   #e11d48;                   /* closed unhappily */
+
+    /* The six columns a fresh project starts with, still addressable by name
+       for the chrome that is *about* a status rather than in one: the activity
+       timeline, notification rows, a person's KPI tiles. */
+    --st-OPEN:           var(--col-SLATE);
+    --st-IN_PROGRESS:    var(--col-BLUE);
+    --st-ON_HOLD:        var(--col-VIOLET);
+    --st-READY_FOR_TEST: var(--col-TEAL);
+    --st-RETEST:         var(--col-AMBER);
+    --st-CLOSED:         var(--col-GREEN);
 
     /* severity: heat */
     --sev-LOW:      #0891b2;
@@ -55,14 +78,26 @@
     --sev-HIGH:     #ea580c;
     --sev-CRITICAL: #dc2626;
 
-    --pri-P1: #dc2626;
-    --pri-P2: #ea580c;
-    --pri-P3: #2563eb;
-    --pri-P4: #64748b;
 
     --env-QA:         #64748b;
     --env-UAT:        #8b5cf6;
     --env-PRODUCTION: #dc2626;
+
+    /* supporting docs: one axis of their own, so they read as neither a
+       status nor a severity — indigo for prose, deep cyan for a grid.
+       A project's documents area files three more things beside those two,
+       and the same five hues name them everywhere they appear: the card tile,
+       the folder rail, the recent strip, the badge in the editor. */
+    --doc-PAGE:   #4f46e5;                   /* prose you write here    */
+    --doc-SHEET:  #0e7490;                   /* a grid you write here   */
+    --doc-FOLDER: #b45309;                   /* holds the other four    */
+    --doc-FILE:   #64748b;                   /* bytes somebody uploaded */
+    --doc-LINK:   #0369a1;                   /* it lives somewhere else */
+
+    /* Text on a fill somebody chose in a sheet. White in both themes on
+       purpose: the fill is their colour, not the theme's, so the contrast is
+       worked out against it rather than against the page. */
+    --ink-on-fill: #ffffff;
 
     --ok:     #059669;
     --danger: #dc2626;
@@ -80,9 +115,22 @@
     --r-xl: 15px;
     --r-full: 999px;
 
-    --sidebar-w: 236px;
-    --sidebar-rail: 56px;
-    --topbar-h: 54px;
+    --nav-h: 52px;
+    --topbar-h: 50px;
+    --edge: 12px;         /* gutter a screen-wide popover keeps from the edge */
+    --tap: 44px;          /* the smallest thing a finger reliably hits       */
+
+    /* One stacking scale for the whole app. Every z-index below is one of
+       these, so "what sits on top of what" is answered in one place rather
+       than by whoever last picked a number. */
+    --z-toolbar: 20;      /* the sticky filter bar                          */
+    --z-stats:   25;      /* the stats panel, which drops over the toolbar  */
+    --z-sheet-corner: 22; /* a sheet's frozen corner, over its own sticky row */
+    --z-topbar:  30;      /* the page's own bar, above both of those        */
+    --z-raised:  50;      /* a card whose menu is open — see .panel:has()   */
+    --z-nav:     60;      /* the navbar, above every page                   */
+    --z-menu:    80;      /* anything that opens: menus, popovers           */
+    --z-toast:   95;      /* the one thing that outranks a menu             */
 
     --ease: cubic-bezier(.22, .72, .18, 1);
     --fast: 120ms;
@@ -93,49 +141,55 @@
 /* ---------- tokens: dark ---------- */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-        --bg:          #0a0f1a;
-        --bg-far:      #070b13;
-        --tint-a:      #14b8a6;
-        --tint-b:      #6366f1;
-        --tint-c:      #0284c7;
+        --bg:          #0f1413;
+        --bg-far:      #0a0e0d;
+        --tint-a:      #12a598;
+        --tint-b:      #0e8a86;
+        --tint-c:      #16b39d;
+        --wash-1: 6%;
+        --wash-2: 5%;
+        --wash-3: 4%;
 
-        --surface:     rgba(24, 32, 47, .74);
-        --surface-2:   rgba(31, 41, 58, .68);
-        --surface-3:   rgba(45, 58, 79, .72);
-        --surface-flat:#141b28;
-        --surface-pop: rgba(19, 26, 39, .97);
-        --line:        rgba(148, 178, 220, .13);
-        --line-strong: rgba(148, 178, 220, .24);
+        --surface:     rgba(26, 31, 30, .76);
+        --surface-2:   rgba(33, 39, 38, .70);
+        --surface-3:   rgba(47, 55, 53, .74);
+        --surface-flat:#161a19;
+        --surface-pop: rgba(20, 25, 24, .97);
+        --line:        rgba(178, 200, 194, .12);
+        --line-strong: rgba(178, 200, 194, .22);
 
-        --text:        #eef2f8;
-        --text-2:      #c2ccdb;
-        --muted:       #8b98ac;
+        --text:        #e8eeec;
+        --text-2:      #bbc5c2;
+        --muted:       #8a9491;
 
         --accent:      #2dd4bf;
         --accent-ink:  #06231f;
         --accent-soft: rgba(45, 212, 191, .13);
 
-        --st-OPEN:        #94a3b8;
-        --st-REOPENED:    #fb7185;
-        --st-ASSIGNED:    #a78bfa;
-        --st-IN_PROGRESS: #60a5fa;
-        --st-FIXED:       #2dd4bf;
-        --st-RETEST:      #fbbf24;
-        --st-CLOSED:      #34d399;
+        --col-SLATE:  #94a3b8;
+        --col-BLUE:   #60a5fa;
+        --col-INDIGO: #818cf8;
+        --col-VIOLET: #a78bfa;
+        --col-TEAL:   #2dd4bf;
+        --col-AMBER:  #fbbf24;
+        --col-GREEN:  #34d399;
+        --col-ROSE:   #fb7185;
 
         --sev-LOW:      #22d3ee;
         --sev-MEDIUM:   #fbbf24;
         --sev-HIGH:     #fb923c;
         --sev-CRITICAL: #f87171;
 
-        --pri-P1: #f87171;
-        --pri-P2: #fb923c;
-        --pri-P3: #60a5fa;
-        --pri-P4: #94a3b8;
 
         --env-QA:         #94a3b8;
         --env-UAT:        #a78bfa;
         --env-PRODUCTION: #f87171;
+
+        --doc-PAGE:   #a5b4fc;
+        --doc-SHEET:  #67e8f9;
+        --doc-FOLDER: #fbbf24;
+        --doc-FILE:   #94a3b8;
+        --doc-LINK:   #7dd3fc;
 
         --ok:     #34d399;
         --danger: #f87171;
@@ -147,49 +201,55 @@
 }
 
 [data-theme="dark"] {
-    --bg:          #0a0f1a;
-    --bg-far:      #070b13;
-    --tint-a:      #14b8a6;
-    --tint-b:      #6366f1;
-    --tint-c:      #0284c7;
+    --bg:          #0f1413;
+    --bg-far:      #0a0e0d;
+    --tint-a:      #12a598;
+    --tint-b:      #0e8a86;
+    --tint-c:      #16b39d;
+    --wash-1: 6%;
+    --wash-2: 5%;
+    --wash-3: 4%;
 
-    --surface:     rgba(24, 32, 47, .74);
-    --surface-2:   rgba(31, 41, 58, .68);
-    --surface-3:   rgba(45, 58, 79, .72);
-    --surface-flat:#141b28;
-    --surface-pop: rgba(19, 26, 39, .97);
-    --line:        rgba(148, 178, 220, .13);
-    --line-strong: rgba(148, 178, 220, .24);
+    --surface:     rgba(26, 31, 30, .76);
+    --surface-2:   rgba(33, 39, 38, .70);
+    --surface-3:   rgba(47, 55, 53, .74);
+    --surface-flat:#161a19;
+    --surface-pop: rgba(20, 25, 24, .97);
+    --line:        rgba(178, 200, 194, .12);
+    --line-strong: rgba(178, 200, 194, .22);
 
-    --text:        #eef2f8;
-    --text-2:      #c2ccdb;
-    --muted:       #8b98ac;
+    --text:        #e8eeec;
+    --text-2:      #bbc5c2;
+    --muted:       #8a9491;
 
     --accent:      #2dd4bf;
     --accent-ink:  #06231f;
     --accent-soft: rgba(45, 212, 191, .13);
 
-    --st-OPEN:        #94a3b8;
-    --st-REOPENED:    #fb7185;
-    --st-ASSIGNED:    #a78bfa;
-    --st-IN_PROGRESS: #60a5fa;
-    --st-FIXED:       #2dd4bf;
-    --st-RETEST:      #fbbf24;
-    --st-CLOSED:      #34d399;
+    --col-SLATE:  #94a3b8;
+    --col-BLUE:   #60a5fa;
+    --col-INDIGO: #818cf8;
+    --col-VIOLET: #a78bfa;
+    --col-TEAL:   #2dd4bf;
+    --col-AMBER:  #fbbf24;
+    --col-GREEN:  #34d399;
+    --col-ROSE:   #fb7185;
 
     --sev-LOW:      #22d3ee;
     --sev-MEDIUM:   #fbbf24;
     --sev-HIGH:     #fb923c;
     --sev-CRITICAL: #f87171;
 
-    --pri-P1: #f87171;
-    --pri-P2: #fb923c;
-    --pri-P3: #60a5fa;
-    --pri-P4: #94a3b8;
 
     --env-QA:         #94a3b8;
     --env-UAT:        #a78bfa;
     --env-PRODUCTION: #f87171;
+
+    --doc-PAGE:   #a5b4fc;
+    --doc-SHEET:  #67e8f9;
+    --doc-FOLDER: #fbbf24;
+    --doc-FILE:   #94a3b8;
+    --doc-LINK:   #7dd3fc;
 
     --ok:     #34d399;
     --danger: #f87171;
@@ -203,6 +263,9 @@
 * { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
+
+/* An attachment or a pasted screenshot is whatever width it was uploaded at. */
+img { max-width: 100%; }
 
 body {
     margin: 0;
@@ -226,9 +289,9 @@ body::before {
     z-index: -1;
     pointer-events: none;
     background:
-        radial-gradient(1100px 620px at 8% -12%, color-mix(in oklab, var(--tint-a) 16%, transparent), transparent 62%),
-        radial-gradient(950px 700px at 102% -6%, color-mix(in oklab, var(--tint-b) 14%, transparent), transparent 58%),
-        radial-gradient(1000px 560px at 55% 108%, color-mix(in oklab, var(--tint-c) 11%, transparent), transparent 64%),
+        radial-gradient(1100px 620px at 8% -12%, color-mix(in oklab, var(--tint-a) var(--wash-1), transparent), transparent 62%),
+        radial-gradient(950px 700px at 102% -6%, color-mix(in oklab, var(--tint-b) var(--wash-2), transparent), transparent 58%),
+        radial-gradient(1000px 560px at 55% 108%, color-mix(in oklab, var(--tint-c) var(--wash-3), transparent), transparent 64%),
         linear-gradient(178deg, var(--bg) 0%, var(--bg-far) 100%);
 }
 
@@ -265,49 +328,31 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ==========================================================================
-   The shell
+   The shell — one navbar across the top, nothing down the side
+   --------------------------------------------------------------------------
+   There is no sidebar. Every global control (brand, project, sections, search
+   for notifications, theme, who you are) lives in one bar, so a page is just a
+   topbar and its content.
    ========================================================================== */
-.app {
-    display: grid;
-    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
-    min-height: 100vh;
-    transition: grid-template-columns var(--mid) var(--ease);
-}
-[data-sidebar="collapsed"] .app { grid-template-columns: var(--sidebar-rail) minmax(0, 1fr); }
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+.app-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 
-.app-body { display: flex; flex-direction: column; min-width: 0; }
-
-/* ---------- sidebar ---------- */
-.sidebar {
-    /* Sticky always makes a stacking context, so the rail needs to outrank the
-       topbar and toolbar — otherwise the switcher menu opens behind them. */
+/* ---------- the navbar ---------- */
+.navbar {
     position: sticky;
     top: 0;
-    z-index: 50;
-    align-self: start;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    background: var(--surface);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
-    border-right: 1px solid var(--line);
-}
-
-.sidebar-head {
+    /* Outranks the topbar below it so the popovers open over the page rather
+       than behind the next sticky bar. */
+    z-index: var(--z-nav);
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: var(--topbar-h);
-    padding: 0 8px 0 10px;
+    min-height: var(--nav-h);
+    padding: 0 14px;
+    background: var(--surface);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
     border-bottom: 1px solid var(--line);
-}
-[data-sidebar="collapsed"] .sidebar-head {
-    flex-direction: column;
-    justify-content: center;
-    gap: 6px;
-    padding: 9px 6px;
 }
 
 .brand {
@@ -333,53 +378,172 @@ a { color: inherit; text-decoration: none; }
     font-weight: 700;
 }
 
-.lbl {
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    transition: opacity var(--fast) var(--ease);
-}
-[data-sidebar="collapsed"] .lbl,
-[data-sidebar="collapsed"] .brand > span:not(.brand-mark),
-[data-sidebar="collapsed"] .switcher-text,
-[data-sidebar="collapsed"] .switcher-chev,
-[data-sidebar="collapsed"] .sidenav-pill,
-[data-sidebar="collapsed"] .sidebar-user-name {
-    opacity: 0;
-    width: 0;
-    pointer-events: none;
-}
+.lbl { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-/* The toggle is visible in both states — a rail you cannot obviously reopen
-   is a rail people give up on. */
-.sidebar-toggle { margin-left: auto; flex: none; }
-[data-sidebar="collapsed"] .sidebar-toggle {
-    margin: 0;
-    width: 100%;
-    border: 1px solid var(--line);
-    background: var(--surface-2);
+.nav-sep { flex: none; width: 1px; height: 22px; background: var(--line); }
+
+/* The switcher sits in the bar, so it sizes to its name instead of a column. */
+.navbar .switcher-btn { width: auto; max-width: 230px; }
+.navbar .switcher-menu { width: 264px; left: 0; }
+
+.nav-links { display: flex; align-items: center; gap: 2px; min-width: 0; }
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    border-radius: var(--r-md);
+    font-size: 13px;
+    font-weight: 500;
     color: var(--text-2);
+    white-space: nowrap;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
 }
-[data-sidebar="collapsed"] .sidebar-toggle:hover { background: var(--surface-3); color: var(--text); }
-.sidebar-toggle .ico-expand { display: none; }
-[data-sidebar="collapsed"] .sidebar-toggle .ico-collapse { display: none; }
-[data-sidebar="collapsed"] .sidebar-toggle .ico-expand { display: block; }
+.nav-link svg.i { opacity: .75; }
+.nav-link:hover { background: var(--surface-2); color: var(--text); }
+.nav-link.is-active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.nav-link.is-active svg.i { opacity: 1; color: var(--accent); }
 
-.sidebar-section { padding: 10px 8px; }
-.sidebar-section + .sidebar-section { border-top: 1px solid var(--line); }
-[data-sidebar="collapsed"] .sidebar-section { padding: 10px 6px; }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 
-.sidebar-caption {
-    display: block;
-    padding: 0 6px 6px;
+/* ---------- popovers: <details>, so they open with JS switched off ---------- */
+.pop-wrap { position: relative; }
+.pop-wrap > summary { list-style: none; cursor: pointer; }
+.pop-wrap > summary::-webkit-details-marker { display: none; }
+.pop-wrap > summary::marker { content: ""; }
+
+.pop {
+    position: absolute;
+    z-index: var(--z-menu);
+    top: calc(100% + 7px);
+    right: 0;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+    padding: 5px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-lg);
+    background: var(--surface-pop);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: var(--shadow-3);
+    animation: menu-in var(--mid) var(--ease) both;
+}
+.pop-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px 8px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 4px;
     font-size: 10px;
     font-weight: 650;
     letter-spacing: .08em;
     text-transform: uppercase;
     color: var(--muted);
 }
-[data-sidebar="collapsed"] .sidebar-caption { opacity: 0; height: 0; padding: 0; overflow: hidden; }
+.pop-head .spacer { margin-left: auto; }
+.pop-foot {
+    margin-top: 4px;
+    padding: 7px 9px 5px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+}
+.pop-foot a:hover { color: var(--accent); }
+
+.pop-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 9px;
+    border-radius: var(--r-md);
+    font-size: 13px;
+    color: var(--text-2);
+    cursor: pointer;
+    width: 100%;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    text-align: left;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.pop-item:hover { background: var(--surface-3); color: var(--text); }
+.pop-item svg.i { flex: none; color: var(--muted); }
+.pop-item:hover svg.i { color: inherit; }
+/* Mirrors .nav-link.is-active: the menu carries the section state on a phone,
+   where the bar's own links are icons only. */
+.pop-item.is-active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.pop-item.is-active svg.i { color: var(--accent); }
+
+/* ---------- who is signed in: a face in the bar, the rest behind it ---------- */
+.user-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 9px 3px 3px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-full);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 12.5px;
+    transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.user-btn:hover { background: var(--surface-3); border-color: var(--line-strong); }
+.user-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.user-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+}
+.user-card .who { display: grid; min-width: 0; line-height: 1.35; }
+.user-card b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-card span { font-size: 11.5px; color: var(--muted); }
+
+/* ---------- notifications, read where you are ---------- */
+.pop-notif { width: 380px; }
+.pop-notif .pop-list { max-height: 340px; overflow-y: auto; display: grid; gap: 1px; }
+
+.pop-notif-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 9px;
+    padding: 8px 9px;
+    border-radius: var(--r-md);
+    color: var(--text-2);
+    transition: background var(--fast) var(--ease);
+}
+.pop-notif-item:hover { background: var(--surface-3); }
+.pop-notif-item .msg {
+    display: block;
+    font-size: 12.8px;
+    color: var(--text);
+    line-height: 1.4;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.pop-notif-item .when { font-size: 11px; color: var(--muted); }
+.pop-notif-item.is-unread { background: color-mix(in oklab, var(--accent) 7%, transparent); }
+.pop-notif-item.is-unread .msg { font-weight: 560; }
+.notif-mark {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 24px; height: 24px;
+    border-radius: var(--r-sm);
+    background: var(--surface-3);
+    font-size: 11px;
+}
+.pop-empty { padding: 22px 12px; text-align: center; font-size: 12.5px; color: var(--muted); }
 
 /* ---------- project switcher ---------- */
 .switcher { position: relative; }
@@ -402,7 +566,6 @@ a { color: inherit; text-decoration: none; }
 }
 .switcher-btn:hover,
 .switcher-btn[aria-expanded="true"] { background: var(--surface-3); border-color: var(--line-strong); }
-[data-sidebar="collapsed"] .switcher-btn { justify-content: center; padding: 6px; }
 
 .switcher-text { display: grid; min-width: 0; line-height: 1.25; }
 .switcher-label { font-size: 9.5px; color: var(--muted); letter-spacing: .07em; text-transform: uppercase; font-weight: 600; }
@@ -413,7 +576,7 @@ a { color: inherit; text-decoration: none; }
 
 .switcher-menu {
     position: absolute;
-    z-index: 60;
+    z-index: var(--z-menu);
     top: calc(100% + 6px);
     left: 0;
     width: 100%;
@@ -428,7 +591,6 @@ a { color: inherit; text-decoration: none; }
     animation: menu-in var(--mid) var(--ease) both;
 }
 .switcher-menu[hidden] { display: none; }
-[data-sidebar="collapsed"] .switcher-menu { top: 0; left: calc(100% + 8px); width: 248px; }
 
 @keyframes menu-in {
     from { opacity: 0; transform: translateY(-5px) scale(.98); }
@@ -469,99 +631,6 @@ a { color: inherit; text-decoration: none; }
 .switcher-foot a:hover { color: var(--accent); }
 .switcher-empty { padding: 12px 8px; font-size: 12.5px; color: var(--muted); text-align: center; }
 
-/* ---------- sidebar nav ---------- */
-.sidenav { display: grid; gap: 1px; }
-
-.sidenav-item {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 9px;
-    border-radius: var(--r-md);
-    color: var(--text-2);
-    font-size: 13px;
-    font-weight: 500;
-    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
-}
-.sidenav-item .ico {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 16px; height: 16px;
-    opacity: .78;
-}
-.sidenav-item:hover { background: var(--surface-2); color: var(--text); }
-.sidenav-item.is-active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
-.sidenav-item.is-active .ico { opacity: 1; color: var(--accent); }
-.sidenav-item.is-active::before {
-    content: "";
-    position: absolute;
-    left: -8px; top: 7px; bottom: 7px;
-    width: 2px;
-    border-radius: 0 2px 2px 0;
-    background: var(--accent);
-}
-[data-sidebar="collapsed"] .sidenav-item { justify-content: center; padding: 8px 0; }
-[data-sidebar="collapsed"] .sidenav-item.is-active::before { left: -6px; }
-
-.sidenav-pill {
-    margin-left: auto;
-    padding: 0 6px;
-    border-radius: var(--r-full);
-    background: var(--danger);
-    color: #fff;
-    font-size: 10.5px;
-    font-weight: 650;
-    line-height: 16px;
-    font-variant-numeric: tabular-nums;
-}
-/* Tooltips for the collapsed rail. */
-[data-sidebar="collapsed"] [data-tip] { position: relative; }
-[data-sidebar="collapsed"] [data-tip]:hover::before {
-    content: attr(data-tip);
-    position: absolute;
-    left: calc(100% + 10px);
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 70;
-    padding: 4px 9px;
-    border-radius: var(--r-md);
-    background: var(--text);
-    color: var(--bg);
-    font-size: 11.5px;
-    font-weight: 500;
-    white-space: nowrap;
-    pointer-events: none;
-    box-shadow: var(--shadow-2);
-    animation: tip-in var(--fast) var(--ease) both;
-}
-@keyframes tip-in { from { opacity: 0; transform: translate(-3px, -50%); } to { opacity: 1; transform: translate(0, -50%); } }
-
-/* ---------- who is signed in ---------- */
-.sidebar-foot {
-    margin-top: auto;
-    padding: 8px;
-    border-top: 1px solid var(--line);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-[data-sidebar="collapsed"] .sidebar-foot { flex-direction: column; padding: 8px 6px; }
-
-.sidebar-user {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    margin-right: auto;
-    padding: 2px;
-    font-size: 12.5px;
-    color: var(--text-2);
-}
-.sidebar-user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-[data-sidebar="collapsed"] .sidebar-user { margin: 0; }
-
 .inline-form { display: flex; align-items: center; gap: 8px; margin: 0; }
 
 /* ==========================================================================
@@ -569,8 +638,8 @@ a { color: inherit; text-decoration: none; }
    ========================================================================== */
 .topbar {
     position: sticky;
-    top: 0;
-    z-index: 30;
+    top: var(--nav-h);
+    z-index: var(--z-topbar);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -620,48 +689,56 @@ a { color: inherit; text-decoration: none; }
 .topbar-sub { font-size: 12.5px; color: var(--muted); }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
-.stat-toggle {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 5px 9px 5px 6px;
-    border: 1px solid transparent;
-    border-radius: var(--r-md);
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    cursor: pointer;
-    transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
-}
-.stat-toggle:hover,
-.stat-toggle[aria-expanded="true"] { background: var(--surface-2); border-color: var(--line); }
-.stat-toggle .chev { color: var(--muted); transition: transform var(--mid) var(--ease); }
-.stat-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
-
-/* A one-line summary that stays put whether the drawer is open or not. */
+/* The headline numbers ARE the control: one line that says where the project
+   stands, and opens everything else — the switcher included — when pulled. */
 .topbar-meta {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding-left: 11px;
-    border-left: 1px solid var(--line);
+    padding: 5px 9px;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    font: inherit;
     font-size: 12.5px;
     color: var(--muted);
+    cursor: pointer;
+    transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
 }
+.topbar-meta:hover,
+.topbar-meta[aria-expanded="true"] { background: var(--surface-2); border-color: var(--line); }
 .topbar-meta .mk { display: inline-flex; align-items: center; gap: 5px; }
 .topbar-meta b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
-@media (max-width: 980px) { .topbar-meta { display: none; } }
+.topbar-meta .chev { color: var(--muted); transition: transform var(--mid) var(--ease); }
+.topbar-meta[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+/* Narrow: the counts drop away but the handle must not — it is the only way
+   to the switcher. The chevron alone keeps it reachable. */
+@media (max-width: 820px) {
+    .topbar-meta .mk:not(:first-child) { display: none; }
+}
 
 /* ---------- the stats drawer ---------- */
+/* --z-stats was 40, above --z-topbar, so the drawer wiped across the project
+   switcher and New bug as it scrolled. It is now 25: over the toolbar, which
+   is what the scale always said it was for, and under the bar it drops from. */
 .stats-drawer {
+    position: relative;
+    z-index: var(--z-stats);
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 22px;
-    padding: 16px;
-    background: var(--surface-2);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
-    border-bottom: 1px solid var(--line);
+    padding: 18px 16px;
+    /* Deliberately NOT the bar colour. This sits between the topbar and the
+       filter bar, and matching either made it read as a third bar; recessed and
+       tinted, it reads as something pulled out from behind the one above. */
+    background:
+        linear-gradient(180deg,
+            color-mix(in oklab, var(--accent) 7%, var(--bg-far)),
+            color-mix(in oklab, var(--accent) 3%, var(--bg-far)));
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line-strong);
+    box-shadow: inset 0 7px 12px -9px color-mix(in oklab, var(--text) 42%, transparent);
     animation: drawer-in var(--mid) var(--ease) both;
 }
 .stats-drawer[hidden] { display: none; }
@@ -710,7 +787,7 @@ a.kpi:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var
 .kpi-value { font-size: 21px; font-weight: 650; letter-spacing: -.035em; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .kpi-label { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
 
-/* ---------- distribution bar + legend ---------- */
+/* ---------- distribution bar ---------- */
 .dist {
     display: flex;
     height: 7px;
@@ -728,25 +805,6 @@ a.kpi:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var
 .dist span:hover { filter: brightness(1.14); }
 @keyframes grow { from { width: 0; } to { width: var(--w, 0%); } }
 
-.legend { display: flex; flex-wrap: wrap; gap: 5px; }
-.legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 9px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    background: var(--surface);
-    font-size: 12px;
-    color: var(--text-2);
-    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease), color var(--fast) var(--ease);
-    animation: rise var(--mid) var(--ease) both;
-    animation-delay: calc(var(--i, 0) * 30ms + 40ms);
-}
-.legend-item:hover { border-color: color-mix(in oklab, var(--c) 45%, var(--line)); color: var(--text); }
-.legend-item.is-active { border-color: color-mix(in oklab, var(--c) 60%, var(--line)); background: color-mix(in oklab, var(--c) 10%, var(--surface)); color: var(--text); font-weight: 560; }
-.legend-item b { font-weight: 650; font-variant-numeric: tabular-nums; }
-
 .dot {
     flex: none;
     width: 7px; height: 7px;
@@ -757,7 +815,7 @@ a.kpi:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var
 .dot.is-live { animation: blink 2.6s var(--ease) infinite; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
-/* ---------- severity / priority rows ---------- */
+/* ---------- severity rows ---------- */
 .heat { display: grid; gap: 4px; }
 
 .heat-card {
@@ -856,7 +914,8 @@ a.kpi:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var
     border-radius: var(--r-md);
     background: var(--surface-2);
 }
-.seg a {
+.seg a,
+.seg button {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -868,15 +927,17 @@ a.kpi:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var
     color: var(--muted);
     transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
 }
-.seg a:hover { color: var(--text); }
-.seg a.is-active { background: var(--surface-flat); color: var(--text); box-shadow: var(--shadow-1); }
+.seg button { border: 0; background: transparent; font: inherit; cursor: pointer; }
+.seg a:hover, .seg button:hover { color: var(--text); }
+.seg a.is-active,
+.seg button.is-active { background: var(--surface-flat); color: var(--text); box-shadow: var(--shadow-1); }
 
 /* ---------- fields ---------- */
 label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 520; color: var(--text-2); }
 label .req { color: var(--danger); }
 label .hint { font-weight: 400; font-size: 11.5px; color: var(--muted); }
 
-input[type=text], input[type=email], input[type=password], select, textarea {
+input[type=text], input[type=search], input[type=email], input[type=password], select, textarea {
     font: inherit;
     font-size: 13.5px;
     width: 100%;
@@ -889,6 +950,11 @@ input[type=text], input[type=email], input[type=password], select, textarea {
     transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
 }
 textarea { height: auto; min-height: 72px; padding: 8px 10px; line-height: 1.55; resize: vertical; }
+
+/* Safari draws a search field as a capsule and ignores the height, and its
+   clear button lands on top of the "/" hint. */
+input[type=search] { appearance: none; -webkit-appearance: none; }
+input[type=search]::-webkit-search-cancel-button { display: none; }
 
 input:hover, select:hover, textarea:hover { border-color: var(--muted); }
 input:focus, select:focus, textarea:focus {
@@ -924,8 +990,8 @@ select {
    ========================================================================== */
 .toolbar {
     position: sticky;
-    top: var(--topbar-h);
-    z-index: 20;
+    top: calc(var(--nav-h) + var(--topbar-h));
+    z-index: var(--z-toolbar);
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -938,13 +1004,17 @@ select {
 }
 
 .search-wrap { position: relative; flex: 0 1 236px; min-width: 160px; }
-.search-wrap input { height: 30px; padding-left: 29px; padding-right: 26px; font-size: 13px; }
-.search-wrap .search-ico {
+/* padding-left clears the submit button sitting inside the field's left edge. */
+.search-wrap input { height: 30px; padding-left: 36px; padding-right: 26px; font-size: 13px; }
+/* That button's slot. It used to be an inline style on the board's button and
+   nothing at all on the documents page, where the magnifier was left in normal
+   flow — so it sat outside the field while the input went on reserving the
+   36px meant to clear it. */
+.search-go {
     position: absolute;
-    left: 9px; top: 50%;
+    left: 1px;
+    top: 50%;
     transform: translateY(-50%);
-    color: var(--muted);
-    pointer-events: none;
 }
 .kbd {
     position: absolute;
@@ -1003,10 +1073,11 @@ select {
 
 .fmenu-pop {
     position: absolute;
-    z-index: 40;
+    z-index: var(--z-menu);
     top: calc(100% + 5px);
     left: 0;
     min-width: 196px;
+    max-width: calc(100vw - 24px);   /* the same clamp .pop has always had */
     max-height: 320px;
     overflow-y: auto;
     padding: 5px;
@@ -1098,27 +1169,6 @@ select {
 .face-more:hover { color: var(--text); border-color: var(--line-strong); }
 
 /* "Mine" — the one filter a developer reaches for constantly. */
-.mine-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 10px 0 6px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-full);
-    background: var(--surface-2);
-    color: var(--text-2);
-    font-size: 12.5px;
-    font-weight: 520;
-    transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease), color var(--fast) var(--ease);
-}
-.mine-toggle:hover { background: var(--surface-3); color: var(--text); }
-.mine-toggle.is-active {
-    border-color: color-mix(in oklab, var(--accent) 55%, transparent);
-    background: var(--accent-soft);
-    color: var(--text);
-    font-weight: 600;
-}
 
 /* ---------- applied filters ---------- */
 .chips {
@@ -1156,9 +1206,23 @@ select {
    ========================================================================== */
 .content { flex: 1; min-width: 0; padding: 16px; }
 .stack { display: grid; gap: 14px; }
+
+/* A grid or flex child defaults to min-width: auto, which is min-content — so a
+   panel refuses to shrink past its widest field and pushes the whole page
+   sideways on a phone. Every layout container that holds a panel has to say
+   otherwise. This is the rule that keeps the report and the raise form inside
+   a 360px screen; without it they measure 398 and 443. */
+.stack > *,
+.report > *,
+.detail-grid > *,
+.detail-main > *,
+.detail-rail > *,
+.two-col > *,
+.content > * { min-width: 0; }
 .stack-narrow { max-width: 1120px; }
 
 .panel {
+    position: relative;
     background: var(--surface);
     -webkit-backdrop-filter: var(--blur);
     backdrop-filter: var(--blur);
@@ -1166,6 +1230,15 @@ select {
     border-radius: var(--r-xl);
     box-shadow: var(--shadow-1);
 }
+
+/* backdrop-filter makes every panel its own stacking context, so a menu
+   opening inside one cannot paint over the panel that follows it however high
+   its z-index goes. Raising the whole panel while something in it is open is
+   the fix — the menu then travels with it. */
+.panel:has(details[open]),
+.stats-block:has(details[open]),
+.stats-block:has(.switcher-menu:not([hidden])) { z-index: var(--z-raised); }
+.stats-block { position: relative; }
 .panel-pad { padding: 14px 16px; }
 .panel-head {
     display: flex;
@@ -1208,7 +1281,10 @@ select {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    max-height: calc(100vh - var(--topbar-h) - 96px);
+    /* dvh, and the navbar counted: 100vh is the URL-bar-less viewport on a
+       phone, and the navbar was missing from the sum entirely. */
+    max-height: calc(100vh - var(--nav-h) - var(--topbar-h) - 96px);
+    max-height: calc(100dvh - var(--nav-h) - var(--topbar-h) - 96px);
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
     background: var(--surface-2);
@@ -1276,6 +1352,166 @@ select {
     color: var(--muted);
 }
 
+/* ---------- editing the board's own columns ---------- */
+/* The head is the drag handle for reordering the board; the cards inside it are
+   the drag handles for moving a bug. Only one of the two is ever draggable, so
+   the two gestures never compete for the same press. */
+.kcol-head[draggable="true"] { cursor: grab; }
+.kcol-head[draggable="true"]:active { cursor: grabbing; }
+.kcol-grip {
+    width: 12px; height: 12px;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease);
+}
+.kcol-head:hover .kcol-grip,
+.kcol-head:has(.kcol-menu[open]) .kcol-grip { opacity: 1; }
+
+.kcol.is-col-dragging { opacity: .5; }
+.kcol.is-col-over {
+    border-color: color-mix(in oklab, var(--c) 65%, var(--line));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--c) 45%, transparent);
+}
+
+/* The count already takes the free space when it is there; the menu takes it
+   when the column is empty and there is no count to push. */
+.kcol-menu { margin-left: auto; }
+.kcol-head:has(.kcol-count) .kcol-menu { margin-left: 2px; }
+.kcol-menu > summary { list-style: none; cursor: pointer; }
+.kcol-menu > summary::-webkit-details-marker { display: none; }
+.kcol-menu > summary::marker { content: ""; }
+.kcol-menu > summary .icon-btn { width: 22px; height: 22px; }
+.kcol-menu[open] > summary .icon-btn { background: var(--surface-3); color: var(--text); }
+
+/* .kcol carries a backdrop-filter, which makes it a stacking context: a menu
+   inside one cannot paint over the next column however high its own z-index
+   goes, so the whole column lifts while something in it is open. Same trap,
+   same fix, as .panel:has(details[open]). */
+.kcol:has(details[open]) { position: relative; z-index: var(--z-raised); }
+
+/* .kanban scrolls on x, which forces overflow-y to auto as well — so an open
+   menu near the bottom would be clipped rather than overlaid. Room is made for
+   it only while one is open. */
+.kanban:has(.kcol-menu[open]), .kanban:has(#add-column[open]) { padding-bottom: 250px; }
+
+.kcol-pop { display: grid; gap: 9px; min-width: 234px; padding: 9px; }
+.kcol-rename { display: flex; gap: 6px; }
+.kcol-rename input { flex: 1 1 auto; min-width: 0; }
+.kcol-moves { display: flex; gap: 6px; }
+.kcol-moves .inline-form { flex: 1 1 0; }
+.kcol-moves .btn { width: 100%; justify-content: center; }
+.kcol-remove { display: grid; gap: 6px; }
+.kcol-remove label { display: grid; gap: 4px; }
+
+/* One swatch per token in the column palette. A colour is chosen, never typed:
+   the board only reads as a journey while every column is on the same scale. */
+.kcol-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+.swatch {
+    display: block;
+    width: 18px; height: 18px;
+    padding: 0;
+    border: 1px solid color-mix(in oklab, var(--c) 50%, transparent);
+    border-radius: var(--r-full);
+    background: color-mix(in oklab, var(--c) 80%, transparent);
+    cursor: pointer;
+    transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+.swatch:hover { transform: scale(1.14); }
+.swatch.is-active,
+.swatch-pick input:checked + .swatch {
+    box-shadow: 0 0 0 2px var(--surface-pop), 0 0 0 3.5px var(--c);
+}
+.swatch-pick { position: relative; display: inline-flex; cursor: pointer; }
+/* The radio is the control; the circle beside it is what you see. Kept in the
+   layout rather than display:none so it stays focusable and announced. */
+.swatch-pick input {
+    position: absolute;
+    width: 1px; height: 1px;
+    opacity: 0;
+    margin: 0;
+}
+.swatch-pick:focus-within .swatch {
+    box-shadow: 0 0 0 2px var(--surface-pop), 0 0 0 3.5px var(--accent);
+}
+
+/* The tile that adds one more, at the end of the board. */
+.kcol-new {
+    border-style: dashed;
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+.kcol-new > .fmenu { position: relative; }
+.kcol-new > .fmenu > summary { list-style: none; cursor: pointer; }
+.kcol-new > .fmenu > summary::-webkit-details-marker { display: none; }
+.kcol-new > .fmenu > summary::marker { content: ""; }
+.kcol-new-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 13px 10px;
+    border-radius: var(--r-lg);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 560;
+    transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.kcol-new-btn:hover { color: var(--text); background: var(--surface-2); }
+.kcol-new[open] .kcol-new-btn, .kcol-new .fmenu[open] .kcol-new-btn { color: var(--text); }
+.kcol-add { display: grid; gap: 9px; }
+.kcol-add label { display: grid; gap: 4px; }
+
+/* ---------- the same columns, edited in full in Settings ---------- */
+.column-editor { display: grid; gap: 10px; }
+.column-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px 12px;
+    padding: 11px 13px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--c);
+    border-radius: var(--r-lg);
+    background: var(--surface-2);
+    animation: rise var(--mid) var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 30ms);
+}
+.column-rank {
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 5px;
+    padding-top: 4px;
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+.column-form { display: grid; gap: 10px; min-width: 0; }
+.column-save { display: flex; align-items: center; gap: 8px; }
+.column-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-top: 9px;
+    border-top: 1px solid var(--line);
+}
+.column-remove { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+@media (max-width: 780px) {
+    .column-row { grid-template-columns: minmax(0, 1fr); }
+    .column-rank { justify-items: start; grid-auto-flow: column; justify-content: start; gap: 7px; }
+    .column-remove { margin-left: 0; width: 100%; }
+}
+
 .kcard {
     position: relative;
     display: grid;
@@ -1299,10 +1535,13 @@ select {
     background: var(--c);
     transition: inset var(--fast) var(--ease);
 }
+.kcard { cursor: pointer; }
 .kcard:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); transform: translateY(-1px); }
 .kcard:hover::before { inset: 0 auto 0 0; }
 .kcard.is-dragging { opacity: .4; cursor: grabbing; }
 .kcard.is-saving { opacity: .6; pointer-events: none; }
+/* The same held-breath state, for a column being put in its new place. */
+.kcol.is-saving { opacity: .6; }
 .kcard.just-moved { animation: settle var(--slow) var(--ease) both; }
 @keyframes settle {
     from { background: color-mix(in oklab, var(--accent) 16%, var(--surface-flat)); }
@@ -1340,10 +1579,9 @@ select {
 .bug-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 620px; }
 .bug-table td.grow, .bug-table th.grow { width: 99%; }
 
+/* Not sticky: overflow-x on .table-wrap forces overflow-y, so the header would
+   stick to a scrollport that never scrolls vertically. It was inert. */
 .bug-table th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
     padding: 8px 12px;
     text-align: left;
     background: var(--surface-2);
@@ -1432,18 +1670,12 @@ select {
 .sev-MEDIUM   { --c: var(--sev-MEDIUM); }
 .sev-LOW      { --c: var(--sev-LOW); }
 
-.st-OPEN        { --c: var(--st-OPEN); }
-.st-ASSIGNED    { --c: var(--st-ASSIGNED); }
-.st-IN_PROGRESS { --c: var(--st-IN_PROGRESS); }
-.st-FIXED       { --c: var(--st-FIXED); }
-.st-RETEST      { --c: var(--st-RETEST); }
-.st-CLOSED      { --c: var(--st-CLOSED); }
-.st-REOPENED    { --c: var(--st-REOPENED); }
+/* There is no .st-* family any more. Severity and environment are still enums,
+   so a class per value works for them; a status is a row somebody named, and
+   there is no set of class names to declare in advance. Anything painted in a
+   status colour gets it inline instead — th:style="'--c:' + ${cols.token(bug)}"
+   — which is the same one-token indirection, sourced from the column. */
 
-.pri-P1 { --c: var(--pri-P1); }
-.pri-P2 { --c: var(--pri-P2); }
-.pri-P3 { --c: var(--pri-P3); }
-.pri-P4 { --c: var(--pri-P4); }
 
 .env-tag {
     border-color: color-mix(in oklab, var(--c, var(--muted)) 28%, var(--line));
@@ -1455,6 +1687,9 @@ select {
 .env-QA         { --c: var(--env-QA); }
 .env-UAT        { --c: var(--env-UAT); }
 .env-PRODUCTION { --c: var(--env-PRODUCTION); }
+
+.dk-PAGE  { --c: var(--doc-PAGE); }
+.dk-SHEET { --c: var(--doc-SHEET); }
 
 .meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
 .meter i { width: 3px; border-radius: 1px; background: var(--surface-3); transition: background var(--fast) var(--ease); }
@@ -1521,62 +1756,14 @@ select {
 @media (max-width: 1080px) { .detail-grid { grid-template-columns: minmax(0, 1fr); } }
 
 .detail-main { display: grid; gap: 14px; min-width: 0; }
-.detail-rail { display: grid; gap: 12px; position: sticky; top: calc(var(--topbar-h) + 14px); }
+/* No z-index here on purpose. `position: sticky` already makes a stacking
+   context, which is all the rail needs: it paints over the report column
+   because it comes later in the DOM, and its own menus are ordered inside it
+   by `.panel:has(details[open])`. Giving it --z-raised put the whole rail
+   above the topbar, so it scrolled over the bar instead of under it. */
+.detail-rail { display: grid; gap: 12px; position: sticky; top: calc(var(--nav-h) + var(--topbar-h) + 14px); align-self: start; }
 @media (max-width: 1080px) { .detail-rail { position: static; } }
 
-.detail-hero { position: relative; overflow: hidden; padding: 16px 18px; }
-.detail-hero::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--c); }
-.detail-hero .id-line {
-    display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
-    margin-bottom: 6px; font-size: 12px; color: var(--muted);
-}
-.detail-hero h1 { max-width: 62ch; font-size: 21px; }
-.detail-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 12px; }
-
-/* status stepper */
-.stepper { display: grid; grid-template-columns: repeat(6, 1fr); margin: 20px 0 2px; padding: 0; list-style: none; }
-.stepper li {
-    position: relative;
-    padding-top: 18px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--muted);
-    text-align: center;
-    transition: color var(--mid) var(--ease);
-}
-.stepper li::before { content: ""; position: absolute; top: 5px; left: 0; right: 0; height: 2px; background: var(--surface-3); }
-.stepper li:first-child::before { left: 50%; }
-.stepper li:last-child::before  { right: 50%; }
-.stepper li::after {
-    content: "";
-    position: absolute;
-    top: 1px; left: 50%;
-    transform: translateX(-50%);
-    width: 10px; height: 10px;
-    border-radius: var(--r-full);
-    background: var(--surface-flat);
-    border: 2px solid var(--surface-3);
-    transition: border-color var(--mid) var(--ease), background var(--mid) var(--ease);
-}
-.stepper li.is-done { color: var(--text-2); }
-.stepper li.is-done::before { background: color-mix(in oklab, var(--c) 55%, var(--surface-3)); }
-.stepper li.is-done::after  { border-color: var(--c); background: var(--c); }
-.stepper li.is-current { color: var(--text); font-weight: 620; }
-.stepper li.is-current::after { background: var(--surface-flat); border-color: var(--c); border-width: 3px; }
-
-.reopened-note {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 10px;
-    padding: 4px 10px;
-    border-radius: var(--r-md);
-    border: 1px solid color-mix(in oklab, var(--st-REOPENED) 32%, transparent);
-    background: color-mix(in oklab, var(--st-REOPENED) 8%, transparent);
-    color: color-mix(in oklab, var(--st-REOPENED) 74%, var(--text));
-    font-size: 12px;
-    font-weight: 500;
-}
 
 /* ---------- the rail: one click to move it on, one to hand it over ---------- */
 .rail-card { padding: 12px 13px; display: grid; gap: 9px; }
@@ -1625,35 +1812,6 @@ select {
 .status-opt .go { opacity: 0; color: var(--muted); }
 .status-opt:hover .go { opacity: 1; }
 
-/* Assignee: faces, and one click to take it yourself. */
-.assign-now { display: flex; align-items: center; gap: 9px; }
-.assign-now .who { display: grid; min-width: 0; line-height: 1.3; }
-.assign-now .who b { font-size: 13px; font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.assign-now .who span { font-size: 11px; color: var(--muted); }
-
-.assign-list { display: grid; gap: 2px; max-height: 260px; overflow-y: auto; }
-.assign-opt {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 9px;
-    width: 100%;
-    padding: 5px 8px;
-    border: 0;
-    border-radius: var(--r-md);
-    background: transparent;
-    color: var(--text-2);
-    font: inherit;
-    font-size: 12.5px;
-    text-align: left;
-    cursor: pointer;
-    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
-}
-.assign-opt:hover { background: var(--surface-3); color: var(--text); }
-.assign-opt.is-current { background: var(--accent-soft); color: var(--text); font-weight: 560; }
-.assign-opt .tick { opacity: 0; color: var(--accent); }
-.assign-opt.is-current .tick { opacity: 1; }
-
 /* ---------- facts ---------- */
 .rail-facts { display: grid; gap: 7px; }
 .rail-fact { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; align-items: center; font-size: 12.5px; }
@@ -1664,35 +1822,39 @@ select {
 .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 760px) { .compare { grid-template-columns: 1fr; } }
 
-.compare-card { border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); overflow: hidden; }
+/* Two columns, told apart by a coloured rule and a coloured label rather than
+   by being two more cards inside a card. */
+.compare-card { padding-left: 11px; border-left: 2px solid var(--line); }
 .compare-card header {
     display: flex; align-items: center; gap: 6px;
-    padding: 7px 13px;
+    margin-bottom: 5px;
     font-size: 10.5px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
-    border-bottom: 1px solid var(--line);
-    background: var(--surface-2);
 }
-.compare-card .body { padding: 12px 13px; white-space: pre-wrap; font-size: 13.5px; }
+.compare-card .body { white-space: pre-wrap; font-size: 13.5px; color: var(--text-2); }
+.compare-expected { border-left-color: color-mix(in oklab, var(--ok) 45%, transparent); }
+.compare-actual   { border-left-color: color-mix(in oklab, var(--danger) 45%, transparent); }
 .compare-expected header { color: color-mix(in oklab, var(--ok) 72%, var(--text)); }
 .compare-actual   header { color: color-mix(in oklab, var(--danger) 72%, var(--text)); }
 
 .pre { white-space: pre-wrap; font-size: 13.5px; color: var(--text-2); }
 
 .steps {
-    padding: 12px 14px;
-    border-radius: var(--r-md);
-    background: var(--surface-2);
-    border: 1px solid var(--line);
     font-size: 12.5px;
     white-space: pre-wrap;
-    line-height: 1.7;
+    line-height: 1.75;
+    color: var(--text-2);
 }
+
+/* pre-wrap breaks at whitespace and nowhere else, and the primary content of a
+   bug tracker is a stack trace or a URL: one unbroken token that would push the
+   panel wider than the screen and take the page's layout with it. */
+.pre, .steps, .compare-card .body,
+.timeline-line, .notif-message, .mini-title { overflow-wrap: anywhere; }
 
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .spacer { flex: 1 1 auto; }
 
 /* ---------- attachments ---------- */
-.attachment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .attachment {
     display: flex;
     align-items: center;
@@ -1715,6 +1877,9 @@ select {
 
 .upload-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .file-drop {
+    /* anchors the 1x1 file input below, so the browser's "select a file"
+       bubble points at this control and not at the top of the panel */
+    position: relative;
     flex: 1 1 240px;
     flex-direction: row;
     align-items: center;
@@ -1787,7 +1952,7 @@ select {
 
 .timeline .ev-created  { --c: var(--accent); }
 .timeline .ev-status   { --c: var(--st-IN_PROGRESS); }
-.timeline .ev-assigned { --c: var(--st-ASSIGNED); }
+.timeline .ev-assigned { --c: var(--st-ON_HOLD); }
 .timeline .ev-comment  { --c: var(--muted); }
 .timeline .ev-attachment { --c: var(--st-CLOSED); }
 
@@ -1812,10 +1977,12 @@ select {
 .notif-list .is-unread .notif-message { font-weight: 560; }
 .notif-list .is-read { opacity: .58; }
 
-.nt-assigned { --c: var(--st-ASSIGNED); }
-.nt-fixed    { --c: var(--st-FIXED); }
-.nt-reopened { --c: var(--st-REOPENED); }
+.nt-assigned { --c: var(--st-ON_HOLD); }
+.nt-fixed    { --c: var(--st-READY_FOR_TEST); }
+.nt-reopened { --c: var(--st-RETEST); }
 .nt-closed   { --c: var(--st-CLOSED); }
+/* Coming off a bug is news too, but it is not a status move: grey, not a hue. */
+.nt-unassigned { --c: var(--muted); }
 
 .notif-icon {
     flex: none;
@@ -1870,8 +2037,6 @@ select {
     text-transform: uppercase;
 }
 
-/* three numbers that say what this person is carrying */
-.member-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .stat-tile {
     display: grid;
     gap: 1px;
@@ -1887,10 +2052,6 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
 .stat-name { font-size: 10.5px; color: var(--muted); }
 .stat-tile.is-zero .stat-value { color: var(--muted); opacity: .5; }
 
-/* how much of their queue is still live */
-.load-bar { height: 5px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; display: flex; }
-.load-bar i { display: block; height: 100%; animation: grow var(--slow) var(--ease) both; }
-
 .member-foot { display: flex; align-items: center; gap: 6px; }
 .member-foot .spacer { flex: 1; }
 
@@ -1900,9 +2061,20 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
 .person-id h1 { font-size: 22px; }
 .person-id .person-mail { font-size: 13px; color: var(--muted); }
 .person-hero .kpi-row { margin-left: auto; grid-template-columns: repeat(4, minmax(78px, 1fr)); min-width: 348px; }
-@media (max-width: 800px) { .person-hero .kpi-row { margin-left: 0; min-width: 0; width: 100%; } }
+/* 800 predates the 780 breakpoint and should fold into it. Dropping min-width
+   alone left four 78px tracks in a 292px panel, clipping the last tile. */
+@media (max-width: 800px) {
+    .person-hero .kpi-row {
+        margin-left: 0;
+        min-width: 0;
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
 
-.two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; align-items: start; }
+/* min() so a single auto-fit track can go under 360px: with a bare minmax the
+   floor stands even when there is only one column, and it overflows. */
+.two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 14px; align-items: start; }
 
 /* a compact bug row, used on the person page */
 .mini-list { list-style: none; margin: 0; padding: 0; }
@@ -1926,37 +2098,6 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
 /* ==========================================================================
    Forms
    ========================================================================== */
-.form-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; align-items: start; }
-@media (max-width: 980px) { .form-grid { grid-template-columns: 1fr; } .preview { position: static; } }
-
-.bug-form { display: grid; gap: 0; }
-.form-section { padding: 16px; border-bottom: 1px solid var(--line); display: grid; gap: 12px; }
-.form-section:last-of-type { border-bottom: none; }
-
-.form-section-head {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    margin: -16px -16px 2px;
-    padding: 9px 16px;
-    border-bottom: 1px solid var(--line);
-    background: var(--surface-2);
-}
-.form-section:first-of-type .form-section-head { border-radius: var(--r-xl) var(--r-xl) 0 0; }
-.form-section-head h2 { font-size: 12.5px; color: var(--text-2); }
-.form-section-head .step-num {
-    display: grid; place-items: center;
-    flex: none;
-    width: 19px; height: 19px;
-    border-radius: var(--r-sm);
-    background: var(--surface-3);
-    color: var(--text-2);
-    font-size: 11px; font-weight: 650;
-    transition: background var(--mid) var(--ease), color var(--mid) var(--ease);
-}
-.form-section:focus-within .form-section-head h2 { color: var(--text); }
-.form-section:focus-within .step-num { background: var(--accent); color: var(--accent-ink); }
-
 .row { display: flex; flex-wrap: wrap; gap: 12px; }
 .row > * { flex: 1 1 190px; }
 .row-inline { align-items: flex-end; }
@@ -1971,21 +2112,6 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
     border-radius: 0 0 var(--r-xl) var(--r-xl);
 }
 
-.preview { position: sticky; top: calc(var(--topbar-h) + 16px); padding: 14px 16px; display: grid; gap: 10px; }
-.preview h2 { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.preview-title { font-weight: 560; font-size: 14px; }
-.preview-empty { color: var(--muted); font-weight: 400; }
-.impact {
-    padding: 9px 11px;
-    border-radius: var(--r-md);
-    border: 1px solid color-mix(in oklab, var(--c) 28%, transparent);
-    background: color-mix(in oklab, var(--c) 8%, transparent);
-    font-size: 12.5px;
-    color: var(--text-2);
-    transition: background var(--mid) var(--ease), border-color var(--mid) var(--ease);
-}
-.impact b { color: color-mix(in oklab, var(--c) 74%, var(--text)); font-weight: 600; }
-
 /* ==========================================================================
    Toast
    ========================================================================== */
@@ -1993,7 +2119,7 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
     position: fixed;
     bottom: 18px;
     right: 18px;
-    z-index: 80;
+    z-index: var(--z-toast);
     display: flex;
     align-items: center;
     gap: 9px;
@@ -2036,46 +2162,194 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
 /* ==========================================================================
    Sign-in
    ========================================================================== */
-.login-page { display: grid; place-items: center; min-height: 100vh; }
-.login-shell { display: grid; justify-items: center; gap: 16px; padding: 24px; width: 100%; }
+/* --------------------------------------------------------------------------
+   Sign in: the form on the left, what the app is for on the right.
+   The right panel is decoration — it is hidden below 900px rather than
+   stacked, because a marketing panel above a login form just pushes the
+   fields off a phone screen.
+   -------------------------------------------------------------------------- */
+/* dvh, or the card sits under the phone's URL bar. vh first, as the fallback. */
+.login-page { min-height: 100vh; min-height: 100dvh; padding: 18px; display: grid; }
+
+.login-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 18px;
+    width: 100%;
+    max-width: 1240px;
+    margin: auto;
+}
+
+/* ---- left: the card that does the work ---- */
 .login-card {
-    width: min(376px, 92vw);
-    padding: 26px 28px 28px;
+    display: flex;
+    flex-direction: column;
+    padding: 30px 34px;
     border: 1px solid var(--line);
     border-radius: var(--r-xl);
-    background: var(--surface);
-    -webkit-backdrop-filter: saturate(180%) blur(22px);
-    backdrop-filter: saturate(180%) blur(22px);
-    box-shadow: var(--shadow-3);
-    animation: rise var(--slow) var(--ease) both;
+    background: var(--surface-flat);
+    box-shadow: var(--shadow-2);
 }
-.login-card h1 { font-size: 19px; margin-bottom: 3px; }
-.login-card .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-.login-card form { display: grid; gap: 13px; }
-.login-brand { margin-bottom: 18px; }
-.login-submit { width: 100%; height: 35px; margin-top: 4px; }
-.login-foot { color: var(--muted); font-size: 12px; }
+
+.login-body { margin: auto 0; width: 100%; max-width: 380px; align-self: center; }
+
+.login-brand { margin-bottom: 0; }
+.login-card h1 { font-size: 25px; letter-spacing: -.028em; text-align: center; }
+.login-card .sub {
+    margin: 7px auto 22px;
+    max-width: 34ch;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.5;
+    text-align: center;
+}
+.login-card form { display: grid; gap: 15px; }
+
+/* An input with an icon sitting inside its left edge. */
+.field-icon { position: relative; display: block; }
+.field-icon > svg.i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+}
+.field-icon input { height: 42px; padding-left: 38px; font-size: 13.5px; }
+.field-icon input::placeholder { color: var(--muted); }
+
+.req { color: var(--accent); font-weight: 700; }
+
+.reveal {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: grid;
+    place-items: center;
+    width: 30px; height: 30px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+.reveal:hover { background: var(--surface-3); color: var(--text); }
+
+.login-submit { width: 100%; height: 44px; margin-top: 3px; font-size: 14px; border-radius: var(--r-md); }
 
 .login-alert {
-    display: flex; align-items: center; gap: 7px;
-    padding: 8px 11px;
-    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+    padding: 9px 12px;
     border-radius: var(--r-md);
     font-size: 12.5px;
-    animation: rise var(--mid) var(--ease) both;
 }
 .login-alert.is-error {
     border: 1px solid color-mix(in oklab, var(--danger) 32%, transparent);
-    background: color-mix(in oklab, var(--danger) 8%, transparent);
+    background: color-mix(in oklab, var(--danger) 9%, transparent);
     color: color-mix(in oklab, var(--danger) 76%, var(--text));
 }
 .login-alert.is-error::before { content: "!"; display: grid; place-items: center; width: 14px; height: 14px; flex: none; border-radius: var(--r-full); background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; }
-.login-alert.is-ok {
-    border: 1px solid color-mix(in oklab, var(--ok) 32%, transparent);
-    background: color-mix(in oklab, var(--ok) 8%, transparent);
-    color: color-mix(in oklab, var(--ok) 76%, var(--text));
+
+/* ---- right: the peacock panel ---- */
+.login-aside {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 18px;
+    padding: 38px;
+    border-radius: var(--r-xl);
+    background:
+        radial-gradient(120% 80% at 78% 6%, rgba(255, 255, 255, .10), transparent 58%),
+        linear-gradient(158deg, #0d5f5b 0%, #0a4744 46%, #07322f 100%);
+    color: #eaf6f4;
+    isolation: isolate;
 }
-.login-alert.is-ok::before { content: "✓"; color: var(--ok); font-weight: 700; }
+
+/* A faint grid, so the panel reads as a surface rather than a gradient. */
+.login-aside::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px);
+    background-size: 62px 62px;
+    mask-image: radial-gradient(120% 90% at 60% 20%, #000 30%, transparent 78%);
+}
+
+.login-aside-mark {
+    display: grid;
+    place-items: center;
+    width: 52px; height: 52px;
+    border-radius: var(--r-lg);
+    background: rgba(255, 255, 255, .13);
+    border: 1px solid rgba(255, 255, 255, .18);
+    color: #fff;
+    font-size: 21px;
+    font-weight: 700;
+}
+.login-aside h2 { font-size: 29px; line-height: 1.2; letter-spacing: -.03em; color: #fff; max-width: 17ch; }
+.login-aside p { max-width: 46ch; font-size: 13.5px; line-height: 1.65; color: rgba(234, 246, 244, .76); }
+
+/* The floating preview cards: the app's own vocabulary, at rest. */
+.login-preview {
+    flex: 1;
+    position: relative;
+    min-height: 250px;
+    margin-bottom: 6px;
+}
+.pv {
+    position: absolute;
+    padding: 13px 15px;
+    border-radius: var(--r-lg);
+    border: 1px solid rgba(255, 255, 255, .14);
+    background: rgba(9, 46, 44, .74);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 22px 44px -18px rgba(0, 0, 0, .6);
+    animation: rise var(--slow) var(--ease) both;
+}
+.pv-a { top: 4%;  left: 4%;  width: 60%; animation-delay: 60ms; }
+.pv-b { top: 34%; right: 2%; width: 54%; animation-delay: 160ms; }
+.pv-c { bottom: 2%; left: 12%; width: 66%; animation-delay: 260ms; }
+
+.pv-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(234, 246, 244, .62);
+}
+.pv-head .spacer { margin-left: auto; }
+.pv-big { font-size: 21px; font-weight: 660; color: #fff; letter-spacing: -.02em; }
+.pv-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: rgba(234, 246, 244, .8); }
+.pv-row + .pv-row { margin-top: 8px; }
+.pv-row .spacer { margin-left: auto; }
+.pv-bar { height: 5px; border-radius: var(--r-full); background: rgba(255, 255, 255, .14); overflow: hidden; }
+.pv-bar i { display: block; height: 100%; border-radius: inherit; background: var(--c, #2dd4bf); }
+.pv-chip {
+    padding: 2px 7px;
+    border-radius: var(--r-full);
+    background: rgba(255, 255, 255, .12);
+    font-size: 10px;
+    font-weight: 600;
+    color: #eaf6f4;
+}
+
+@media (max-width: 900px) {
+    .login-shell { grid-template-columns: minmax(0, 1fr); max-width: 460px; }
+    .login-aside { display: none; }
+    .login-card { padding: 26px 22px; }
+}
 
 /* ==========================================================================
    Icons
@@ -2092,7 +2366,7 @@ svg.i {
     stroke-linejoin: round;
     vertical-align: middle;
 }
-.sidenav-item svg.i { width: 16px; height: 16px; }
+.nav-link svg.i { width: 15px; height: 15px; }
 svg.i.chev, svg.i.switcher-chev, svg.i.tick, svg.i.go { width: 12px; height: 12px; }
 .chip .x svg.i { width: 12px; height: 12px; }
 .seg svg.i { width: 13px; height: 13px; }
@@ -2105,11 +2379,25 @@ svg.i.chev, svg.i.switcher-chev, svg.i.tick, svg.i.go { width: 12px; height: 12p
 @keyframes rise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 .rise { animation: rise var(--mid) var(--ease) both; animation-delay: calc(var(--i, 0) * 35ms); }
 
+@media (max-width: 900px) {
+    /* The words come off, the links stay: two 15px icons cost about 70px and
+       keep .nav-link.is-active — the only "you are here" cue there is — in the
+       bar rather than behind a menu. Both links carry title and aria-label.
+       The user menu lists the sections too, which is what a screen reader and
+       a narrower screen need; this keeps the sighted phone user oriented. */
+    .brand .lbl, .user-name, .nav-link > span { display: none; }
+    .nav-link { padding: 6px 8px; }
+    .navbar { gap: 6px; padding: 0 10px; }
+}
+
 @media (max-width: 780px) {
-    .app,
-    [data-sidebar="expanded"] .app { grid-template-columns: var(--sidebar-rail) minmax(0, 1fr); }
-    .toolbar { top: 0; }
+    /* A panel head is a title plus its actions; with two buttons beside it
+       (the docs panel) that is wider than a phone, and it must fall to a
+       second line rather than take the page with it. */
+    .panel-head { flex-wrap: wrap; row-gap: 8px; }
+    .toolbar { top: var(--nav-h); }
     .kanban { grid-auto-columns: minmax(228px, 84vw); }
+    .detail-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2119,8 +2407,1566 @@ svg.i.chev, svg.i.switcher-chev, svg.i.tick, svg.i.go { width: 12px; height: 12p
         animation-iteration-count: 1 !important;
         transition-duration: .001ms !important;
     }
-    .dist span, .heat-track i, .load-bar i { width: var(--w, 0%); }
+    .dist span, .heat-track i { width: var(--w, 0%); }
 }
 
 /* Progressive enhancement: the Apply button only exists without JS. */
 html.js .no-js { display: none; }
+
+
+/* ==========================================================================
+   Bug detail — one report, a rail of controls
+   ========================================================================== */
+
+/* The line under the title: labelled facts, not a row of loose badges that
+   reads as one run-on sentence. */
+
+/* Description, steps, expected and actual are one report, not four cards. */
+.report { display: grid; }
+.report-sec { padding: 14px 16px; }
+.report-sec + .report-sec { border-top: 1px solid var(--line); }
+.report-sec > h3 {
+    margin-bottom: 8px;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.report-sec .pre, .report-sec .steps { font-size: 13.5px; }
+.report-sec .compare { margin-top: 2px; }
+
+/* Status: what it is now, and a menu to move it on. */
+.statuspick { position: relative; width: 100%; }
+.statuspick > summary { list-style: none; cursor: pointer; }
+.statuspick > summary::-webkit-details-marker { display: none; }
+.statuspick > summary::marker { content: ""; }
+
+.status-current {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in oklab, var(--c) 34%, var(--line));
+    border-radius: var(--r-md);
+    background: color-mix(in oklab, var(--c) 11%, var(--surface-2));
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 560;
+    transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.status-current:hover { background: color-mix(in oklab, var(--c) 17%, var(--surface-2)); }
+.status-current .dot { flex: none; background: var(--c); }
+.status-current .chev { margin-left: auto; color: var(--muted); transition: transform var(--mid) var(--ease); }
+.statuspick[open] .status-current .chev { transform: rotate(180deg); }
+
+/* A popover that fills the rail card rather than hanging off its right edge. */
+.pop-block { left: 0; right: 0; width: auto; }
+
+.status-opt-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: none;
+    color: var(--text-2);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.status-opt-row .dot { flex: none; background: var(--c); }
+.status-opt-row:hover:not(:disabled) { background: color-mix(in oklab, var(--c) 12%, var(--surface-3)); color: var(--text); }
+.status-opt-row:disabled { cursor: default; background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.status-opt-row .tick { margin-left: auto; color: var(--accent); }
+.status-opt-row .step-n {
+    margin-left: auto;
+    font-size: 10.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Assignee: one select, already pointed at whoever has it. */
+.assign-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 9px; }
+.assign-row select { height: 34px; }
+.assign-hint { font-size: 11.5px; color: var(--muted); }
+.assign-hint a { color: var(--accent); }
+
+/* A rail panel that folds. History starts shut — it is reference, not the job. */
+.rail-fold { border-radius: inherit; }
+.rail-fold > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 13px;
+    list-style: none;
+    cursor: pointer;
+    border-radius: inherit;
+}
+.rail-fold > summary::-webkit-details-marker { display: none; }
+.rail-fold > summary::marker { content: ""; }
+.rail-fold > summary:hover { background: var(--surface-2); }
+.rail-fold > summary .rail-title { margin: 0; }
+.rail-fold > summary .chev { margin-left: auto; color: var(--muted); transition: transform var(--mid) var(--ease); }
+.rail-fold[open] > summary .chev { transform: rotate(180deg); }
+.rail-fold[open] > summary { border-bottom: 1px solid var(--line); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.rail-fold-body { padding: 12px 13px; }
+.rail-fold-body .timeline { margin: 0; }
+
+/* The rail's own panels carry their padding on the fold, not the panel. */
+.panel.rail-fold { padding: 0; display: block; }
+
+/* Compact attachment list for the rail, where there is no room for a grid. */
+.rail-files { display: grid; gap: 6px; }
+.rail-file {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 9px;
+    padding: 7px 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.rail-file:hover { border-color: var(--line-strong); background: var(--surface-3); }
+.rail-file .nm { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-file .mt { font-size: 11px; color: var(--muted); }
+
+/* Progressive enhancement, the other way round: shown only when JS is off. */
+html.js .js-off { display: none; }
+/* ...and its mirror: chrome that only means anything with scripting. */
+html:not(.js) .js-only { display: none; }
+
+/* ==========================================================================
+   People pickers, blockers and mentions
+   ========================================================================== */
+
+/* A checkbox list behind a summary. Used wherever more than one person can be
+   chosen — a multi-select would work, but nobody knows to ctrl-click one. */
+.picker { width: 100%; }
+
+.picker-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--surface-flat);
+    color: var(--text);
+    font-size: 13px;
+    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.picker-btn:hover { border-color: var(--muted); }
+.picker-btn > .chev { margin-left: auto; color: var(--muted); transition: transform var(--mid) var(--ease); }
+.picker[open] .picker-btn > .chev { transform: rotate(180deg); }
+.picker-btn svg.i:first-child { color: var(--muted); }
+
+.picker-faces { display: inline-flex; }
+.picker-faces .avatar + .avatar { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-flat); }
+
+.pick-opt {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 9px;
+    border-radius: var(--r-md);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.pick-opt:hover { background: var(--surface-3); color: var(--text); }
+.pick-opt input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    flex: none;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+.pick-opt:has(input:checked) { background: var(--accent-soft); color: var(--text); font-weight: 550; }
+
+/* Overlapping faces, for "these three people are on it" in one column width. */
+.face-stack { display: inline-flex; align-items: center; }
+.face-stack .avatar + .avatar { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-flat); }
+
+.assignee-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- blocked ---------- */
+
+/* On a card or a row: small, red, and ahead of the title, because a blocked
+   bug is one you should stop reading about and go unblock. */
+.blocked-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px; height: 17px;
+    flex: none;
+    border-radius: var(--r-sm);
+    background: color-mix(in oklab, var(--danger) 14%, transparent);
+    color: var(--danger);
+    vertical-align: middle;
+}
+.blocked-mark svg.i { width: 11px; height: 11px; stroke-width: 2.1; }
+.bug-table .blocked-mark { margin-right: 6px; }
+.kcard-top .blocked-mark { margin-left: 2px; }
+.kcard-top .blocked-mark + .badge-square { margin-left: auto; }
+
+/* On the bug itself: a full line, and a link to whatever is in the way. */
+.blocked-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 8px 11px;
+    border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent);
+    border-radius: var(--r-md);
+    background: color-mix(in oklab, var(--danger) 8%, transparent);
+    color: color-mix(in oklab, var(--danger) 74%, var(--text));
+    font-size: 12.5px;
+    transition: background var(--fast) var(--ease);
+}
+.blocked-note:hover { background: color-mix(in oklab, var(--danger) 14%, transparent); }
+.blocked-note svg.i { flex: none; color: var(--danger); }
+
+/* ---------- mentions ---------- */
+.mention {
+    padding: 1px 5px;
+    border-radius: var(--r-sm);
+    background: var(--accent-soft);
+    color: color-mix(in oklab, var(--accent) 80%, var(--text));
+    font-weight: 560;
+}
+
+.comment-row { position: relative; }
+
+.mention-menu {
+    position: absolute;
+    z-index: var(--z-menu);
+    left: 0;
+    bottom: calc(100% + 6px);
+    min-width: 200px;
+    padding: 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-lg);
+    background: var(--surface-pop);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: var(--shadow-3);
+}
+.mention-menu[hidden] { display: none; }
+
+.mention-opt {
+    display: block;
+    width: 100%;
+    padding: 6px 9px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: none;
+    color: var(--text-2);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+.mention-opt:hover, .mention-opt.is-active { background: var(--accent-soft); color: var(--text); }
+
+/* ==========================================================================
+   The raise/edit form — one card, read top to bottom
+   ========================================================================== */
+.stack-form { max-width: 860px; width: 100%; margin: 0 auto; }
+
+.input-lg { height: 40px; font-size: 15px; font-weight: 500; }
+
+/* Fields that wrap instead of overflowing, at any count. */
+.field-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    align-items: start;
+}
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: 12.5px; font-weight: 520; color: var(--text-2); }
+
+/* The fields most bugs never need, behind one line. */
+.form-more > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    list-style: none;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 550;
+    color: var(--muted);
+}
+.form-more > summary::-webkit-details-marker { display: none; }
+.form-more > summary::marker { content: ""; }
+.form-more > summary:hover { color: var(--text); }
+.form-more > summary .chev { transition: transform var(--mid) var(--ease); }
+.form-more[open] > summary .chev { transform: rotate(180deg); }
+
+.form-foot .spacer { margin-left: auto; }
+
+
+/* ==========================================================================
+   Back navigation, detail hierarchy and visible attachments
+   ========================================================================== */
+
+/* Every page below the board carries one, in the same place, so "where does
+   this take me back to" is never a guess. */
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    margin-right: 2px;
+    padding: 5px 9px 5px 7px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 12.5px;
+    font-weight: 520;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease),
+                border-color var(--fast) var(--ease);
+}
+.back-link:hover { background: var(--surface-3); color: var(--text); border-color: var(--line-strong); }
+.back-link svg.i { width: 14px; height: 14px; }
+@media (max-width: 640px) { .back-link span { display: none; } }
+
+
+
+/* An image attachment is usually the clearest thing in the report, so it is
+   shown rather than named. */
+.shot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+}
+.shot {
+    display: grid;
+    gap: 5px;
+    padding: 5px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.shot:hover { border-color: var(--accent); background: var(--surface-3); }
+/* contain, not cover: a full-page screenshot IS the report, and cropping it to
+   a band leaves an unreadable horizontal sliver. */
+.shot img {
+    display: block;
+    width: 100%;
+    height: 132px;
+    object-fit: contain;
+    border-radius: var(--r-sm);
+    background: var(--surface-3);
+}
+.shot-name {
+    font-size: 10.5px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Both lists are grid tracks in the rail: an empty one still costs its gap. */
+.shot-grid:not(:has(.shot)) { display: none; }
+.rail-files:not(:has(.rail-file)) { display: none; }
+
+/* The file input on the raise form takes several at once. */
+#files { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+
+/* ==========================================================================
+   The project name as the switcher, and the merged facts card
+   ========================================================================== */
+
+/* On the board the project name IS the control — one click, no expanding. */
+.switcher-title {
+    width: auto;
+    max-width: min(460px, 46vw);
+    gap: 10px;
+    padding: 5px 9px 5px 6px;
+    border-color: transparent;
+    background: transparent;
+}
+.switcher-title:hover,
+.switcher-title[aria-expanded="true"] { background: var(--surface-2); border-color: var(--line); }
+.switcher-title .topbar-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.switcher-title .switcher-chev { margin-left: 0; }
+.topbar .switcher-menu { width: 280px; left: 0; }
+
+/* One card for what the bug is: its number, where it is, and the fixed facts. */
+.facts-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--line);
+}
+.facts-top .bug-id { font-size: 12px; color: var(--muted); }
+.facts-top .spacer { margin-left: auto; }
+#bug-facts .rail-facts { margin-top: 2px; }
+
+/* ---------- attachments you can remove ---------- */
+.icon-btn-sm { width: 24px; height: 24px; flex: none; }
+.icon-btn-sm svg.i { width: 13px; height: 13px; }
+.icon-btn-sm:hover { color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, transparent); }
+
+.shot { position: relative; }
+.shot-open { display: block; border-radius: var(--r-sm); overflow: hidden; }
+.shot-foot { display: flex; align-items: center; gap: 4px; }
+.shot-foot .shot-name { flex: 1; min-width: 0; }
+
+.rail-file { grid-template-columns: auto minmax(0, 1fr) auto; }
+.rail-file > a { display: grid; min-width: 0; }
+
+/* ---------- the lightbox ----------
+   An attachment opens over the page, not instead of it: you are still reading
+   the bug. The thumbnail stays a real link, so this is only a shortcut. */
+.lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-toast);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 10px;
+    padding: 18px;
+    background: color-mix(in oklab, var(--text) 62%, transparent);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity var(--mid) var(--ease);
+}
+.lightbox[hidden] { display: none; }
+.lightbox.is-open { opacity: 1; }
+
+.lightbox-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-self: center;
+    max-width: 100%;
+    padding: 7px 8px 7px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-full);
+    background: var(--surface-pop);
+    box-shadow: var(--shadow-3);
+}
+.lightbox-name {
+    font-size: 12.5px;
+    font-weight: 550;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lightbox-stage {
+    display: grid;
+    place-items: center;
+    min-height: 0;
+}
+.lightbox-stage img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-3);
+    background: var(--surface-flat);
+    animation: rise var(--mid) var(--ease) both;
+}
+
+
+/* Save stays put while a long roster scrolls under it. */
+.pop-head-sticky {
+    position: sticky;
+    top: -5px;                      /* cancels the .pop padding */
+    z-index: 1;
+    background: var(--surface-pop);
+    margin: -5px -5px 4px;
+    padding: 10px 12px;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.pop-head-sticky .btn { text-transform: none; letter-spacing: 0; }
+
+.pick-search {
+    position: relative;
+    margin: 0 4px 5px;
+}
+.pick-search > svg.i {
+    position: absolute;
+    left: 9px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+}
+.pick-search input { height: 30px; padding-left: 29px; font-size: 12.5px; }
+
+/* A thirty-person roster is a 900px popover otherwise. Save is sticky above it. */
+#assignee-list { max-height: 260px; overflow-y: auto; }
+
+
+/* ==========================================================================
+   The trash — deleting is reversible, so it needs somewhere to be reversed
+   ========================================================================== */
+.bell.is-active { background: var(--accent-soft); color: var(--text); }
+
+.toast-undo {
+    margin-left: 4px;
+    padding: 3px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-full);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--fast) var(--ease);
+}
+.toast-undo:hover { background: color-mix(in oklab, var(--bg) 22%, transparent); }
+
+/* Struck through, because the row is a record of something that is not there. */
+.trash-title { color: var(--text-2); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+#trash-table tr { opacity: .86; }
+#trash-table tr:hover { opacity: 1; }
+
+
+/* ==========================================================================
+   Mobile
+   --------------------------------------------------------------------------
+   Two widths, matching the rest of the file: 1080 is where the detail rail
+   stops being a rail, 780 is where the chrome collapses. The 640 block below
+   is the popover work, which only misbehaves on a phone; 760/800/820/900 are
+   older one-off queries that should eventually fold into these two.
+   ========================================================================== */
+
+/* The controls are in the rail and the rail is last in the DOM: on a bug with
+   twenty comments, changing the status was five screens down. */
+@media (max-width: 1080px) {
+    .detail-rail { order: -1; }
+}
+
+@media (max-width: 780px) {
+    /* Two sticky bars claimed the same offset. --z-topbar beats --z-toolbar and
+       the topbar is opaque, so the whole filter bar — search, faces, every
+       filter, the count — sat behind it for the entire scroll. On a phone the
+       topbar scrolls away and the toolbar keeps the sticky slot, because the
+       filters are what you reach for. Relative, not static: the popovers in it
+       are absolutely positioned and need it as their containing block. */
+    .topbar {
+        position: relative;
+        top: auto;
+        flex-wrap: wrap;
+        row-gap: 8px;
+        padding: 8px 12px;
+    }
+    /* Secondary context, and on Settings it wraps into a dozen stacked lines
+       that push the tabs off the screen. The title already says where you are. */
+    .topbar-sub { display: none; }
+
+    /* Restored open from a desktop session, three stacked blocks are taller
+       than the phone and the board is unreachable. Cap and scroll it. */
+    .stats-drawer {
+        gap: 12px;
+        padding: 12px;
+        max-height: 52dvh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    /* iOS zooms in on any field under 16px and never zooms back out. */
+    input[type=text], input[type=search], input[type=email], input[type=password], select, textarea,
+    .search-wrap input, .switcher-search input, .field-icon input,
+    .pick-search input { font-size: 16px; }
+
+    /* ---------- a table row becomes a card ----------
+       620px of columns in a 360px screen meant "Raised by" and "Reported" — and
+       on the trash, Restore and Delete for good — were reachable only by finding
+       a horizontal scroll with no shadow, no fade and no hint that it was there.
+       The header goes and each cell states its own label instead. */
+    .table-wrap { overflow-x: visible; }
+    .bug-table { min-width: 0; }
+    .bug-table, .bug-table tbody { display: block; }
+    .bug-table thead { display: none; }
+
+    .bug-table tbody tr {
+        position: relative;
+        display: grid;
+        /* Same two tracks the labelled cells use inside themselves, so the
+           severity line below lands in the same columns as everything else. */
+        grid-template-columns: 88px minmax(0, 1fr);
+        gap: 3px 8px;
+        margin: 8px;
+        padding: 10px 12px 11px 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-lg);
+        background: var(--surface-2);
+        overflow: hidden;
+    }
+    .bug-table tbody tr:hover { border-color: var(--line-strong); }
+
+    .bug-table td { grid-column: 1 / -1; padding: 0; border-bottom: none; }
+    .bug-table td:empty:not(.rail) { display: none; }
+    /* Out of the grid rather than a spanning cell: the row has a different
+       number of cells on every page that uses this table. */
+    .bug-table td.rail { position: absolute; inset: 0 auto 0 0; width: 4px; }
+    .bug-table td.rail::before { inset: 0 auto 0 0; width: 4px; }
+    .bug-table tbody tr:hover td.rail::before { inset: 0 auto 0 0; }
+
+    .bug-table td[data-label] {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+    }
+    .bug-table td[data-label]::before {
+        content: attr(data-label);
+        font-size: 10px;
+        font-weight: 650;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+
+    /* The number and the title identify the card; they lead it, unlabelled. */
+    .bug-table td.bug-id, .bug-table td.grow { display: block; width: auto; }
+    .bug-table td.bug-id::before, .bug-table td.grow::before { content: none; }
+    .bug-table td.grow { padding-bottom: 4px; }
+    .bug-table td.grow .bug-link { max-width: none; font-size: 14px; font-weight: 560; }
+
+    /* Severity has no column of its own — it is the 4px rail, which cannot hold
+       a word — so on a phone it was colour and nothing else. The row carries it:
+       ::before is the label, ::after the value, both ordered last so they land
+       in one grid row whatever number of cells the table has. */
+    .bug-table tbody tr[data-severity]::before,
+    .bug-table tbody tr[data-severity]::after { order: 1; align-self: center; }
+    .bug-table tbody tr[data-severity]::before {
+        content: "Severity";
+        font-size: 10px;
+        font-weight: 650;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+    .bug-table tbody tr[data-severity]::after {
+        content: attr(data-severity);
+        color: color-mix(in oklab, var(--c) 74%, var(--text));
+        font-weight: 560;
+    }
+
+    /* Two-letter initials with no hover to resolve them are not an assignee.
+       The name is already in the cell for screen readers; on a phone it stops
+       being screen-reader-only and just reads. It wraps to its own line when it
+       has to — eleven overlapping avatars and eleven names do not share one. */
+    .bug-table td[data-label] .face-stack { flex-wrap: wrap; row-gap: 4px; }
+    .bug-table td[data-label] .face-stack .sr-only {
+        position: static;
+        width: auto;
+        height: auto;
+        min-width: 0;
+        margin: 0 0 0 7px;
+        overflow: visible;
+        clip: auto;
+        white-space: normal;
+        font-size: 12.5px;
+        color: var(--text-2);
+    }
+}
+
+@media (max-width: 640px) {
+    /* max-width clamped these panels but never moved them: anchored to a button
+       near the right edge, a 336px panel started at x = -78 and the left of
+       every row was off-screen, which is not somewhere you can scroll to. The
+       wrapper stops being the containing block so the bar itself is, and the
+       panel spans the screen under it. .pop-block is excluded — it is meant to
+       fill its rail card. */
+    .navbar .pop-wrap, .topbar .pop-wrap { position: static; }
+    .navbar .pop, .topbar .pop:not(.pop-block) {
+        left: var(--edge);
+        right: var(--edge);
+        width: auto;
+        max-width: none;
+    }
+
+    /* Same bug, other menu: min-width 196px with nothing clamping it and
+       nowrap children, opening from a button in the middle of the bar. */
+    .toolbar .fmenu { position: static; }
+    .toolbar .fmenu-pop,
+    .toolbar .fmenu-pop.to-right {
+        left: var(--edge);
+        right: var(--edge);
+        width: auto;
+        min-width: 0;
+        max-width: none;
+    }
+    .fmenu-opt { white-space: normal; }
+}
+
+/* A finger is about 9mm and nothing here was drawn bigger than 33px. The two
+   controls that are transparent at rest simply grow — you cannot see the box
+   either way. The rest keep their drawn size and get an invisible target
+   centred on them, so the desktop UI is untouched. (The bell is in the second
+   group: its unread count is pinned to its corner and would drift off the
+   icon if the box grew under it.) */
+@media (pointer: coarse) {
+    .icon-btn, .icon-btn-sm { width: var(--tap); height: var(--tap); }
+
+    .bell, .btn-sm, .seg a, .seg button, .fmenu-btn, .face, .face-more, .chip, .toast-undo { position: relative; }
+    .bell::after, .btn-sm::after, .seg a::after, .seg button::after, .fmenu-btn::after, .face::after,
+    .face-more::after, .chip::after, .toast-undo::after {
+        content: "";
+        position: absolute;
+        left: 50%; top: 50%;
+        width: max(100%, var(--tap));
+        height: max(100%, var(--tap));
+        transform: translate(-50%, -50%);
+    }
+
+    .pop-item { min-height: var(--tap); }
+
+    /* Room to grow into, rather than into each other: five 28px faces at a 5px
+       gap have overlapping targets the moment the targets are 44px. */
+    .people-bar { gap: 16px; }
+    .nav-right { gap: 12px; }
+    .chips, .toolbar { row-gap: 14px; }
+}
+
+/* :hover latches after a tap on a touch screen, so a tapped face or card stays
+   lifted until something else is tapped. Only the lift is undone — the colour
+   change is still useful feedback that the tap landed. */
+@media (hover: none) {
+    .face:hover        { transform: none; }
+    .kcard:hover       { transform: none; box-shadow: none; }
+    .member-card:hover { transform: none; box-shadow: var(--shadow-1); }
+    a.kpi:hover        { transform: none; }
+}
+
+/* ==========================================================================
+   Supporting docs — a page or a sheet, written against one bug.
+
+   Two components: the list on the bug's page, and the editor the list opens.
+   Docs are their own axis, not a status and not a severity, so they carry
+   their own --doc-* pair (see .dk-PAGE / .dk-SHEET) rather than borrowing a
+   meaning that already belongs to something else.
+   ========================================================================== */
+
+.doc-list { display: grid; }
+.doc-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px 8px 14px;
+    border-bottom: 1px solid var(--line);
+    transition: background var(--fast) var(--ease);
+    animation: rise var(--mid) var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 30ms + 30ms);
+}
+.doc-row:last-child { border-bottom: none; }
+.doc-row:hover { background: var(--surface-2); }
+
+.doc-open { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; color: var(--text); }
+.doc-kind {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 30px; height: 30px;
+    border-radius: var(--r-md);
+    border: 1px solid color-mix(in oklab, var(--c) 28%, transparent);
+    background: color-mix(in oklab, var(--c) 12%, transparent);
+    color: color-mix(in oklab, var(--c) 78%, var(--text));
+}
+.doc-text { display: grid; gap: 1px; min-width: 0; }
+.doc-name { font-size: 13.5px; font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-open:hover .doc-name { color: var(--accent); }
+.doc-meta { font-size: 11.5px; color: var(--muted); }
+.doc-meta > span + span::before { content: "·"; margin: 0 5px; opacity: .6; }
+
+/* The bug page's own empty states sit inside a card, where the full-height
+   one leaves a hole. */
+.empty-sm { padding: 26px 20px; }
+.empty-sm p { max-width: 52ch; }
+
+/* ---------- the editor ---------- */
+
+/* The editor is one screen: the chrome stays put and the writing surface
+   scrolls, rather than the page scrolling its own toolbar away.
+
+   Measured rather than subtracted, because there is no constant to subtract —
+   below 780 the topbar wraps and so does the tool row, and both were wrong in
+   opposite directions when this was a calc(). .app is already a flex column,
+   so giving it a definite height on this page alone is enough for the shell to
+   take what is left. Everything in the chain needs min-height: 0, or a flex
+   child refuses to shrink below its content and the overflow comes back.
+
+   :has() scopes it to this page — .doc-page exists on no other. Where :has()
+   is not understood the height is never pinned, the chain sizes to content and
+   the floors below carry it, which is worse but not broken. */
+.app:has(.doc-page) { height: 100vh; height: 100dvh; }
+.app:has(.doc-page) .app-body { min-height: 0; }
+.doc-page { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+/* Scrolls only if the floors below outgrow the viewport — a phone on its side. */
+.doc-page .content { display: flex; min-width: 0; min-height: 0; overflow: auto; }
+
+/* The floor lives here and nowhere below it. On a leaf it would only be
+   clipped by this element's own overflow; here the shell stops shrinking,
+   .content above starts scrolling, and a phone on its side stays usable.
+   It is also what holds the editor up where :has() is not understood. */
+.doc-shell { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 340px; overflow: hidden; }
+.doc-body { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+
+.doc-bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px 9px 14px;
+    border-bottom: 1px solid var(--line);
+}
+/* The document's name is the heading, so it is styled as one and only looks
+   like a field once you are in it. */
+.doc-title {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    padding: 0 8px;
+    border-color: transparent;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 620;
+    letter-spacing: -.01em;
+}
+.doc-title:hover { background: var(--surface-2); border-color: var(--line); }
+.doc-title:focus { background: var(--surface-flat); }
+
+.doc-state { flex: none; display: flex; align-items: baseline; gap: 4px; font-size: 11.5px; color: var(--muted); }
+.doc-state.is-dirty  { color: color-mix(in oklab, var(--st-RETEST) 76%, var(--text)); }
+.doc-state.is-failed { color: var(--danger); }
+@media (max-width: 640px) { .doc-state { display: none; } }
+
+.doc-tools {
+    display: flex;
+    flex: none;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+}
+.doc-tools .spacer { flex: 1 1 auto; }
+.tool-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--line); }
+
+.mdbtn {
+    display: grid;
+    place-items: center;
+    min-width: 27px; height: 27px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-2);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 560;
+    cursor: pointer;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.mdbtn:hover { background: var(--surface-3); color: var(--text); }
+.mdbtn.mono { font-family: "JetBrains Mono", ui-monospace, Consolas, monospace; font-size: 11px; }
+.mdbtn b, .mdbtn i { font-size: 13px; }
+
+/* ---------- write, split, preview ---------- */
+
+.doc-panes { display: grid; flex: 1; min-height: 0; }
+.doc-panes[data-view="split"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.doc-panes[data-view="preview"] .doc-write { display: none; }
+@media (max-width: 780px) {
+    .doc-panes[data-view="split"] { grid-template-columns: minmax(0, 1fr); }
+    #view-split { display: none; }
+}
+
+.doc-write {
+    min-height: 0;
+    overflow: auto;
+    padding: 18px 20px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 14.5px;
+    line-height: 1.75;
+    resize: none;
+}
+.doc-write:hover { border-color: transparent; }
+.doc-write:focus { box-shadow: none; }
+
+.doc-preview {
+    min-height: 0;
+    padding: 18px 22px;
+    overflow: auto;
+    background: var(--surface-2);
+}
+.doc-panes[data-view="split"] .doc-preview { border-left: 1px solid var(--line); }
+
+/* ---------- rendered Markdown ---------- */
+
+.markdown { font-size: 14.5px; line-height: 1.7; color: var(--text-2); }
+.markdown > :first-child { margin-top: 0; }
+.markdown h1, .markdown h2, .markdown h3,
+.markdown h4, .markdown h5, .markdown h6 {
+    margin: 1.4em 0 .5em;
+    color: var(--text);
+    line-height: 1.3;
+    letter-spacing: -.01em;
+}
+.markdown h1 { font-size: 21px; }
+.markdown h2 { font-size: 17.5px; }
+.markdown h3 { font-size: 15px; }
+.markdown h4, .markdown h5, .markdown h6 { font-size: 13.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.markdown p { margin: 0 0 .85em; }
+.markdown ul, .markdown ol { margin: 0 0 .85em; padding-left: 1.35em; }
+.markdown li { margin: .2em 0; }
+.markdown li.task { list-style: none; margin-left: -1.25em; }
+.markdown li.task input { width: auto; height: auto; margin-right: 6px; accent-color: var(--accent); }
+.markdown a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.markdown strong { color: var(--text); font-weight: 620; }
+.markdown del { color: var(--muted); }
+.markdown code {
+    padding: 1px 5px;
+    border-radius: var(--r-sm);
+    background: var(--surface-3);
+    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+    font-size: .88em;
+}
+.markdown pre {
+    margin: 0 0 .9em;
+    padding: 11px 13px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-flat);
+    overflow-x: auto;
+}
+.markdown pre code { padding: 0; background: none; font-size: 12.5px; }
+.markdown blockquote {
+    margin: 0 0 .9em;
+    padding-left: 12px;
+    border-left: 2px solid color-mix(in oklab, var(--accent) 45%, transparent);
+    color: var(--muted);
+}
+.markdown blockquote p:last-child { margin-bottom: 0; }
+.markdown hr { margin: 1.4em 0; border: 0; border-top: 1px solid var(--line); }
+.markdown table { width: 100%; margin: 0 0 .9em; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.markdown th, .markdown td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: left; }
+.markdown th { background: var(--surface-3); color: var(--text); font-weight: 620; font-size: 11.5px; letter-spacing: .03em; text-transform: uppercase; }
+.markdown tr:last-child td { border-bottom: none; }
+
+/* ==========================================================================
+   The sheet — a spreadsheet made of real inputs, so it still posts and saves
+   with scripting switched off. Letters and numbers stay put while you scroll,
+   because a grid you have scrolled into is unreadable without them.
+   ========================================================================== */
+
+.sheet-wrap { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
+.sheet { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+
+.sheet th {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-toolbar);
+    padding: 5px 8px;
+    background: var(--surface-3);
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line-strong);
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 650;
+    letter-spacing: .06em;
+    text-align: center;
+    white-space: nowrap;
+}
+.sheet-rowno {
+    position: sticky;
+    top: auto;
+    left: 0;
+    z-index: var(--z-toolbar);
+    min-width: 34px;
+    border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+}
+/* Over the sticky row of letters it crosses, and under everything the page
+   itself puts on top. --z-topbar would tie with the real topbar on desktop. */
+.sheet-corner { position: sticky; left: 0; z-index: var(--z-sheet-corner); min-width: 34px; }
+
+.sheet td {
+    position: relative;
+    padding: 0;
+    min-width: 132px;
+    background: var(--surface-flat);
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+
+.cell {
+    width: 100%;
+    height: 31px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 13px;
+}
+.cell:hover { border: 0; }
+.cell:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* A formula cell keeps the formula as its value — that is what is saved, and
+   what you get back when you click into it. The answer is painted over the
+   top while the cell is not being edited. */
+.cell-view {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    background: var(--surface-flat);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.cell-view.is-error { color: var(--danger); font-size: 11.5px; font-weight: 600; }
+.cell:focus ~ .cell-view { display: none; }
+
+/* Only ever seen with JavaScript off, where the toolbar cannot do this. */
+.cell-x {
+    display: grid;
+    place-items: center;
+    width: 18px; height: 18px;
+    margin: 0 auto;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+.cell-x:hover { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+
+.doc-tools .hint code {
+    padding: 1px 5px;
+    border-radius: var(--r-sm);
+    background: var(--surface-3);
+    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+    font-size: 11px;
+}
+@media (max-width: 780px) { #sheet-hint { display: none; } }
+
+
+/* ==========================================================================
+   A project's documents — the folder browser
+
+   Four kinds of thing in one grid: folders, pages and sheets written here,
+   files uploaded here, links to things that live elsewhere. They share one
+   card, and the tile at its left is the only thing that differs — its colour
+   and its icon come from the --doc-* pair the kind is named by, so "what is
+   this" is answered before a word is read.
+   ========================================================================== */
+
+.docs-content {
+    display: grid;
+    grid-template-columns: 244px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+.docs-main { min-width: 0; }
+
+/* The topbar's search sizes to the bar rather than to the board's toolbar. */
+.docs-search { flex: 0 1 240px; min-width: 130px; }
+
+/* ---------- the folder rail ---------- */
+
+/* Stays put while the grid scrolls: it is how you move between folders, and a
+   navigation column you have to scroll back up to reach is not one. */
+.docs-rail {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--topbar-h) + 10px);
+    max-height: calc(100dvh - var(--nav-h) - var(--topbar-h) - 26px);
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.tree { display: grid; padding: 6px; }
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* --d is the depth. One rule draws every level, so the tree is flat in the
+       DOM and a keyboard walks it in reading order. */
+    padding: 6px 9px 6px calc(9px + var(--d, 0) * 13px);
+    border-radius: var(--r-md);
+    color: var(--text-2);
+    font-size: 12.5px;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.tree-item:hover { background: var(--surface-2); color: var(--text); }
+.tree-item.is-active { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.tree-item svg.i { flex: none; color: var(--doc-FOLDER); }
+.tree-item.is-active svg.i { color: var(--accent); }
+.tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-count { flex: none; font-size: 10.5px; color: var(--muted); }
+
+.tree-empty { margin: 0; padding: 10px 10px 12px; font-size: 12px; color: var(--muted); }
+
+/* ---------- where you are ---------- */
+
+.crumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    font-size: 12.5px;
+    color: var(--muted);
+}
+.crumbs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 7px;
+    border-radius: var(--r-sm);
+    color: var(--text-2);
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.crumbs a:hover { background: var(--surface-2); color: var(--text); }
+.crumb { display: inline-flex; align-items: center; gap: 2px; }
+.crumb .sep { width: 13px; height: 13px; color: var(--line-strong); }
+.crumb-here { padding: 3px 7px; color: var(--text); font-weight: 560; }
+
+/* ---------- the row of ways to add something ---------- */
+
+.add-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 9px 11px;
+}
+.add-bar .spacer { flex: 1 1 auto; }
+.add-bar .hint { font-size: 11.5px; }
+
+/* A popover that holds a form rather than a list of links. */
+.pop-form { width: 268px; padding: 0; }
+.pop-fields {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px 12px;
+    border-bottom: 1px solid var(--line);
+}
+.pop-fields:last-child { border-bottom: 0; }
+.pop-fields label { display: grid; gap: 4px; font-size: 12px; font-weight: 520; color: var(--text-2); }
+.pop-fields label em { font-style: normal; font-weight: 400; }
+.pop-fields input, .pop-fields select { height: 32px; font-size: 13px; }
+
+/* The picker itself is never seen: the label beside it is the button, and
+   choosing a file submits the form. */
+.upload-form { position: relative; }
+.upload-form input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.upload-form input[type=file]:focus-visible + .btn,
+.upload-form label.btn:hover { border-color: var(--line-strong); background: var(--surface-3); }
+.upload-form label.btn { cursor: pointer; }
+/* While the post is in flight. The label is the button, and a <label> takes no
+   disabled attribute, so the pointer-events are what actually stop a second
+   pick landing on top of the first. */
+.upload-form.is-busy label.btn {
+    pointer-events: none;
+    opacity: .65;
+    border-color: var(--line-strong);
+    background: var(--surface-3);
+}
+
+/* A filename has no length limit and this sits in a flex row of buttons, so it
+   is clipped rather than allowed to push the row apart. flex-shrink with a zero
+   basis keeps it from claiming width it has not got. */
+.file-note {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 28ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11.5px;
+    color: var(--muted);
+}
+.file-note:empty { display: none; }
+
+/* ---------- the grid of things ---------- */
+
+.res-groups { display: grid; gap: 16px; }
+.res-group { display: grid; gap: 8px; }
+.res-group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.res-group-head .num { font-size: 11px; color: var(--text-2); }
+
+.res-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+    gap: 9px;
+}
+
+.res-card {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface-2);
+    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease),
+                transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+    animation: rise var(--mid) var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 26ms + 20ms);
+}
+.res-card:hover {
+    border-color: color-mix(in oklab, var(--c) 42%, var(--line));
+    background: var(--surface-3);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-2);
+}
+/* The menu inside the card is a <details>; the panel it sits in already lifts
+   itself while one is open, but the card has to outrank its neighbours too. */
+.res-card:has(details[open]) { z-index: var(--z-raised); }
+
+.res-open {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 10px 34px 10px 10px;
+    color: var(--text);
+    min-width: 0;
+}
+
+.res-thumb {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 40px; height: 40px;
+    border-radius: var(--r-md);
+    border: 1px solid color-mix(in oklab, var(--c) 28%, transparent);
+    background: color-mix(in oklab, var(--c) 12%, transparent);
+    color: color-mix(in oklab, var(--c) 78%, var(--text));
+    overflow: hidden;
+}
+.res-icon { gap: 1px; }
+.res-icon svg.i { width: 17px; height: 17px; }
+.res-ext { font-size: 8.5px; font-weight: 650; letter-spacing: .04em; line-height: 1; }
+
+/* An uploaded picture is the fastest way to recognise the right file, so it
+   takes the whole width of its card rather than a 40px square. */
+.res-card.has-shot .res-open { grid-template-columns: minmax(0, 1fr); padding: 8px 8px 10px; }
+.res-card.has-shot .res-thumb { width: 100%; height: 104px; border-radius: var(--r-md); }
+.res-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.res-body { display: grid; gap: 2px; min-width: 0; }
+.res-name {
+    font-size: 13px;
+    font-weight: 560;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.res-open:hover .res-name { color: var(--accent); }
+.res-note {
+    font-size: 11.5px;
+    color: var(--text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.res-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 0;
+}
+.res-meta > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-kind { color: color-mix(in oklab, var(--c) 66%, var(--muted)); font-weight: 560; }
+.res-meta > * + *::before { content: "·"; margin-right: 5px; opacity: .6; }
+
+.res-out {
+    position: absolute;
+    right: 34px; top: 12px;
+    width: 12px; height: 12px;
+    color: var(--muted);
+}
+.res-card.has-shot .res-out { right: 32px; top: 14px; }
+
+/* Always drawn, never on hover only: on a touch screen there is no hover, and
+   a menu you have to guess at is a menu nobody finds. */
+.res-menu { position: absolute; right: 6px; top: 8px; }
+.res-menu > summary .icon-btn { color: var(--muted); }
+.res-menu > summary:hover .icon-btn,
+.res-menu[open] > summary .icon-btn { color: var(--text); background: var(--surface-3); }
+
+.pop-item.is-danger { color: var(--danger); }
+.pop-item.is-danger:hover { background: color-mix(in oklab, var(--danger) 12%, transparent); }
+.pop-item.is-danger svg.i { color: var(--danger); }
+
+/* ---------- dropping files on the page ---------- */
+
+.drop-veil {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-toast);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    pointer-events: none;                   /* the drop belongs to the window */
+}
+.drop-veil[hidden] { display: none; }
+.drop-veil > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 16px 26px;
+    border: 2px dashed color-mix(in oklab, var(--accent) 60%, transparent);
+    border-radius: var(--r-xl);
+    background: var(--surface-pop);
+    box-shadow: var(--shadow-3);
+    font-size: 14px;
+    font-weight: 560;
+    color: var(--text);
+}
+.drop-veil svg.i { width: 18px; height: 18px; color: var(--accent); }
+
+@media (max-width: 980px) {
+    .docs-content { grid-template-columns: minmax(0, 1fr); }
+    /* Below the folder you are in: on a narrow screen the contents are what you
+       came for, and the tree is how you leave. */
+    .docs-rail { order: 2; position: static; max-height: none; }
+}
+@media (max-width: 640px) {
+    .res-grid { grid-template-columns: minmax(0, 1fr); }
+    .docs-search { flex: 1 1 100%; }
+}
+
+
+/* ==========================================================================
+   The project sheet — a spreadsheet's worth of formatting on the same grid
+
+   Everything below decorates the same table the bug editor uses; .gsheet is
+   the only selector that separates them. A cell's look is set as an inline
+   style by sheet-editor.js from what was saved, so these rules are the frame
+   around that, never the colours themselves.
+   ========================================================================== */
+
+/* Fixed layout is what makes a dragged column width mean something: with auto,
+   the widest cell wins and the drag is a suggestion. Every column is given a
+   width in JS, so the table is exactly as wide as its columns. */
+.gsheet { table-layout: fixed; width: auto; }
+
+.gsheet .sheet-corner, .gsheet .sheet-rowno { width: 44px; }
+
+/* The input has to take the cell's typography, or bold and colour would show
+   on the overlay and nowhere on the text you are editing. */
+.gsheet .cell,
+.gsheet .cell-view {
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    letter-spacing: inherit;
+}
+.gsheet .cell { font-family: inherit; }
+/* The overlay covers the cell, so it has to take the cell's own fill with it —
+   .cell-view is opaque by default and would paint over every colour set here. */
+.gsheet .cell-view { background: inherit; }
+
+.gsheet td { transition: box-shadow var(--fast) var(--ease); }
+
+/* The selection: a wash over the block, a ring around the whole of it. */
+.gsheet td.is-sel { background-image: linear-gradient(var(--accent-soft), var(--accent-soft)); }
+.gsheet td.is-anchor { box-shadow: inset 0 0 0 2px var(--accent); }
+.gsheet th.is-head-sel {
+    background: color-mix(in oklab, var(--accent) 16%, var(--surface-3));
+    color: var(--text);
+}
+
+.gsheet td.is-bordered { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.gsheet td.is-anchor.is-bordered { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* A fill the user chose can be dark; the text on it then has to be light, and
+   that is a fact about their colour rather than about the theme. */
+.gsheet td.on-dark,
+.gsheet td.on-dark .cell,
+.gsheet td.on-dark .cell-view { color: var(--ink-on-fill); }
+
+/* Wrapping. An <input> cannot wrap, so a wrapped cell shows its text through
+   the overlay — which is in the flow, and therefore gives the row its height —
+   and hides it again the moment you click in to edit. */
+.gsheet td.is-wrapped { vertical-align: top; }
+.gsheet td.is-wrapped .cell-view {
+    position: relative;
+    inset: auto;
+    display: block;
+    min-height: 31px;
+    padding: 7px 8px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+}
+.gsheet td.is-wrapped .cell { position: absolute; inset: 0; height: 100%; }
+
+/* Merged cells. The covered ones stay in the DOM and keep posting, so the grid
+   the server folds back together is still a rectangle. */
+.gsheet td.is-merged { z-index: 1; }
+.gsheet td.is-covered { display: none; }
+
+/* A frozen row rides above the grid at an offset the editor measures, because
+   the heading row's height moves with the theme. */
+.gsheet tr.is-frozen-row > td,
+.gsheet tr.is-frozen-row > th {
+    position: sticky;
+    top: var(--frozen-top, 0);
+    z-index: var(--z-toolbar);
+    background: var(--surface-flat);
+    box-shadow: 0 1px 0 var(--line-strong);
+}
+.gsheet tr.is-frozen-row > th.sheet-rowno { z-index: var(--z-sheet-corner); }
+
+/* ---------- dragging a column wider ---------- */
+
+.col-grip {
+    position: absolute;
+    right: -3px; top: 0; bottom: 0;
+    width: 7px;
+    cursor: col-resize;
+    z-index: 1;
+}
+.col-grip::after {
+    content: "";
+    position: absolute;
+    left: 3px; top: 4px; bottom: 4px;
+    width: 1px;
+    background: transparent;
+    transition: background var(--fast) var(--ease);
+}
+.col-grip:hover::after { background: var(--accent); }
+body.is-resizing { cursor: col-resize; user-select: none; }
+
+/* ---------- the formatting bar ---------- */
+
+.sheet-tools { row-gap: 4px; }
+
+.tool-select {
+    height: 27px;
+    min-width: 62px;
+    padding: 0 22px 0 7px;
+    border-radius: var(--r-sm);
+    font-size: 12px;
+}
+.tool-select-wide { min-width: 132px; }
+
+.mdbtn.is-active {
+    background: var(--accent-soft);
+    color: var(--text);
+    border-color: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.mdbtn:disabled { opacity: .38; cursor: default; }
+.mdbtn:disabled:hover { background: transparent; color: var(--text-2); }
+.mdbtn u, .mdbtn s { font-size: 13px; }
+
+/* Which cell you are in, in the bar beside the name. */
+.cell-ref {
+    flex: none;
+    min-width: 54px;
+    padding: 2px 7px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    font-size: 11.5px;
+    color: var(--text-2);
+    text-align: center;
+}
+@media (max-width: 780px) { .cell-ref { display: none; } }
+
+/* ---------- the two colour menus ---------- */
+
+.swatch-btn { display: inline-grid; gap: 1px; place-items: center; min-width: 27px; }
+.swatch-btn svg.i { width: 14px; height: 14px; }
+/* The bar under the letter is the colour the button would apply — the one
+   thing about a colour button that has to be a colour. */
+.swatch-bar { display: block; width: 15px; height: 3px; border-radius: 2px; }
+
+.pop-swatches { width: 208px; padding: 0; }
+.swatches {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    padding: 10px 12px;
+}
+.swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-sm);
+    background: var(--sw, transparent);
+    cursor: pointer;
+    transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+.swatch:hover { transform: scale(1.12); box-shadow: var(--shadow-2); }
+.swatch-off { font-size: 11px; color: var(--muted); }
+
+.swatch-custom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px 11px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--text-2);
+}
+.swatch-custom input[type=color] {
+    width: 34px;
+    height: 26px;
+    padding: 2px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    cursor: pointer;
+}
+
+/* The roster menu in a sheet is positioned against the window rather than a
+   comment box, so it drops below the cell instead of rising above a textarea. */
+.mention-menu.is-floating { position: absolute; bottom: auto; }

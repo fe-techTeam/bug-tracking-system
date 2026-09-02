@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(${doc.name}, ~{::section})}">
+<body>
+<!--
+  A page in a project's documents area.
+
+  Deliberately the same markup the bug editor uses — same ids, same toolbar,
+  same write/split/preview switch — so doc-editor.js drives both and there is
+  one Markdown editor in this app rather than two that drift apart. What is
+  different is where it saves to, and that you can tag people in it.
+
+  Works with JavaScript off: a textarea and a Save button.
+-->
+<section class="doc-page">
+
+    <header class="topbar">
+        <a class="back-link"
+           th:href="@{/projects/{p}/docs(p=${project.id},folder=${doc.parentId})}"
+           title="Back to the documents" aria-label="Back to the documents">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span th:text="${#lists.isEmpty(trail)} ? 'Documents' : ${trail[#lists.size(trail) - 1].name}">Documents</span>
+        </a>
+
+        <span class="badge badge-square" th:style="'--c: var(--doc-' + ${doc.kind} + ')'"
+              th:text="${doc.kind.label}">Page</span>
+        <h1 class="topbar-title" th:text="${project.name}">Godrej</h1>
+        <span class="topbar-sub"
+              th:text="${#lists.isEmpty(trail)} ? 'Top level'
+                       : ${#strings.listJoin(trail.![name], ' / ')}">Design / Specs</span>
+
+        <div class="topbar-actions">
+            <a class="btn btn-sm" id="export-doc"
+               th:href="@{/projects/{p}/docs/{id}/export(p=${project.id},id=${doc.id})}"
+               th:title="'Download as .' + ${doc.kind.extension}">
+                <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>
+                <span>Download</span>
+            </a>
+
+            <form method="post" class="inline-form"
+                  th:action="@{/projects/{p}/docs/{id}/delete(p=${project.id},id=${doc.id})}"
+                  th:attr="data-confirm=|Delete ${doc.name}? This cannot be undone.|">
+                <input type="hidden" name="actor" class="actor-field">
+                <input type="hidden" name="back" th:value="${doc.parentId}">
+                <button type="submit" class="btn btn-sm btn-danger" id="delete-doc">
+                    <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
+                    <span>Delete</span>
+                </button>
+            </form>
+
+            <div th:replace="~{fragments :: bell}"></div>
+        </div>
+    </header>
+
+    <div class="content">
+        <!-- data-people drives the "@" autocomplete; the server matches the
+             roster again on save, so a name typed by hand still notifies. -->
+        <form class="panel doc-shell" method="post" id="doc-form"
+              th:action="@{/projects/{p}/docs/{id}(p=${project.id},id=${doc.id})}"
+              th:attr="data-autosave=@{/projects/{p}/docs/{id}/autosave(p=${project.id},id=${doc.id})},
+                       data-people=${#strings.listJoin(people, '|')}">
+            <input type="hidden" name="actor" class="actor-field">
+
+            <div class="doc-bar">
+                <label class="sr-only" for="doc-title">Document name</label>
+                <input type="text" id="doc-title" name="name" class="doc-title" required
+                       th:value="${doc.name}" th:placeholder="${doc.kind.defaultName}"
+                       maxlength="200" autocomplete="off">
+
+                <span class="doc-state" id="doc-state" role="status" aria-live="polite">
+                    <span>Saved</span>
+                    <span class="when" th:attr="data-time=${doc.updatedAt}"
+                          th:text="${#temporals.format(doc.updatedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+                </span>
+
+                <button type="submit" class="btn btn-sm btn-primary" id="save-doc">Save</button>
+            </div>
+
+            <div class="doc-body">
+                <div class="doc-tools js-only" role="toolbar" aria-label="Formatting">
+                    <button type="button" class="mdbtn" id="md-h1" data-md="# " title="Heading">H1</button>
+                    <button type="button" class="mdbtn" id="md-h2" data-md="## " title="Subheading">H2</button>
+                    <span class="tool-sep" aria-hidden="true"></span>
+                    <button type="button" class="mdbtn" id="md-bold" data-wrap="**" title="Bold (Ctrl+B)"><b>B</b></button>
+                    <button type="button" class="mdbtn" id="md-italic" data-wrap="*" title="Italic (Ctrl+I)"><i>I</i></button>
+                    <button type="button" class="mdbtn mono" id="md-code" data-wrap="`" title="Code">&lt;/&gt;</button>
+                    <span class="tool-sep" aria-hidden="true"></span>
+                    <button type="button" class="mdbtn" id="md-bullets" data-md="- " title="Bulleted list">&bull;</button>
+                    <button type="button" class="mdbtn" id="md-numbers" data-md="1. " title="Numbered list">1.</button>
+                    <button type="button" class="mdbtn" id="md-todo" data-md="- [ ] " title="Checklist">&#9744;</button>
+                    <button type="button" class="mdbtn" id="md-quote" data-md="&gt; " title="Quote">&rdquo;</button>
+                    <span class="tool-sep" aria-hidden="true"></span>
+                    <button type="button" class="mdbtn" id="md-table" data-table="1" title="Table">&#9638;</button>
+                    <button type="button" class="mdbtn" id="md-link" data-link="1" title="Link">Link</button>
+                    <!-- Types the "@" for you and opens the roster; the same
+                         menu appears whenever you type one yourself. -->
+                    <button type="button" class="mdbtn" id="md-mention" data-mention="1"
+                            title="Tag someone">@</button>
+
+                    <span class="spacer"></span>
+
+                    <div class="seg" id="doc-view">
+                        <button type="button" id="view-write" class="is-active">Write</button>
+                        <button type="button" id="view-split">Split</button>
+                        <button type="button" id="view-preview">Preview</button>
+                    </div>
+                </div>
+
+                <div class="doc-panes" id="doc-panes" data-view="write">
+                    <label class="sr-only" for="doc-content">Document</label>
+                    <textarea id="doc-content" name="content" class="doc-write" spellcheck="true"
+                              data-mentions="true" th:text="${doc.content}"
+                              placeholder="Start typing.
+
+Markdown works:  # a heading   **bold**   - a list   - [ ] a checklist
+Tag someone:     @ and their name — they get a notification with a link here"></textarea>
+                    <div class="doc-preview markdown" id="doc-preview" hidden></div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script th:src="@{/js/markdown.js}"></script>
+    <script th:src="@{/js/sheet-formula.js}"></script>
+    <script th:src="@{/js/doc-editor.js}"></script>
+</section>
+</body>
+</html>

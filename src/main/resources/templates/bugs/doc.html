@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(${doc.title}, ~{::section})}">
+<body>
+<!--
+  The editor for one supporting document.
+
+  Both shapes are one <form> posting to one route, and both work with
+  JavaScript switched off: a page is a textarea, a sheet is a grid of ordinary
+  text inputs, and Save is a submit button. Scripting adds the Markdown
+  preview, the formulas, pasting a block out of Excel, and not having to press
+  Save — never the only way to do something.
+-->
+<section class="doc-page">
+
+    <header class="topbar">
+        <a class="back-link" th:href="@{/bugs/{id}(id=${bug.id})}" id="back-to-bug"
+           th:title="'Back to BUG-' + ${bug.id}" th:attr="aria-label='Back to BUG-' + ${bug.id}">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span th:text="'BUG-' + ${bug.id}">BUG-1</span>
+        </a>
+
+        <span class="badge badge-square" th:classappend="'dk-' + ${doc.type}"
+              th:text="${doc.type.label}">Page</span>
+        <h1 class="topbar-title" th:text="${bug.title}">Bug title</h1>
+        <span class="topbar-sub" th:if="${bug.project}" th:text="${bug.project}">Godrej</span>
+
+        <div class="topbar-actions">
+            <!-- Straight to the other documents on this bug, rather than back
+                 out to the bug and in again. -->
+            <details class="pop-wrap" id="doc-switcher" th:unless="${#lists.isEmpty(siblings)}">
+                <summary>
+                    <span class="btn btn-sm btn-ghost">
+                        <svg class="i" aria-hidden="true"><use href="#i-file-text"/></svg>
+                        <span th:text="${#lists.size(siblings)} + ' more'">2 more</span>
+                        <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                    </span>
+                </summary>
+                <div class="pop">
+                    <div class="pop-head"><span th:text="'Also on BUG-' + ${bug.id}">Also on BUG-1</span></div>
+                    <a class="pop-item" th:each="s : ${siblings}"
+                       th:href="@{/bugs/{id}/docs/{did}(id=${bug.id},did=${s.id})}"
+                       th:id="'switch-doc-' + ${s.id}">
+                        <svg class="i" aria-hidden="true"><use th:attr="href='#' + ${s.type.icon}"/></svg>
+                        <span th:text="${s.title}">Test cases</span>
+                    </a>
+                </div>
+            </details>
+
+            <a class="btn btn-sm" id="export-doc"
+               th:href="@{/bugs/{id}/docs/{did}/export(id=${bug.id},did=${doc.id})}"
+               th:title="'Download as .' + ${doc.type.extension}">
+                <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>
+                <span>Download</span>
+            </a>
+
+            <form method="post" class="inline-form"
+                  th:action="@{/bugs/{id}/docs/{did}/delete(id=${bug.id},did=${doc.id})}"
+                  th:attr="data-confirm=|Delete ${doc.title}? This cannot be undone.|">
+                <input type="hidden" name="actor" class="actor-field">
+                <button type="submit" class="btn btn-sm btn-danger" id="delete-doc">
+                    <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
+                    <span>Delete</span>
+                </button>
+            </form>
+
+            <div th:replace="~{fragments :: bell}"></div>
+        </div>
+    </header>
+
+    <div class="content">
+        <form class="panel doc-shell" method="post" id="doc-form"
+              th:action="@{/bugs/{id}/docs/{did}(id=${bug.id},did=${doc.id})}"
+              th:attr="data-autosave=@{/bugs/{id}/docs/{did}/autosave(id=${bug.id},did=${doc.id})}">
+            <input type="hidden" name="actor" class="actor-field">
+
+            <!-- The document's own name, and the state of it. Save is the first
+                 submit button in the form on purpose: Enter inside a sheet cell
+                 has to mean Save, never one of the row buttons further down. -->
+            <div class="doc-bar">
+                <label class="sr-only" for="doc-title">Document name</label>
+                <input type="text" id="doc-title" name="title" class="doc-title" required
+                       th:value="${doc.title}" th:placeholder="${doc.type.defaultTitle}"
+                       maxlength="150" autocomplete="off">
+
+                <span class="doc-state" id="doc-state" role="status" aria-live="polite">
+                    <span>Saved</span>
+                    <span class="when" th:attr="data-time=${doc.updatedAt}"
+                          th:text="${#temporals.format(doc.updatedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+                </span>
+
+                <button type="submit" class="btn btn-sm btn-primary" id="save-doc">Save</button>
+            </div>
+
+            <!-- ================= a page: Markdown, written and previewed ================= -->
+            <div th:if="${doc.page}" class="doc-body">
+                <div class="doc-tools js-only" role="toolbar" aria-label="Formatting">
+                    <button type="button" class="mdbtn" id="md-h1" data-md="# " title="Heading">H1</button>
+                    <button type="button" class="mdbtn" id="md-h2" data-md="## " title="Subheading">H2</button>
+                    <span class="tool-sep" aria-hidden="true"></span>
+                    <button type="button" class="mdbtn" id="md-bold" data-wrap="**" title="Bold (Ctrl+B)"><b>B</b></button>
+                    <button type="button" class="mdbtn" id="md-italic" data-wrap="*" title="Italic (Ctrl+I)"><i>I</i></button>
+                    <button type="button" class="mdbtn mono" id="md-code" data-wrap="`" title="Code">&lt;/&gt;</button>
+                    <span class="tool-sep" aria-hidden="true"></span>
+                    <button type="button" class="mdbtn" id="md-bullets" data-md="- " title="Bulleted list">&bull;</button>
+                    <button type="button" class="mdbtn" id="md-numbers" data-md="1. " title="Numbered list">1.</button>
+                    <button type="button" class="mdbtn" id="md-todo" data-md="- [ ] " title="Checklist">&#9744;</button>
+                    <button type="button" class="mdbtn" id="md-quote" data-md="&gt; " title="Quote">&rdquo;</button>
+                    <span class="tool-sep" aria-hidden="true"></span>
+                    <button type="button" class="mdbtn" id="md-table" data-table="1" title="Table">&#9638;</button>
+                    <button type="button" class="mdbtn" id="md-link" data-link="1" title="Link">Link</button>
+
+                    <span class="spacer"></span>
+
+                    <div class="seg" id="doc-view">
+                        <button type="button" id="view-write" class="is-active">Write</button>
+                        <button type="button" id="view-split">Split</button>
+                        <button type="button" id="view-preview">Preview</button>
+                    </div>
+                </div>
+
+                <div class="doc-panes" id="doc-panes" data-view="write">
+                    <label class="sr-only" for="doc-content">Document</label>
+                    <textarea id="doc-content" name="content" class="doc-write" spellcheck="true"
+                              th:text="${doc.content}"
+                              placeholder="Start typing.
+
+Markdown works:  # a heading   **bold**   - a list   - [ ] a checklist
+A table:         | Step | Result |"></textarea>
+                    <div class="doc-preview markdown" id="doc-preview" hidden></div>
+                </div>
+            </div>
+
+            <!-- ================= a sheet: a grid of real inputs ================= -->
+            <div th:if="${doc.sheet}" class="doc-body">
+                <div class="doc-tools">
+                    <!-- Submit buttons, so the grid still grows without JS. The
+                         editor intercepts them and does it in the page instead. -->
+                    <button type="submit" class="btn btn-sm" name="op" value="add-row" id="add-row">
+                        <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+                        <span>Row</span>
+                    </button>
+                    <button type="submit" class="btn btn-sm" name="op" value="add-col" id="add-col">
+                        <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+                        <span>Column</span>
+                    </button>
+                    <span class="tool-sep js-only" aria-hidden="true"></span>
+                    <button type="button" class="btn btn-sm btn-ghost js-only" id="del-row">Delete row</button>
+                    <button type="button" class="btn btn-sm btn-ghost js-only" id="del-col">Delete column</button>
+
+                    <span class="spacer"></span>
+                    <span class="hint js-only" id="sheet-hint">
+                        Paste straight from Excel. <code>=SUM(A1:A9)</code> works.
+                    </span>
+                </div>
+
+                <div class="sheet-wrap">
+                    <table class="sheet" id="sheet">
+                        <thead>
+                            <tr>
+                                <th class="sheet-corner" scope="col"><span class="sr-only">Row</span></th>
+                                <th th:each="c,cs : ${colLabels}" scope="col">
+                                    <span th:text="${c}">A</span>
+                                    <button type="submit" class="cell-x js-off" name="op"
+                                            th:value="'del-col:' + ${cs.index}"
+                                            th:title="'Delete column ' + ${c}"
+                                            th:attr="aria-label='Delete column ' + ${c}">&times;</button>
+                                </th>
+                                <th class="sheet-corner js-off" scope="col"><span class="sr-only">Remove</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="row,rs : ${sheetRows}">
+                                <th class="sheet-rowno" scope="row" th:text="${rs.index + 1}">1</th>
+                                <td th:each="cell,cs : ${row}">
+                                    <input type="text" name="cell" class="cell" th:value="${cell}"
+                                           autocomplete="off" spellcheck="false"
+                                           th:attr="aria-label=${colLabels[cs.index]} + ${rs.index + 1}">
+                                </td>
+                                <td class="js-off">
+                                    <button type="submit" class="cell-x" name="op"
+                                            th:value="'del-row:' + ${rs.index}"
+                                            th:title="'Delete row ' + ${rs.index + 1}"
+                                            th:attr="aria-label='Delete row ' + ${rs.index + 1}">&times;</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- How wide the grid is. The server folds the flat list of
+                     cells back into rows with it. -->
+                <input type="hidden" name="cols" id="sheet-cols" th:value="${sheetCols}">
+            </div>
+        </form>
+    </div>
+
+    <!-- The renderer and the formula engine are shared with the project
+         documents editor; doc-editor.js degrades to plain text without them,
+         but both are here so it does not have to. -->
+    <script th:src="@{/js/markdown.js}"></script>
+    <script th:src="@{/js/sheet-formula.js}"></script>
+    <script th:src="@{/js/doc-editor.js}"></script>
+</section>
+</body>
+</html>

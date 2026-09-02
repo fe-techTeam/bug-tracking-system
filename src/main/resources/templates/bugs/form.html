@@ -2,53 +2,57 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout :: page('Raise Bug', ~{::section})}">
 <body>
-<section>
+<section th:with="me=${#authentication.name}, editing=${bug.id != null}">
 
     <header class="topbar">
+        <a class="back-link" th:href="${editing} ? @{/bugs/{id}(id=${bug.id})} : @{/bugs(project=${bug.project})}"
+           id="form-back" title="Go back" aria-label="Go back">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span th:text="${editing} ? 'Bug' : 'Board'">Board</span>
+        </a>
         <h1 class="topbar-title"
-            th:text="${bug.id == null} ? 'Raise a bug' : 'Edit BUG-' + ${bug.id}">Raise a bug</h1>
-        <span class="topbar-sub">Only Title, Project, Severity, Priority and Environment are required.</span>
+            th:text="${editing} ? 'Edit BUG-' + ${bug.id} : 'Raise a bug'">Raise a bug</h1>
+        <span class="topbar-sub" th:unless="${editing}">Title is the only thing you have to write.</span>
         <div class="topbar-actions">
-            <div th:replace="~{fragments :: bell}"></div>
             <a class="btn btn-sm btn-ghost" th:href="@{/bugs(project=${bug.project})}">Cancel</a>
         </div>
     </header>
 
     <div class="content">
+    <div class="stack stack-form">
 
-    <div class="form-grid">
-        <form class="panel bug-form" method="post" id="bug-form"
-              th:action="${bug.id == null} ? @{/bugs} : @{/bugs/{id}(id=${bug.id})}"
-              th:object="${bug}">
+        <form class="panel report" method="post" id="bug-form"
+              th:action="${editing} ? @{/bugs/{id}(id=${bug.id})} : @{/bugs}"
+              th:object="${bug}" enctype="multipart/form-data">
 
-            <div class="form-section">
-                <div class="form-section-head">
-                    <span class="step-num">1</span>
-                    <h2>What broke</h2>
-                </div>
-
+            <!-- ---------- the bug itself ---------- -->
+            <div class="report-sec">
                 <label>
-                    <span>Title <span class="req">*</span></span>
+                    <span>Title <span class="req">*</span> <span class="hint">— up to 150 characters</span></span>
                     <input type="text" th:field="*{title}" id="title" autocomplete="off"
-                           placeholder="Short summary of what is broken">
+                           class="input-lg" placeholder="Short summary of what is broken"
+                           enterkeyhint="next" autocapitalize="sentences">
                     <span class="field-error" th:if="${#fields.hasErrors('title')}"
                           th:errors="*{title}">Title error</span>
                 </label>
 
-                <label>
-                    <span>Description <span class="hint">— what happens, and where</span></span>
+                <!-- Every capped field says its cap and shows what came back from the
+                     server. Without the error line a paste over the limit was thrown
+                     away on save with nothing on screen to say why. -->
+                <label style="margin-top:12px">
+                    <span>Description <span class="hint">— up to 4000 characters</span></span>
                     <textarea rows="3" th:field="*{description}" id="description"
-                              placeholder="On the sign-in page the first click is ignored..."></textarea>
+                              placeholder="What happens, and where"
+                              autocapitalize="sentences"></textarea>
+                    <span class="field-error" th:if="${#fields.hasErrors('description')}"
+                          th:errors="*{description}">Description error</span>
                 </label>
             </div>
 
-            <div class="form-section">
-                <div class="form-section-head">
-                    <span class="step-num">2</span>
-                    <h2>Who it affects, and how badly</h2>
-                </div>
-
-                <div class="row">
+            <!-- ---------- how bad, and where ---------- -->
+            <div class="report-sec">
+                <h3>Classification</h3>
+                <div class="field-row">
                     <label>
                         <span>Project <span class="req">*</span></span>
                         <select th:field="*{project}" id="project">
@@ -59,28 +63,12 @@
                               th:errors="*{project}">Project error</span>
                     </label>
                     <label>
-                        <span>Severity <span class="req">*</span> <span class="hint">— impact</span></span>
+                        <span>Severity <span class="req">*</span></span>
                         <select th:field="*{severity}" id="severity">
                             <option th:each="s : ${severities}" th:value="${s}" th:text="${s.label}">High</option>
                         </select>
-                    </label>
-                    <label>
-                        <span>Priority <span class="req">*</span> <span class="hint">— urgency</span></span>
-                        <select th:field="*{priority}" id="priority">
-                            <option th:each="p : ${priorities}" th:value="${p}"
-                                    th:text="${p.label + ' — ' + p.description}">P1</option>
-                        </select>
-                        <span class="field-error" th:if="${#fields.hasErrors('priority')}"
-                              th:errors="*{priority}">Priority error</span>
-                    </label>
-                </div>
-
-                <div class="row">
-                    <label>
-                        <span>Status <span class="req">*</span></span>
-                        <select th:field="*{status}" id="status">
-                            <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.label}">Open</option>
-                        </select>
+                        <span class="field-error" th:if="${#fields.hasErrors('severity')}"
+                              th:errors="*{severity}">Severity error</span>
                     </label>
                     <label>
                         <span>Environment <span class="req">*</span></span>
@@ -90,107 +78,188 @@
                         <span class="field-error" th:if="${#fields.hasErrors('environment')}"
                               th:errors="*{environment}">Environment error</span>
                     </label>
-                    <label>
-                        <span>Module <span class="hint">— optional</span></span>
-                        <input type="text" th:field="*{module}" id="module"
-                               placeholder="e.g. Authentication" autocomplete="off">
-                    </label>
                 </div>
             </div>
 
-            <div class="form-section">
-                <div class="form-section-head">
-                    <span class="step-num">3</span>
-                    <h2>How to see it happen</h2>
-                </div>
-
-                <label>
-                    <span>Steps to Reproduce</span>
-                    <textarea rows="5" th:field="*{stepsToReproduce}" id="stepsToReproduce"
-                              placeholder="1. Open ...&#10;2. Click ...&#10;3. Observe ..."></textarea>
-                </label>
-
-                <div class="row">
+            <!-- ---------- people ---------- -->
+            <div class="report-sec">
+                <h3>People</h3>
+                <div class="field-row">
                     <label>
-                        <span>Expected Result</span>
-                        <textarea rows="3" th:field="*{expectedResult}" id="expectedResult"
-                                  placeholder="What should have happened"></textarea>
-                    </label>
-                    <label>
-                        <span>Actual Result</span>
-                        <textarea rows="3" th:field="*{actualResult}" id="actualResult"
-                                  placeholder="What happened instead"></textarea>
-                    </label>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <div class="form-section-head">
-                    <span class="step-num">4</span>
-                    <h2>People</h2>
-                </div>
-
-                <div class="row">
-                    <label>
-                        <span>Reported By</span>
+                        <span>Reported by</span>
                         <select th:field="*{reportedBy}" id="reportedBy">
                             <option value="">— Nobody selected —</option>
-                            <option th:each="p : ${people}" th:value="${p}" th:text="${p}">Nishana R</option>
+                            <option th:each="p : ${people}" th:value="${p}"
+                                    th:text="${p == me} ? ${p} + ' (me)' : ${p}">Nishana R</option>
                         </select>
+                        <span class="field-error" th:if="${#fields.hasErrors('reportedBy')}"
+                              th:errors="*{reportedBy}">Reporter error</span>
+                    </label>
+
+                    <div class="field">
+                        <span class="field-label" id="assignee-label">Assigned to</span>
+                        <!-- A list, because a fix often needs a developer and a
+                             tester on it at once. Checkboxes rather than a
+                             multi-select: nobody knows to ctrl-click. -->
+                        <details class="pop-wrap picker" id="assignee-picker">
+                            <!-- A <span> label cannot be a <label for>, so the control
+                                 borrows it and keeps its own "2 assigned" reading. -->
+                            <summary aria-labelledby="assignee-label assignee-summary">
+                                <span class="picker-btn" id="assignee-summary">
+                                    <span class="picker-faces" th:if="${!#lists.isEmpty(bug.assignees)}">
+                                        <span class="avatar avatar-sm" th:each="p : ${bug.assignees}"
+                                              th:attr="data-avatar=${p}" th:title="${p}" aria-hidden="true"></span>
+                                    </span>
+                                    <span th:if="${#lists.isEmpty(bug.assignees)}" class="muted">Unassigned</span>
+                                    <span th:if="${!#lists.isEmpty(bug.assignees)}"
+                                          th:text="${#lists.size(bug.assignees)} + ' assigned'">2 assigned</span>
+                                    <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                                </span>
+                            </summary>
+                            <div class="pop pop-block">
+                                <div class="pop-head"><span>Assign to</span></div>
+                                <div class="pop-list">
+                                    <label class="pick-opt" th:each="p : ${people}">
+                                        <input type="checkbox" th:field="*{assignees}" th:value="${p}">
+                                        <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
+                                        <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
+                                    </label>
+                                </div>
+                                <p class="pop-empty" th:if="${#lists.isEmpty(people)}">
+                                    Nobody on the team yet.
+                                </p>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------- reproduction ---------- -->
+            <div class="report-sec">
+                <h3>How to see it happen</h3>
+                <label>
+                    <span>Steps to reproduce <span class="hint">— up to 4000 characters</span></span>
+                    <textarea rows="4" th:field="*{stepsToReproduce}" id="stepsToReproduce"
+                              placeholder="1. Open ...&#10;2. Click ...&#10;3. Observe ..."
+                              autocapitalize="sentences"></textarea>
+                    <span class="field-error" th:if="${#fields.hasErrors('stepsToReproduce')}"
+                          th:errors="*{stepsToReproduce}">Steps error</span>
+                </label>
+                <div class="field-row" style="margin-top:12px">
+                    <!-- 1000, not 4000: a pasted stack trace clears this cap easily,
+                         which is exactly the edit that used to vanish on save. -->
+                    <label>
+                        <span>Expected result <span class="hint">— up to 1000 characters</span></span>
+                        <textarea rows="2" th:field="*{expectedResult}" id="expectedResult"
+                                  placeholder="What should have happened"
+                                  autocapitalize="sentences"></textarea>
+                        <span class="field-error" th:if="${#fields.hasErrors('expectedResult')}"
+                              th:errors="*{expectedResult}">Expected result error</span>
                     </label>
                     <label>
-                        <span>Assigned To <span class="hint">— leave blank for triage</span></span>
-                        <select th:field="*{assignedTo}" id="assignedTo">
-                            <option value="">— Unassigned —</option>
-                            <option th:each="p : ${people}" th:value="${p}" th:text="${p}">Vatsal Motiani</option>
-                        </select>
+                        <span>Actual result <span class="hint">— up to 1000 characters</span></span>
+                        <textarea rows="2" th:field="*{actualResult}" id="actualResult"
+                                  placeholder="What happened instead"
+                                  autocapitalize="sentences"></textarea>
+                        <span class="field-error" th:if="${#fields.hasErrors('actualResult')}"
+                              th:errors="*{actualResult}">Actual result error</span>
                     </label>
                 </div>
-                <p class="hint">
-                    Names come from the <a th:href="@{/team}">team list</a>.
+            </div>
+
+            <!-- ---------- evidence ---------- -->
+            <div class="report-sec" th:unless="${editing}">
+                <h3>Attachments</h3>
+                <label class="file-drop" for="files">
+                    <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                    <span class="file-drop-text" id="file-name">
+                        Add a screenshot, log or document — you can pick several
+                    </span>
+                    <input type="file" name="files" id="files" multiple>
+                </label>
+                <!-- A browser will not hand the same file over twice, so a failed
+                     save empties this control. Say so rather than let it look full. -->
+                <p class="field-error" th:if="${#fields.hasAnyErrors()}" style="margin-top:8px">
+                    Your file choice was cleared when the form came back — pick it again
+                    before you save.
+                </p>
+                <p class="hint" style="margin-top:8px">
+                    A screenshot usually saves a round trip. You can add more later.
                 </p>
             </div>
 
-            <!-- Stamped with whoever the top bar says you are, for the history trail. -->
+            <!-- Editing keeps uploads on the bug itself, where the existing
+                 files are listed and can be seen. -->
+            <div class="report-sec" th:if="${editing}">
+                <h3>Attachments</h3>
+                <p class="hint">
+                    Files are added on
+                    <a th:href="@{/bugs/{id}(id=${bug.id})} + '#attachments'">the bug itself</a>,
+                    where you can see the ones already on it.
+                </p>
+            </div>
+
+            <!-- ---------- the rest, folded away ---------- -->
+            <!-- Folded away, unless something in here is what failed — an error
+                 behind a closed summary is an error nobody reads. -->
+            <details class="report-sec form-more"
+                     th:open="${#fields.hasErrors('module') or #fields.hasErrors('blockedBy') or #fields.hasErrors('status')}">
+                <summary>
+                    <span>More — module, blocker<span th:if="${editing}">, status</span></span>
+                    <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                </summary>
+
+                <div class="field-row" style="margin-top:12px">
+                    <label>
+                        <span>Module <span class="hint">— up to 80 characters</span></span>
+                        <input type="text" th:field="*{module}" id="module"
+                               placeholder="e.g. Authentication" autocomplete="off"
+                               enterkeyhint="done" autocapitalize="words" autocorrect="off"
+                               spellcheck="false">
+                        <span class="field-error" th:if="${#fields.hasErrors('module')}"
+                              th:errors="*{module}">Module error</span>
+                    </label>
+
+                    <label>
+                        <span>Blocked by <span class="hint">— an open bug in the way</span></span>
+                        <select th:field="*{blockedBy}" id="blockedBy">
+                            <option value="">— Not blocked —</option>
+                            <option th:each="b : ${blockerOptions}" th:value="${b.id}"
+                                    th:text="'BUG-' + ${b.id} + ' · ' + ${b.title}">BUG-3 · Something</option>
+                        </select>
+                        <span class="field-error" th:if="${#fields.hasErrors('blockedBy')}"
+                              th:errors="*{blockedBy}">Blocker error</span>
+                    </label>
+
+                    <!-- The columns of the project this bug is on. data-columns
+                         carries every project's, so picking a different project
+                         above re-offers the right ones; with JavaScript off the
+                         list stays as it loaded and the server remaps a status
+                         that does not belong to the project it is saved against. -->
+                    <label th:if="${editing}">
+                        <span>Status</span>
+                        <select th:field="*{status}" id="status" th:attr="data-columns=${columnsJson}">
+                            <option th:each="c : ${boardColumns}" th:value="${c.statusKey}"
+                                    th:text="${c.label}">Open</option>
+                        </select>
+                        <span class="field-error" th:if="${#fields.hasErrors('status')}"
+                              th:errors="*{status}">Status error</span>
+                    </label>
+                </div>
+            </details>
+
+            <!-- Stamped with whoever is signed in, for the history trail. -->
             <input type="hidden" name="actor" class="actor-field">
 
-            <div class="form-foot">
+            <div class="report-sec form-foot">
                 <button type="submit" class="btn btn-primary" id="submit-bug">
-                    <span th:text="${bug.id == null} ? 'Raise Bug' : 'Save Changes'">Raise Bug</span>
+                    <span th:text="${editing} ? 'Save changes' : 'Raise bug'">Raise bug</span>
                 </button>
-                <a class="btn btn-ghost" th:href="@{/bugs}">Cancel</a>
+                <a class="btn btn-ghost" th:href="@{/bugs(project=${bug.project})}">Cancel</a>
+                <span class="spacer"></span>
+                <span class="hint" th:unless="${editing}">Filed as Open</span>
             </div>
         </form>
-
-        <!-- Live preview: you see the row you are about to create, before you create it. -->
-        <aside class="panel preview">
-            <h2>Preview</h2>
-
-            <div class="preview-title preview-empty" id="preview-title">Untitled bug</div>
-
-            <div class="detail-badges">
-                <span class="badge" id="preview-severity" th:classappend="'sev-' + ${bug.severity}"
-                      th:text="${bug.severity != null} ? ${bug.severity.label} : 'Medium'">Medium</span>
-                <span class="meter" id="preview-meter" th:classappend="'sev-' + ${bug.severity}" aria-hidden="true">
-                    <i></i><i></i><i></i><i></i>
-                </span>
-                <span class="badge badge-square" id="preview-priority"
-                      th:classappend="'pri-' + ${bug.priority}"
-                      th:text="${bug.priority != null} ? ${bug.priority.label} : 'P3'">P3</span>
-                <span class="tag env-tag" id="preview-environment"
-                      th:classappend="'env-' + ${bug.environment}"
-                      th:text="${bug.environment != null} ? ${bug.environment.label} : 'QA'">QA</span>
-            </div>
-
-            <div class="client-chip">
-                <span class="avatar" id="preview-project" hidden aria-hidden="true"></span>
-                <span class="client-name muted" id="preview-project-name">No project picked yet</span>
-            </div>
-
-            <div class="impact" id="preview-impact" th:classappend="'sev-' + ${bug.severity}">
-                Pick a severity to see what it means.
-            </div>
-        </aside>
     </div>
     </div>
 </section>

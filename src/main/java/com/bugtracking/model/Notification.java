@@ -7,15 +7,25 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.time.LocalDateTime;
 
 /**
- * An in-app notification raised when something happens to a bug.
+ * An in-app notification raised when something happens to a bug, or when
+ * somebody is tagged in a project document.
  *
  * <p>The recipient is the name already on the bug (its assignee or reporter)
- * rather than a user account, because the app has no login yet. Swapping this
- * for a real user id later is a one-column change.
+ * rather than a user account: a display name, which is also what sign-in makes
+ * the principal, so the two line up without a join. Matched case-insensitively
+ * everywhere, because it is typed by hand in places. Swapping this for a real
+ * user id later is a one-column change.
+ *
+ * <p>Where it takes you is {@link #getHref()}. A bug notification carries a
+ * bug id and nothing else, as it always has; anything that is not about a bug
+ * carries an explicit {@code link} instead. Exactly one of the two is set —
+ * hence {@code bug_id} being nullable, which {@code SchemaUpgrade} relaxes on
+ * a database created before project documents existed.
  */
 @Entity
 @Table(name = "notifications")
@@ -25,7 +35,7 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "bug_id", nullable = false)
+    @Column(name = "bug_id")
     private Long bugId;
 
     /** "assigned", "fixed", "reopened" or "closed" - drives the icon and colour. */
@@ -37,6 +47,13 @@ public class Notification {
 
     @Column(nullable = false, length = 255)
     private String message;
+
+    /**
+     * Where clicking it goes, for a notification that is not about a bug.
+     * An app-relative path, only ever built here — never a URL out of a form.
+     */
+    @Column(length = 300)
+    private String link;
 
     @Column(name = "is_read", nullable = false)
     private boolean read;
@@ -54,9 +71,30 @@ public class Notification {
         this.message = message;
     }
 
+    /** For anything that is not a bug: the link is the whole address. */
+    public Notification(String link, String type, String recipient, String message) {
+        this.link = link;
+        this.type = type;
+        this.recipient = recipient;
+        this.message = message;
+    }
+
     @PrePersist
     void onCreate() {
         this.createdAt = LocalDateTime.now();
+    }
+
+    /**
+     * Where this notification takes you. The templates ask for this rather
+     * than building "/bugs/" + id themselves, so a notification about a
+     * document lands on the document.
+     */
+    @Transient
+    public String getHref() {
+        if (link != null && !link.isBlank()) {
+            return link;
+        }
+        return bugId == null ? "/notifications" : "/bugs/" + bugId;
     }
 
     public Long getId() {
@@ -97,6 +135,14 @@ public class Notification {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getLink() {
+        return link;
+    }
+
+    public void setLink(String link) {
+        this.link = link;
     }
 
     public boolean isRead() {

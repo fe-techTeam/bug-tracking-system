@@ -22,10 +22,15 @@ public class ProjectService {
 
     private final ProjectRepository repository;
     private final BugRepository bugs;
+    private final ProjectDocService documents;
+    private final BoardColumnService columns;
 
-    public ProjectService(ProjectRepository repository, BugRepository bugs) {
+    public ProjectService(ProjectRepository repository, BugRepository bugs,
+                          ProjectDocService documents, BoardColumnService columns) {
         this.repository = repository;
         this.bugs = bugs;
+        this.documents = documents;
+        this.columns = columns;
     }
 
     @Transactional(readOnly = true)
@@ -70,7 +75,7 @@ public class ProjectService {
         // Matched case-insensitively, so "Godrej" picks up a bug filed as "godrej".
         Set<String> claimed = new HashSet<>();
         for (String name : activeNames()) {
-            counts.put(name, bugs.countByProjectIgnoreCase(name));
+            counts.put(name, bugs.countByProjectIgnoreCaseAndDeletedAtIsNull(name));
             claimed.add(name.toLowerCase(Locale.ROOT));
         }
 
@@ -90,9 +95,17 @@ public class ProjectService {
         return counts;
     }
 
+    /** One project by name, for the routes that are handed a name rather than an id. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<Project> findByName(String name) {
+        return name == null || name.isBlank()
+                ? java.util.Optional.empty()
+                : repository.findByNameIgnoreCase(name.trim());
+    }
+
     @Transactional(readOnly = true)
     public long bugsIn(String name) {
-        return bugs.countByProjectIgnoreCase(name);
+        return bugs.countByProjectIgnoreCaseAndDeletedAtIsNull(name);
     }
 
     @Transactional(readOnly = true)
@@ -109,8 +122,14 @@ public class ProjectService {
         if (clean.isBlank()) {
             throw new IllegalArgumentException("A project needs a name.");
         }
-        return repository.findByNameIgnoreCase(clean)
+        Project project = repository.findByNameIgnoreCase(clean)
                 .orElseGet(() -> repository.save(new Project(clean)));
+        // A new project opens on the six columns this app has always had, which
+        // it is then free to rename, reorder or replace. Doing it here rather
+        // than lazily means the columns are editable in Settings the moment the
+        // project exists, instead of only once somebody has opened its board.
+        columns.seed(project.getName());
+        return project;
     }
 
     public Project setActive(Long id, boolean active) {
@@ -129,6 +148,15 @@ public class ProjectService {
             throw new IllegalArgumentException(project.getName() + " has " + used
                     + " bug" + (used == 1 ? "" : "s") + ", so it cannot be removed. Hide it instead.");
         }
+        // Its documents go with it. They are reachable only through the project,
+        // so leaving them behind would leave rows and files nothing can ever
+        // list again - and the next project to be given this id would inherit
+        // somebody else's folders.
+        documents.deleteForProject(id);
+        // Its board goes with it. Nothing else can reach those columns once the
+        // project is gone, and a project later given the same name should start
+        // from the defaults rather than inherit a stranger's process.
+        columns.removeProject(project.getName());
         repository.delete(project);
     }
 

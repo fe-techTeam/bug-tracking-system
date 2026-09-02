@@ -2,7 +2,6 @@ package com.bugtracking.controller;
 
 import com.bugtracking.service.ProjectService;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,7 +9,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-/** The projects a bug can be raised against. */
+/**
+ * The projects a bug can be raised against.
+ *
+ * <p>The list itself now renders inside Settings, so the GET here only
+ * forwards; the POSTs are unchanged and simply land back on that page.
+ */
 @Controller
 @RequestMapping("/projects")
 public class ProjectController {
@@ -21,11 +25,10 @@ public class ProjectController {
         this.service = service;
     }
 
+    /** Kept so old links and bookmarks still arrive somewhere useful. */
     @GetMapping
-    public String list(Model model) {
-        model.addAttribute("projects", service.all());
-        model.addAttribute("usage", service.usageByProjectId());
-        return "projects";
+    public String list() {
+        return "redirect:/settings";
     }
 
     @PostMapping
@@ -36,7 +39,7 @@ public class ProjectController {
         } catch (IllegalArgumentException e) {
             flash.addFlashAttribute("message", e.getMessage());
         }
-        return "redirect:/projects";
+        return "redirect:/settings";
     }
 
     @PostMapping("/{id}/active")
@@ -46,8 +49,8 @@ public class ProjectController {
         var project = service.setActive(id, active);
         flash.addFlashAttribute("message", active
                 ? project.getName() + " is active again."
-                : project.getName() + " is hidden from the sidebar and dropdowns.");
-        return "redirect:/projects";
+                : project.getName() + " is hidden from the switcher and dropdowns.");
+        return "redirect:/settings";
     }
 
     @PostMapping("/{id}/delete")
@@ -58,6 +61,6 @@ public class ProjectController {
         } catch (IllegalArgumentException e) {
             flash.addFlashAttribute("message", e.getMessage());
         }
-        return "redirect:/projects";
+        return "redirect:/settings";
     }
 }

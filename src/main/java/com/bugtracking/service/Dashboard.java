@@ -9,11 +9,15 @@ import java.util.Map;
  *
  * @param project     the project this describes, or null for the whole board
  * @param total       bugs in scope
- * @param byStatus    count per status label, in lifecycle order
+ * @param byStatus    count per column key, in board order — keyed by the key
+ *                    rather than the wording, since two projects may name two
+ *                    different columns the same thing and the whole-board view
+ *                    shows both
  * @param bySeverity  count per severity label, worst first
- * @param byPriority  count per priority label, P1 first
- * @param urgent      P1 + P2 — the ones that should not be sitting in the queue
- * @param open        not yet Fixed, Retest or Closed: the actual workload
+ * @param urgent      Critical + High severity, still open — the ones that
+ *                    should not be sitting in the queue
+ * @param open        sitting in a column its project does not count as done:
+ *                    the actual workload
  * @param maxStatus   the largest per-status count, so bars can be scaled
  * @param bugIds      ids in scope, used to narrow the activity timeline
  */
@@ -22,7 +26,6 @@ public record Dashboard(
         long total,
         Map<String, Long> byStatus,
         Map<String, Long> bySeverity,
-        Map<String, Long> byPriority,
         long urgent,
         long open,
         long maxStatus,
@@ -30,6 +33,15 @@ public record Dashboard(
 
     public boolean isEmpty() {
         return total == 0;
+    }
+
+    /**
+     * Everything in a column its project counts as finished. Derived rather
+     * than counted, because "done" is no longer one named status to look up —
+     * a project can have several, or call its only one something else.
+     */
+    public long done() {
+        return total - open;
     }
 
     /** Bar length as a percentage of the busiest status. Never divides by zero. */

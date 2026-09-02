@@ -10,14 +10,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AuthController {
 
     @GetMapping("/login")
-    public String login(@RequestParam(required = false) String error,
-                        @RequestParam(required = false) String logout,
-                        Model model) {
+    public String login(@RequestParam(required = false) String error, Model model) {
         if (error != null) {
             model.addAttribute("loginError", "That email and password do not match.");
-        }
-        if (logout != null) {
-            model.addAttribute("loginNotice", "You are signed out.");
         }
         return "login";
     }

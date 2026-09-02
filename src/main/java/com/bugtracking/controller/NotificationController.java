@@ -9,6 +9,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+/**
+ * Your notifications, and nobody else's — the service answers for whoever is
+ * signed in, so nothing here has to be told who is asking.
+ */
 @Controller
 @RequestMapping("/notifications")
 public class NotificationController {

@@ -6,7 +6,7 @@ package com.bugtracking.service;
  * @param reported  bugs they raised
  * @param assigned  bugs currently on their plate
  * @param open      of those assigned, the ones not yet Fixed, Retest or Closed
- * @param urgent    of those assigned, the P1s and P2s
+ * @param urgent    of those assigned and still open, the Critical and High ones
  * @param critical  of those assigned, the Critical-severity ones
  */
 public record Workload(long reported, long assigned, long open, long urgent, long critical) {

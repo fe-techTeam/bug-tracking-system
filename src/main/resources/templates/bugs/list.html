@@ -2,30 +2,75 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout :: page('Board', ~{::section})}">
 <body>
-<section th:with="me=${#authentication.name}">
+<section th:with="me=${#authentication.name},
+                  noProjects=${projectCounts == null or projectCounts.isEmpty()}">
 
     <!-- ============ topbar: the project, and the stats folded under it ============ -->
     <header class="topbar">
-        <button type="button" class="stat-toggle" id="stats-toggle"
-                aria-expanded="false" aria-controls="stats-drawer"
-                title="Show project stats">
-            <span class="avatar" th:if="${selectedProject}"
-                  th:attr="data-avatar=${selectedProject}" aria-hidden="true"></span>
-            <span class="topbar-title" id="board-title"
-                  th:text="${selectedProject} ?: 'All projects'">Godrej</span>
-            <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
-        </button>
+        <!-- Switching project is one click on the name itself. The counts
+             beside it open the numbers; the two are separate jobs. -->
+        <div class="switcher" id="project-switcher"
+             th:with="shown=${selectedProject != null ? selectedProject : currentProject}">
+            <button type="button" class="switcher-btn switcher-title" id="switcher-btn"
+                    aria-expanded="false" aria-haspopup="listbox" aria-controls="switcher-menu"
+                    title="Switch project">
+                <span class="avatar" th:if="${shown}"
+                      th:attr="data-avatar=${shown}" aria-hidden="true"></span>
+                <span class="avatar" th:unless="${shown}" aria-hidden="true">–</span>
+                <span class="topbar-title" id="board-title"
+                      th:text="${shown} ?: 'All projects'">Godrej</span>
+                <svg class="i switcher-chev" aria-hidden="true"><use href="#i-selector"/></svg>
+            </button>
 
-        <!-- The headline numbers stay visible whether the drawer is open or not. -->
-        <span class="topbar-meta">
+            <div class="switcher-menu" id="switcher-menu" role="listbox" hidden>
+                <div class="switcher-search" th:if="${projectCounts != null and projectCounts.size() > 6}">
+                    <!-- A project name is not prose: no capitalising, no autocorrect,
+                         and the phone's return key says Search, not Go. -->
+                    <input type="text" id="switcher-filter" placeholder="Find a project…"
+                           autocomplete="off" aria-label="Find a project"
+                           inputmode="search" enterkeyhint="search"
+                           autocapitalize="none" autocorrect="off" spellcheck="false">
+                </div>
+
+                <div class="switcher-list" id="switcher-list">
+                    <a class="switcher-item" th:each="entry : ${projectCounts}"
+                       th:href="@{/bugs(project=${entry.key})}"
+                       th:classappend="${entry.key == shown} ? 'is-active' : ''"
+                       th:data-name="${entry.key}" role="option"
+                       th:attr="aria-selected=${entry.key == shown}">
+                        <span class="avatar avatar-sm" th:attr="data-avatar=${entry.key}" aria-hidden="true"></span>
+                        <span class="switcher-item-name" th:text="${entry.key}">Godrej</span>
+                        <span class="switcher-item-count num" th:if="${entry.value > 0}"
+                              th:text="${entry.value}">4</span>
+                    </a>
+                </div>
+
+                <p class="switcher-empty" th:if="${noProjects}">
+                    No projects yet.
+                </p>
+
+                <div class="switcher-foot">
+                    <a th:href="@{/settings}">Manage projects</a>
+                    <a th:href="@{/settings}" aria-label="Add a project">+ New</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- The headline numbers are the handle: they say enough on their own,
+             and pulling them open is how you get to everything else, the
+             project switcher included. -->
+        <button type="button" class="topbar-meta" id="stats-toggle"
+                aria-expanded="false" aria-controls="stats-drawer"
+                title="Show project stats and switch project">
             <span class="mk"><b class="num" th:text="${dashboard.total}">24</b>
                 <span th:text="${dashboard.total == 1} ? 'bug' : 'bugs'">bugs</span></span>
             <span class="mk"><span class="dot" style="--c: var(--st-IN_PROGRESS)"></span>
                 <b class="num" th:text="${dashboard.open}">9</b> open</span>
-            <span class="mk"><span class="dot" style="--c: var(--pri-P1)"
+            <span class="mk"><span class="dot" style="--c: var(--sev-CRITICAL)"
                                    th:classappend="${dashboard.urgent > 0} ? 'is-live' : ''"></span>
                 <b class="num" th:text="${dashboard.urgent}">2</b> urgent</span>
-        </span>
+            <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+        </button>
 
         <div class="topbar-actions">
             <div class="seg" role="group" aria-label="View">
@@ -40,8 +85,6 @@
                     <span>List</span>
                 </a>
             </div>
-
-            <div th:replace="~{fragments :: bell}"></div>
 
             <a class="btn btn-primary" id="raise-bug-link"
                th:href="@{/bugs/new(project=${selectedProject})}">
@@ -67,8 +110,8 @@
                           th:text="${dashboard.open}">9</span>
                     <span class="kpi-label">Still open</span>
                 </div>
-                <a class="kpi" style="--i:2; --c: var(--pri-P1)"
-                   th:href="@{${'/bugs' + q.toggle('priority', 'P1')}}"
+                <a class="kpi" style="--i:2; --c: var(--sev-CRITICAL)"
+                   th:href="@{${'/bugs' + q.toggle('severity', 'CRITICAL')}}"
                    th:classappend="${dashboard.urgent > 0} ? 'is-hot' : ''">
                     <span class="kpi-value num" th:attr="data-count=${dashboard.urgent}"
                           th:text="${dashboard.urgent}">2</span>
@@ -77,19 +120,22 @@
                         Urgent
                     </span>
                 </a>
-                <div class="kpi" style="--i:3; --c: var(--st-CLOSED)">
-                    <span class="kpi-value num" th:attr="data-count=${dashboard.byStatus.get('Closed')}"
-                          th:text="${dashboard.byStatus.get('Closed')}">13</span>
-                    <span class="kpi-label">Closed</span>
+                <!-- Everything in a column this project counts as finished.
+                     Asking for a column called "Closed" by name stopped working
+                     the moment columns became renameable — a project that calls
+                     it Signed off would have shown a blank tile. -->
+                <div class="kpi" style="--i:3; --c: var(--col-GREEN)">
+                    <span class="kpi-value num" th:attr="data-count=${dashboard.done()}"
+                          th:text="${dashboard.done()}">13</span>
+                    <span class="kpi-label">Done</span>
                 </div>
             </div>
 
             <div class="dist" role="img" aria-label="Bugs by status" th:if="${dashboard.total > 0}">
-                <span th:each="s,st : ${boardStatuses}"
-                      th:if="${dashboard.byStatus.get(s.label) > 0}"
-                      th:classappend="'st-' + ${s}"
-                      th:style="'--w:' + ${#numbers.formatDecimal(dashboard.percent(dashboard.byStatus.get(s.label)), 1, 2, 'POINT')} + '%; --i:' + ${st.index}"
-                      th:title="${s.label + ': ' + dashboard.byStatus.get(s.label)}"></span>
+                <span th:each="c,st : ${boardColumns}"
+                      th:if="${dashboard.byStatus.get(c.statusKey) > 0}"
+                      th:style="'--c:' + ${c.token} + '; --w:' + ${#numbers.formatDecimal(dashboard.percent(dashboard.byStatus.get(c.statusKey)), 1, 2, 'POINT')} + '%; --i:' + ${st.index}"
+                      th:title="${c.label + ': ' + dashboard.byStatus.get(c.statusKey)}"></span>
             </div>
         </div>
 
@@ -110,25 +156,6 @@
                         <i th:style="'--w:' + ${#numbers.formatDecimal(dashboard.percent(dashboard.bySeverity.get(sev.label)), 1, 2, 'POINT')} + '%'"></i>
                     </span>
                     <span class="heat-value num" th:text="${dashboard.bySeverity.get(sev.label)}">4</span>
-                </a>
-            </div>
-        </div>
-
-        <div class="stats-block">
-            <span class="stats-title">Priority</span>
-            <div class="heat">
-                <a class="heat-card" th:each="pri,st : ${priorities}"
-                   th:href="@{${'/bugs' + q.toggle('priority', pri)}}"
-                   th:classappend="'pri-' + ${pri} + (${pri == selectedPriority} ? ' is-active' : '')"
-                   th:style="'--i:' + ${st.index}" th:title="${pri.description}">
-                    <span class="heat-name">
-                        <span class="dot dot-lg"></span>
-                        <span th:text="${pri.label}">P1</span>
-                    </span>
-                    <span class="heat-track">
-                        <i th:style="'--w:' + ${#numbers.formatDecimal(dashboard.percent(dashboard.byPriority.get(pri.label)), 1, 2, 'POINT')} + '%'"></i>
-                    </span>
-                    <span class="heat-value num" th:text="${dashboard.byPriority.get(pri.label)}">2</span>
                 </a>
             </div>
         </div>
@@ -161,42 +188,48 @@
             <input type="hidden" name="view" th:if="${view == 'list'}" value="list">
             <input type="hidden" name="status" th:if="${selectedStatus != null}" th:value="${selectedStatus}">
             <input type="hidden" name="severity" th:if="${selectedSeverity != null}" th:value="${selectedSeverity}">
-            <input type="hidden" name="priority" th:if="${selectedPriority != null}" th:value="${selectedPriority}">
             <input type="hidden" name="environment" th:if="${selectedEnvironment != null}" th:value="${selectedEnvironment}">
             <input type="hidden" name="assignee" th:if="${assignee != null}" th:value="${assignee}">
             <input type="hidden" name="reporter" th:if="${reporter != null}" th:value="${reporter}">
             <input type="hidden" name="sort" th:if="${sort != null}" th:value="${sort}">
             <label class="sr-only" for="filter-keyword">Search</label>
-            <svg class="i search-ico" aria-hidden="true"><use href="#i-search"/></svg>
-            <input type="text" name="keyword" id="filter-keyword"
+            <!-- The magnifier was decoration; now it is the submit button. Typing
+                 still auto-submits on a pause with JS on, but not on touch — that
+                 shut the keyboard mid-word — so the search needs something to press,
+                 and that is the same button JS-off has always relied on.
+                 .btn-sm rather than .icon-btn: on a coarse pointer .icon-btn is
+                 resized to --tap (44px), which bursts a 30px-tall field, while
+                 .btn-sm gets the same 44px target from an invisible ::after. -->
+            <button type="submit" class="btn btn-ghost btn-sm search-go" title="Search" aria-label="Search">
+                <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+            </button>
+            <!-- A search box, not a sentence: "BUG-12" must survive the phone
+                 keyboard, which otherwise capitalises and autocorrects it. -->
+            <input type="search" name="keyword" id="filter-keyword"
                    placeholder="Search id, title, person…"
-                   th:value="${keyword}" autocomplete="off">
+                   th:value="${keyword}" autocomplete="off"
+                   inputmode="search" enterkeyhint="search"
+                   autocapitalize="none" autocorrect="off" spellcheck="false">
             <span class="kbd">/</span>
         </form>
 
         <span class="toolbar-divider" aria-hidden="true"></span>
 
-        <!-- Mine: the filter a developer reaches for every morning. -->
-        <a class="mine-toggle" id="mine-toggle"
-           th:href="@{${'/bugs' + q.withOnly('assignee', assignee == me ? null : me, 'reporter')}}"
-           th:classappend="${assignee == me} ? 'is-active' : ''"
-           th:title="${assignee == me} ? 'Show everyone again' : 'Only bugs assigned to me'">
-            <span class="avatar avatar-sm" th:attr="data-avatar=${me}" aria-hidden="true"></span>
-            <span>Mine</span>
-        </a>
-
         <!-- The people on this board, as faces. Click one to see their queue. -->
         <div class="people-bar">
+            <!-- The face is the whole link, so the name has to be its accessible
+                 name too — a hover title is nothing on a phone. -->
             <a class="face" th:each="w,st : ${workload}" th:if="${st.index < 5}"
                th:href="@{${'/bugs' + q.withOnly('assignee', w.key == assignee ? null : w.key, 'reporter')}}"
                th:classappend="${w.key == assignee} ? 'is-active' : ''"
-               th:title="${w.key + ' — ' + w.value + ' assigned'}">
+               th:title="${w.key + ' — ' + w.value + ' assigned'}"
+               th:attr="aria-label=${w.key + ' — ' + w.value + ' assigned'}">
                 <span class="avatar" th:attr="data-avatar=${w.key}" aria-hidden="true"></span>
                 <span class="face-count num" th:text="${w.value}">3</span>
             </a>
 
             <details class="fmenu" id="filter-people">
-                <summary><span class="face-more" title="Filter by person">···</span></summary>
+                <summary aria-label="Filter by person"><span class="face-more" title="Filter by person">···</span></summary>
                 <div class="fmenu-pop">
                     <p class="fmenu-head">Assigned to</p>
                     <a class="fmenu-opt" th:href="@{${'/bugs' + q.without('assignee')}}"
@@ -209,7 +242,8 @@
                        th:classappend="${p == assignee} ? 'is-active' : ''">
                         <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
                         <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
-                        <span class="opt-count num" th:text="${workload.get(p)}"></span>
+                        <span class="opt-count num" th:if="${workload.get(p) != null and workload.get(p) > 0}"
+                              th:text="${workload.get(p)}"></span>
                     </a>
 
                     <div class="fmenu-sep"></div>
@@ -257,33 +291,8 @@
                         <i></i><i></i><i></i><i></i>
                     </span>
                     <span th:text="${sev.label}">Critical</span>
-                    <span class="opt-count num" th:text="${dashboard.bySeverity.get(sev.label)}">2</span>
-                </a>
-            </div>
-        </details>
-
-        <!-- Priority: a coloured dot, P1 red through P4 slate. -->
-        <details class="fmenu" id="filter-priority">
-            <summary>
-                <span class="fmenu-btn" th:classappend="${selectedPriority != null} ? 'is-set pri-' + ${selectedPriority} : ''">
-                    <span class="dot" th:if="${selectedPriority != null}"></span>
-                    <span th:text="${selectedPriority != null} ? ${selectedPriority.label} : 'Priority'">Priority</span>
-                    <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
-                </span>
-            </summary>
-            <div class="fmenu-pop">
-                <a class="fmenu-opt" th:href="@{${'/bugs' + q.without('priority')}}"
-                   th:classappend="${selectedPriority == null} ? 'is-active' : ''">
-                    <svg class="i tick" aria-hidden="true"><use href="#i-check"/></svg>
-                    <span>Any priority</span><span class="opt-count"></span>
-                </a>
-                <a class="fmenu-opt" th:each="pri : ${priorities}"
-                   th:href="@{${'/bugs' + q.toggle('priority', pri)}}"
-                   th:classappend="'pri-' + ${pri} + (${pri == selectedPriority} ? ' is-active' : '')"
-                   th:title="${pri.description}">
-                    <span class="dot dot-lg"></span>
-                    <span th:text="${pri.label + ' — ' + pri.description}">P1</span>
-                    <span class="opt-count num" th:text="${dashboard.byPriority.get(pri.label)}">2</span>
+                    <span class="opt-count num" th:if="${dashboard.bySeverity.get(sev.label) > 0}"
+                          th:text="${dashboard.bySeverity.get(sev.label)}">2</span>
                 </a>
             </div>
         </details>
@@ -315,9 +324,10 @@
         <!-- Status is a column on the board, so it is only a filter in the list. -->
         <details class="fmenu" id="filter-status" th:if="${view == 'list'}">
             <summary>
-                <span class="fmenu-btn" th:classappend="${selectedStatus != null} ? 'is-set st-' + ${selectedStatus} : ''">
+                <span class="fmenu-btn" th:classappend="${selectedStatus != null} ? 'is-set' : ''"
+                      th:style="${selectedStatus != null} ? '--c:' + ${cols.token(selectedProject, selectedStatus)} : ''">
                     <span class="dot" th:if="${selectedStatus != null}"></span>
-                    <span th:text="${selectedStatus != null} ? ${selectedStatus.label} : 'Status'">Status</span>
+                    <span th:text="${selectedStatus != null} ? ${cols.label(selectedProject, selectedStatus)} : 'Status'">Status</span>
                     <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
                 </span>
             </summary>
@@ -327,12 +337,14 @@
                     <svg class="i tick" aria-hidden="true"><use href="#i-check"/></svg>
                     <span>Any status</span><span class="opt-count"></span>
                 </a>
-                <a class="fmenu-opt" th:each="s : ${boardStatuses}"
-                   th:href="@{${'/bugs' + q.toggle('status', s)}}"
-                   th:classappend="'st-' + ${s} + (${s == selectedStatus} ? ' is-active' : '')">
+                <a class="fmenu-opt" th:each="c : ${boardColumns}"
+                   th:href="@{${'/bugs' + q.toggle('status', c.statusKey)}}"
+                   th:style="'--c:' + ${c.token}"
+                   th:classappend="${c.statusKey == selectedStatus} ? 'is-active' : ''">
                     <span class="dot dot-lg"></span>
-                    <span th:text="${s.label}">Open</span>
-                    <span class="opt-count num" th:text="${dashboard.byStatus.get(s.label)}">2</span>
+                    <span th:text="${c.label}">Open</span>
+                    <span class="opt-count num" th:if="${dashboard.byStatus.get(c.statusKey) > 0}"
+                          th:text="${dashboard.byStatus.get(c.statusKey)}">2</span>
                 </a>
             </div>
         </details>
@@ -345,7 +357,6 @@
                         <span th:case="'oldest'">Oldest</span>
                         <span th:case="'updated'">Updated</span>
                         <span th:case="'severity'">Severity</span>
-                        <span th:case="'priority'">Priority</span>
                         <span th:case="'title'">Title</span>
                         <span th:case="*">Newest</span>
                     </span>
@@ -353,7 +364,7 @@
                 </span>
             </summary>
             <div class="fmenu-pop to-right">
-                <a class="fmenu-opt" th:each="opt : ${ {'newest','oldest','updated','severity','priority','title'} }"
+                <a class="fmenu-opt" th:each="opt : ${ {'newest','oldest','updated','severity','title'} }"
                    th:href="@{${'/bugs' + q.with('sort', opt)}}"
                    th:classappend="${opt == (sort != null ? sort : 'newest')} ? 'is-active' : ''">
                     <svg class="i tick" aria-hidden="true"><use href="#i-check"/></svg>
@@ -361,7 +372,6 @@
                         <span th:case="'oldest'">Oldest first</span>
                         <span th:case="'updated'">Recently updated</span>
                         <span th:case="'severity'">Severity, worst first</span>
-                        <span th:case="'priority'">Priority, P1 first</span>
                         <span th:case="'title'">Title A–Z</span>
                         <span th:case="*">Newest first</span>
                     </span>
@@ -395,13 +405,6 @@
             <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
         </a>
 
-        <a class="chip" th:if="${selectedPriority != null}" th:classappend="'pri-' + ${selectedPriority}"
-           th:href="@{${'/bugs' + q.without('priority')}}">
-            <span class="dot"></span>
-            <b th:text="${selectedPriority.label}">P1</b>
-            <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
-        </a>
-
         <a class="chip" th:if="${selectedEnvironment != null}" th:classappend="'env-' + ${selectedEnvironment}"
            th:href="@{${'/bugs' + q.without('environment')}}">
             <span class="dot"></span>
@@ -423,10 +426,11 @@
             <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
         </a>
 
-        <a class="chip" th:if="${selectedStatus != null}" th:classappend="'st-' + ${selectedStatus}"
+        <a class="chip" th:if="${selectedStatus != null}"
+           th:style="'--c:' + ${cols.token(selectedProject, selectedStatus)}"
            th:href="@{${'/bugs' + q.without('status')}}">
             <span class="dot"></span>
-            <b th:text="${selectedStatus.label}">Open</b>
+            <b th:text="${cols.label(selectedProject, selectedStatus)}">Open</b>
             <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
         </a>
 
@@ -434,75 +438,252 @@
     </div>
 
     <!-- ============ nothing to show at all ============ -->
-    <div class="content" th:if="${projectCounts.isEmpty()}">
+    <div class="content" th:if="${noProjects}">
         <div class="panel">
             <div class="empty" id="no-projects">
                 <span class="empty-art" aria-hidden="true">
                     <svg class="i" style="width:19px;height:19px"><use href="#i-folder"/></svg>
                 </span>
                 <h3>No projects yet</h3>
-                <p>The board is organised by project. Add one and it appears in the switcher.</p>
+                <p>The board is organised by project. Add one in Settings and it appears in the switcher.</p>
                 <div class="actions">
-                    <a class="btn btn-primary" th:href="@{/projects}">Add a project</a>
+                    <a class="btn btn-primary" th:href="@{/settings}">Add a project</a>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- ============ the board: one column per status ============ -->
-    <div class="kanban" id="kanban" th:if="${view == 'board' and !projectCounts.isEmpty()}">
+    <!-- The columns are rows, not an enum: this project's own, in this
+         project's own order. Each one can be renamed, recoloured, moved or
+         removed from its own menu, and the tile at the end adds another.
+         Editing is offered only on a single project's board — the whole-board
+         view merges several projects' columns and there is no one board to
+         change. -->
+    <div class="kanban" id="kanban" th:if="${view == 'board' and !noProjects}"
+         th:attr="data-project=${selectedProject}"
+         th:with="editable=${selectedProject != null}">
         <section class="kcol" th:each="col,cs : ${columns}"
-                 th:classappend="'st-' + ${col.key}"
-                 th:style="'--i:' + ${cs.index}"
-                 th:attr="data-status=${col.key}">
-            <header class="kcol-head">
-                <span class="dot" th:classappend="${col.key.name() == 'OPEN' or col.key.name() == 'REOPENED'} ? 'is-live' : ''"></span>
+                 th:style="'--c:' + ${col.key.token} + '; --i:' + ${cs.index}"
+                 th:attr="data-status=${col.key.statusKey}, data-column=${col.key.id}">
+
+            <!-- Dragging the head reorders the board; dragging a card inside it
+                 moves a bug. Only the head is draggable, so the two never
+                 compete for the same gesture. -->
+            <header class="kcol-head" th:attr="draggable=${editable and col.key.id != null}">
+                <svg class="i kcol-grip" aria-hidden="true"
+                     th:if="${editable and col.key.id != null}"><use href="#i-grip"/></svg>
+                <span class="dot" th:classappend="${cs.first} ? 'is-live' : ''"></span>
                 <h3 th:text="${col.key.label}">Open</h3>
-                <span class="kcol-count num" th:text="${#lists.size(col.value)}">3</span>
+                <span class="kcol-count num" th:if="${!#lists.isEmpty(col.value)}"
+                      th:text="${#lists.size(col.value)}">3</span>
+
+                <details class="fmenu kcol-menu" th:if="${editable and col.key.id != null}">
+                    <summary>
+                        <span class="icon-btn" th:attr="aria-label='Edit the ' + ${col.key.label} + ' column',
+                                                        title='Edit the ' + ${col.key.label} + ' column'">
+                            <svg class="i" aria-hidden="true"><use href="#i-more"/></svg>
+                        </span>
+                    </summary>
+
+                    <div class="fmenu-pop to-right kcol-pop">
+                        <!-- Rename. The key every bug in here stores is not the
+                             name, so this changes the wording and nothing else. -->
+                        <form method="post" th:action="@{/columns/{id}(id=${col.key.id})}" class="kcol-rename">
+                            <input type="hidden" name="from" value="board">
+                            <label class="sr-only" th:for="'rename-' + ${col.key.id}">Column name</label>
+                            <input type="text" name="label" th:id="'rename-' + ${col.key.id}"
+                                   th:value="${col.key.label}" required maxlength="40"
+                                   autocomplete="off" autocapitalize="words" autocorrect="off"
+                                   spellcheck="false" enterkeyhint="done">
+                            <button type="submit" class="btn btn-sm btn-primary">Rename</button>
+                        </form>
+
+                        <!-- Colour. One swatch per token in the palette, so the
+                             board keeps reading as a journey. -->
+                        <div class="kcol-swatches">
+                            <form method="post" th:action="@{/columns/{id}(id=${col.key.id})}"
+                                  th:each="c : ${colours}" class="inline-form">
+                                <input type="hidden" name="from" value="board">
+                                <input type="hidden" name="colour" th:value="${c}">
+                                <button type="submit" class="swatch"
+                                        th:style="'--c:' + ${c.token}"
+                                        th:classappend="${c == col.key.colour} ? 'is-active' : ''"
+                                        th:attr="aria-label='Paint ' + ${col.key.label} + ' ' + ${c.label},
+                                                 title=${c.label} + ' — ' + ${c.reads}"></button>
+                            </form>
+                        </div>
+
+                        <div class="fmenu-sep"></div>
+
+                        <!-- The no-JavaScript half of reordering. -->
+                        <div class="kcol-moves">
+                            <form method="post" th:action="@{/columns/{id}/move(id=${col.key.id})}" class="inline-form">
+                                <input type="hidden" name="from" value="board">
+                                <input type="hidden" name="direction" value="left">
+                                <button type="submit" class="btn btn-sm btn-ghost" data-move="left"
+                                        th:disabled="${cs.first}"
+                                        th:attr="aria-label='Move ' + ${col.key.label} + ' left'">
+                                    <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+                                    <span>Left</span>
+                                </button>
+                            </form>
+                            <form method="post" th:action="@{/columns/{id}/move(id=${col.key.id})}" class="inline-form">
+                                <input type="hidden" name="from" value="board">
+                                <input type="hidden" name="direction" value="right">
+                                <button type="submit" class="btn btn-sm btn-ghost" data-move="right"
+                                        th:disabled="${cs.last}"
+                                        th:attr="aria-label='Move ' + ${col.key.label} + ' right'">
+                                    <span>Right</span>
+                                    <svg class="i" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="fmenu-sep"></div>
+
+                        <!-- Removing a column has to say where its bugs go. The
+                             last column will not delete: a board needs one. -->
+                        <form method="post" th:action="@{/columns/{id}/delete(id=${col.key.id})}"
+                              class="kcol-remove" th:if="${#lists.size(boardColumns) > 1}"
+                              th:attr="onsubmit='return confirm(\'Remove the ' + ${col.key.label} + ' column?\');'">
+                            <input type="hidden" name="from" value="board">
+                            <label th:if="${!#lists.isEmpty(col.value)}">
+                                <span class="hint" th:text="'Move its ' + ${#lists.size(col.value)} + ' bug'
+                                      + (${#lists.size(col.value) == 1} ? '' : 's') + ' to'">Move its bugs to</span>
+                                <select name="moveTo" required>
+                                    <option th:each="other : ${boardColumns}"
+                                            th:if="${other.id != col.key.id}"
+                                            th:value="${other.id}" th:text="${other.label}">Open</option>
+                                </select>
+                            </label>
+                            <button type="submit" class="btn btn-sm btn-danger btn-block"
+                                    th:attr="aria-label='Remove the ' + ${col.key.label} + ' column'">
+                                Remove column
+                            </button>
+                        </form>
+                    </div>
+                </details>
             </header>
 
-            <div class="kcol-body" th:attr="data-status=${col.key}">
+            <!-- data-done is how the drag handler knows what to leave out of the
+                 "open" count in the topbar. It used to be a list of status names
+                 written into app.js, which went stale the moment the statuses
+                 could change — and now they change from Settings. -->
+            <div class="kcol-body" th:attr="data-status=${col.key.statusKey}, data-done=${col.key.doneState}">
                 <article class="kcard" th:each="bug,bs : ${col.value}" draggable="true"
-                         th:attr="data-id=${bug.id}"
-                         th:classappend="${bug.assignedTo != null and bug.assignedTo == me} ? 'is-mine' : ''"
+                         th:attr="data-id=${bug.id}, data-href=@{/bugs/{id}(id=${bug.id})}"
+                         th:classappend="${#lists.contains(bug.assignees, me)} ? 'is-mine' : ''"
                          th:style="'--i:' + ${bs.index} + '; --c: var(--sev-' + ${bug.severity} + ')'">
-                    <div class="kcard-top">
+                    <div class="kcard-top" th:with="blocker=${bug.blockedBy != null} ? ${blockers.get(bug.blockedBy)} : null">
                         <span class="kcard-id" th:text="'BUG-' + ${bug.id}">BUG-12</span>
-                        <span class="badge badge-square" th:if="${bug.priority}"
-                              th:classappend="'pri-' + ${bug.priority}"
-                              th:text="${bug.priority.label}"
-                              th:title="${bug.priority.description}">P1</span>
+                        <!-- Only while the blocker is still open: a bug waiting
+                             on something already fixed is not blocked. -->
+                        <!-- The title says which bug is in the way; without it
+                             "Blocked" is a dead end for anyone not hovering. -->
+                        <span class="blocked-mark" th:if="${blocker != null and cols.openWork(blocker)}"
+                              th:title="'Blocked by BUG-' + ${blocker.id} + ' — ' + ${blocker.title}">
+                            <svg class="i" aria-hidden="true"><use href="#i-blocked"/></svg>
+                            <span class="sr-only"
+                                  th:text="'Blocked by BUG-' + ${blocker.id} + ' — ' + ${blocker.title}">Blocked by BUG-3</span>
+                        </span>
                     </div>
 
                     <a class="kcard-title" th:href="@{/bugs/{id}(id=${bug.id})}"
                        th:text="${bug.title}">Sign-in swallows the first click</a>
 
                     <div class="kcard-foot">
+                        <!-- The bars are the reading; the word beside them is what
+                             a touch screen and a screen reader get, since neither
+                             of them ever sees a tooltip. -->
                         <span class="meter" th:classappend="'sev-' + ${bug.severity}"
-                              th:title="${bug.severity.label + ' severity'}">
+                              th:title="${bug.severity.label + ' severity'}" aria-hidden="true">
                             <i></i><i></i><i></i><i></i>
                         </span>
+                        <span class="sr-only" th:text="${bug.severity.label} + ' severity'">High severity</span>
                         <span class="tag env-tag" th:if="${bug.environment}"
                               th:classappend="'env-' + ${bug.environment}"
                               th:text="${bug.environment.label}">QA</span>
                         <span class="kcard-when when" th:attr="data-time=${bug.createdAt}"
                               th:text="${#temporals.format(bug.createdAt, 'dd MMM')}">01 Jan</span>
-                        <span class="avatar avatar-sm" th:if="${bug.assignedTo}"
-                              th:attr="data-avatar=${bug.assignedTo}"
-                              th:title="'Assigned to ' + ${bug.assignedTo}"></span>
+                        <span class="face-stack" th:unless="${#lists.isEmpty(bug.assignees)}">
+                            <span class="avatar avatar-sm" th:each="p : ${bug.assignees}"
+                                  th:attr="data-avatar=${p}" th:title="${p}" aria-hidden="true"></span>
+                            <span class="sr-only"
+                                  th:text="'Assigned to ' + ${bug.assigneesLabel}">Assigned to Vatsal Motiani</span>
+                        </span>
                     </div>
                 </article>
 
+                <!-- Dragging is a mouse's shortcut, not the route. Saying "drop a
+                     bug here" on a phone asks for something touch cannot do, so
+                     the empty column names the route that always works instead. -->
                 <div class="kcol-empty" th:if="${#lists.isEmpty(col.value)}">
                     <span th:if="${filtered}">Nothing matches</span>
-                    <span th:unless="${filtered}">Drop a bug here</span>
+                    <span th:unless="${filtered}">Nothing here — a bug moves in when you
+                        set its status on the bug itself</span>
                 </div>
             </div>
+        </section>
+
+        <!-- One more column. A <details> rather than script, so it opens and
+             posts with JavaScript off like everything else on this board. -->
+        <section class="kcol kcol-new" th:if="${editable}" th:style="'--i:' + ${#lists.size(boardColumns)}">
+            <details class="fmenu" id="add-column">
+                <summary>
+                    <span class="kcol-new-btn">
+                        <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+                        <span>Add column</span>
+                    </span>
+                </summary>
+
+                <div class="fmenu-pop kcol-pop">
+                    <form method="post" th:action="@{/columns}" class="kcol-add">
+                        <input type="hidden" name="from" value="board">
+                        <input type="hidden" name="project" th:value="${selectedProject}">
+
+                        <label>
+                            <span>Column name</span>
+                            <input type="text" name="label" id="new-column-name" required maxlength="40"
+                                   placeholder="e.g. Waiting on client" autocomplete="off"
+                                   autocapitalize="words" autocorrect="off" spellcheck="false"
+                                   enterkeyhint="done">
+                        </label>
+
+                        <fieldset class="kcol-swatches">
+                            <legend class="sr-only">Colour</legend>
+                            <label class="swatch-pick" th:each="c,ci : ${colours}"
+                                   th:style="'--c:' + ${c.token}"
+                                   th:attr="title=${c.label} + ' — ' + ${c.reads}">
+                                <input type="radio" name="colour" th:value="${c}" th:checked="${ci.first}">
+                                <span class="swatch" aria-hidden="true"></span>
+                                <span class="sr-only" th:text="${c.label}">Slate</span>
+                            </label>
+                        </fieldset>
+
+                        <label>
+                            <span>Bugs here are</span>
+                            <select name="done">
+                                <option value="false">still work in hand</option>
+                                <option value="true">finished</option>
+                            </select>
+                        </label>
+
+                        <button type="submit" class="btn btn-primary btn-block" id="add-column-submit">
+                            Add column
+                        </button>
+                        <p class="hint">
+                            It joins the end of the board. Who gets told when a bug lands here
+                            is set in <a th:href="@{/settings(tab='board', project=${selectedProject})}">Settings</a>.
+                        </p>
+                    </form>
+                </div>
+            </details>
         </section>
     </div>
 
     <!-- ============ the same bugs as a list ============ -->
-    <div class="content" th:if="${view == 'list' and !projectCounts.isEmpty()}">
+    <div class="content" th:if="${view == 'list' and !noProjects}">
 
         <div class="panel" th:if="${#lists.isEmpty(bugs)}">
             <div class="empty" id="no-bugs">
@@ -530,43 +711,56 @@
                     <th>Bug</th>
                     <th class="grow">Title</th>
                     <th>Status</th>
-                    <th>Pri</th>
                     <th>Assigned</th>
                     <th>Raised by</th>
                     <th>Reported</th>
                 </tr>
                 </thead>
                 <tbody>
+                <!-- data-label is the mobile contract: under 780px the row becomes a
+                     card and the CSS prints each label from it, so the value must be
+                     the column's own heading, word for word. The rail is the one
+                     exception — it is a colour bar, not a column, so it carries the
+                     severity as words instead. -->
                 <tr th:each="bug,rs : ${bugs}"
+                    th:attr="data-severity=${bug.severity.label}"
                     th:style="'--i:' + ${rs.index} + '; --c: var(--sev-' + ${bug.severity} + ')'">
 
-                    <td class="rail" aria-hidden="true"></td>
-                    <td class="bug-id" th:text="'BUG-' + ${bug.id}">BUG-1</td>
-
-                    <td class="grow">
-                        <a class="bug-link" th:href="@{/bugs/{id}(id=${bug.id})}" th:text="${bug.title}">Bug title</a>
+                    <td class="rail">
+                        <span class="sr-only" th:text="${bug.severity.label} + ' severity'">High severity</span>
                     </td>
+                    <td class="bug-id" data-label="Bug" th:text="'BUG-' + ${bug.id}">BUG-1</td>
 
-                    <td>
-                        <span class="badge" th:classappend="'st-' + ${bug.status}"
-                              th:text="${bug.status.label}">Open</span>
-                    </td>
-
-                    <td>
-                        <span class="badge badge-square" th:if="${bug.priority}"
-                              th:classappend="'pri-' + ${bug.priority}"
-                              th:text="${bug.priority.label}">P1</span>
-                    </td>
-
-                    <td>
-                        <span class="client-chip" th:if="${bug.assignedTo}">
-                            <span class="avatar avatar-sm" th:attr="data-avatar=${bug.assignedTo}" aria-hidden="true"></span>
-                            <span class="client-name" th:text="${bug.assignedTo}">dev-team</span>
+                    <td class="grow" data-label="Title"
+                        th:with="blocker=${bug.blockedBy != null} ? ${blockers.get(bug.blockedBy)} : null">
+                        <span class="blocked-mark" th:if="${blocker != null and cols.openWork(blocker)}"
+                              th:title="'Blocked by BUG-' + ${blocker.id} + ' — ' + ${blocker.title}">
+                            <svg class="i" aria-hidden="true"><use href="#i-blocked"/></svg>
+                            <span class="sr-only"
+                                  th:text="'Blocked by BUG-' + ${blocker.id} + ' — ' + ${blocker.title}">Blocked by BUG-3</span>
                         </span>
-                        <span class="muted" th:unless="${bug.assignedTo}">Unassigned</span>
+                        <a class="bug-link" th:href="@{/bugs/{id}(id=${bug.id})}"
+                           th:text="${bug.title}">Bug title</a>
                     </td>
 
-                    <td>
+                    <td data-label="Status">
+                        <!-- The bug stores a column key; what it says and what
+                             colour it is belong to that column, on that bug's
+                             own project's board. -->
+                        <span class="badge" th:style="'--c:' + ${cols.token(bug)}"
+                              th:text="${cols.label(bug)}">Open</span>
+                    </td>
+
+                    <td data-label="Assigned">
+                        <span class="face-stack" th:unless="${#lists.isEmpty(bug.assignees)}">
+                            <span class="avatar avatar-sm" th:each="p : ${bug.assignees}"
+                                  th:attr="data-avatar=${p}" th:title="${p}" aria-hidden="true"></span>
+                            <span class="sr-only" th:text="${bug.assigneesLabel}">Vatsal Motiani</span>
+                        </span>
+                        <span class="muted" th:if="${#lists.isEmpty(bug.assignees)}">Unassigned</span>
+                    </td>
+
+                    <td data-label="Raised by">
                         <span class="client-chip" th:if="${bug.reportedBy}">
                             <span class="avatar avatar-sm" th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
                             <span class="client-name" th:text="${bug.reportedBy}">qa-team</span>
@@ -574,7 +768,7 @@
                         <span class="muted" th:unless="${bug.reportedBy}">—</span>
                     </td>
 
-                    <td>
+                    <td data-label="Reported">
                         <span class="when" th:attr="data-time=${bug.createdAt}"
                               th:text="${#temporals.format(bug.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan 2026</span>
                     </td>

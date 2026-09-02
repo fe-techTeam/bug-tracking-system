@@ -2,9 +2,7 @@ package com.bugtracking.repository;
 
 import com.bugtracking.model.Bug;
 import com.bugtracking.model.Environment;
-import com.bugtracking.model.Priority;
 import com.bugtracking.model.Severity;
-import com.bugtracking.model.Status;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,84 +10,158 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
+/**
+ * Deleting a bug is reversible, so every query here says
+ * {@code deletedAt IS NULL}. A bug in the trash still has its row, its
+ * comments, its files and its history — it is simply not looked at until it is
+ * restored. The two methods that deliberately see trashed bugs are
+ * {@link #findTrash()} and {@link #findAnyById(Long)}.
+ */
 public interface BugRepository extends JpaRepository<Bug, Long> {
 
     /**
      * Newest first, with every filter optional: a null project/status/severity/
-     * priority/environment or a blank keyword simply drops that condition
-     * instead of matching nothing. The keyword also matches a bare bug id, so
-     * pasting "12" or "BUG-12" into search finds that bug.
+     * environment or a blank keyword simply drops that condition instead of
+     * matching nothing. The keyword also matches a bare bug id, so pasting "12"
+     * or "BUG-12" into search finds that bug.
+     *
+     * <p>Assignees are a collection, so the two conditions that touch them are
+     * EXISTS sub-queries rather than a column comparison — a join here would
+     * multiply a bug by the number of people on it.
+     *
+     * <p>Person and keyword match differently on purpose. Every link that sets
+     * assignee or reporter passes a whole display name and means that one
+     * person, so those compare the name exactly (folded, since it is typed by
+     * hand): a substring there would let "nishana" answer for "Nishana R" and
+     * "a" for most of the team, and the count beside a face would stop agreeing
+     * with what clicking it returns. The keyword is a free-text search box and
+     * stays a substring.
      */
     @Query("""
             SELECT b FROM Bug b
-            WHERE (:project IS NULL OR LOWER(b.project) = LOWER(:project))
+            WHERE b.deletedAt IS NULL
+              AND (:project IS NULL OR LOWER(b.project) = LOWER(:project))
               AND (:status IS NULL OR b.status = :status)
               AND (:severity IS NULL OR b.severity = :severity)
-              AND (:priority IS NULL OR b.priority = :priority)
               AND (:environment IS NULL OR b.environment = :environment)
-              AND (:assignee IS NULL OR LOWER(b.assignedTo) LIKE LOWER(CONCAT('%', :assignee, '%')))
-              AND (:reporter IS NULL OR LOWER(b.reportedBy) LIKE LOWER(CONCAT('%', :reporter, '%')))
+              AND (:assignee IS NULL OR EXISTS (
+                       SELECT a FROM Bug ab JOIN ab.assignees a
+                       WHERE ab.id = b.id AND LOWER(a) = LOWER(:assignee)))
+              AND (:reporter IS NULL OR LOWER(b.reportedBy) = LOWER(:reporter))
               AND (:keyword IS NULL
                    OR LOWER(b.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
                    OR LOWER(b.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
                    OR LOWER(b.module) LIKE LOWER(CONCAT('%', :keyword, '%'))
                    OR LOWER(b.project) LIKE LOWER(CONCAT('%', :keyword, '%'))
                    OR LOWER(b.reportedBy) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                   OR LOWER(b.assignedTo) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR EXISTS (SELECT a FROM Bug kb JOIN kb.assignees a
+                              WHERE kb.id = b.id AND LOWER(a) LIKE LOWER(CONCAT('%', :keyword, '%')))
                    OR (:keywordId IS NOT NULL AND b.id = :keywordId))
             ORDER BY b.createdAt DESC
             """)
     List<Bug> search(@Param("project") String project,
-                     @Param("status") Status status,
+                     @Param("status") String status,
                      @Param("severity") Severity severity,
-                     @Param("priority") Priority priority,
                      @Param("environment") Environment environment,
                      @Param("assignee") String assignee,
                      @Param("reporter") String reporter,
                      @Param("keyword") String keyword,
                      @Param("keywordId") Long keywordId);
 
-    /** Every bug on one project, newest first — the input to a project dashboard. */
-    List<Bug> findByProjectIgnoreCaseOrderByCreatedAtDesc(String project);
+    /** Every live bug on one project, newest first — the input to a dashboard. */
+    List<Bug> findByProjectIgnoreCaseAndDeletedAtIsNullOrderByCreatedAtDesc(String project);
 
-    List<Bug> findAllByOrderByCreatedAtDesc();
+    List<Bug> findByDeletedAtIsNullOrderByCreatedAtDesc();
 
-    long countByProjectIgnoreCase(String project);
+    long countByProjectIgnoreCaseAndDeletedAtIsNull(String project);
 
     /** Bug counts per project name, including names no longer in the projects table. */
-    @Query("SELECT b.project, COUNT(b) FROM Bug b GROUP BY b.project")
+    @Query("SELECT b.project, COUNT(b) FROM Bug b WHERE b.deletedAt IS NULL GROUP BY b.project")
     List<Object[]> countGroupedByProject();
 
-    long countByStatus(Status status);
+    long countByStatusAndDeletedAtIsNull(String status);
 
-    long countBySeverity(Severity severity);
+    long countBySeverityAndDeletedAtIsNull(Severity severity);
 
-    long countByPriority(Priority priority);
-
-    /** How many bugs name this person, either as reporter or assignee. */
-    long countByReportedByIgnoreCaseOrAssignedToIgnoreCase(String reportedBy, String assignedTo);
+    /** How many live bugs name this person, as reporter or as one of the assignees. */
+    @Query("""
+            SELECT COUNT(DISTINCT b) FROM Bug b
+            WHERE b.deletedAt IS NULL
+              AND (LOWER(b.reportedBy) = LOWER(:name)
+                   OR EXISTS (SELECT a FROM Bug ab JOIN ab.assignees a
+                              WHERE ab.id = b.id AND LOWER(a) = LOWER(:name)))
+            """)
+    long countNaming(@Param("name") String name);
 
     /* ---- one person's two piles: what they raised, and what landed on them ---- */
 
-    List<Bug> findByReportedByIgnoreCaseOrderByCreatedAtDesc(String reportedBy);
+    List<Bug> findByReportedByIgnoreCaseAndDeletedAtIsNullOrderByCreatedAtDesc(String reportedBy);
 
-    List<Bug> findByAssignedToIgnoreCaseOrderByCreatedAtDesc(String assignedTo);
+    /** Everything this person is on, whether or not they are first on it. */
+    @Query("""
+            SELECT b FROM Bug b
+            WHERE b.deletedAt IS NULL
+              AND EXISTS (SELECT a FROM Bug ab JOIN ab.assignees a
+                          WHERE ab.id = b.id AND LOWER(a) = LOWER(:name))
+            ORDER BY b.createdAt DESC
+            """)
+    List<Bug> findAssignedTo(@Param("name") String name);
 
-    long countByReportedByIgnoreCase(String reportedBy);
-
-    long countByAssignedToIgnoreCase(String assignedTo);
+    long countByReportedByIgnoreCaseAndDeletedAtIsNull(String reportedBy);
 
     /**
      * Bugs per assignee, so the board can offer the people who actually carry
-     * work rather than the whole directory. Counted in one query.
+     * work rather than the whole directory. A bug with two people on it counts
+     * once for each, which is the point — but only once each, hence DISTINCT:
+     * the join would otherwise count a bug twice for anyone named on it twice.
      */
     @Query("""
-            SELECT b.assignedTo, COUNT(b) FROM Bug b
-            WHERE b.assignedTo IS NOT NULL AND TRIM(b.assignedTo) <> ''
-            GROUP BY b.assignedTo
-            ORDER BY COUNT(b) DESC
+            SELECT a, COUNT(DISTINCT b) FROM Bug b JOIN b.assignees a
+            WHERE b.deletedAt IS NULL AND TRIM(a) <> ''
+            GROUP BY a
+            ORDER BY COUNT(DISTINCT b) DESC
             """)
     List<Object[]> countGroupedByAssignee();
+
+    /* ---- blockers ---- */
+
+    /**
+     * The blocking bugs for a board, fetched in one go rather than per card.
+     * A blocker that has been trashed is simply not returned, so the bug it was
+     * holding up stops reading as blocked — and starts again if it is restored.
+     */
+    @Query("SELECT b FROM Bug b WHERE b.deletedAt IS NULL AND b.id IN :ids")
+    List<Bug> findByIdIn(@Param("ids") List<Long> ids);
+
+    /**
+     * Every live bug but this one, newest first — the candidates for "blocked
+     * by".
+     *
+     * <p>This used to name the three finished statuses inline. It cannot any
+     * more: which columns count as finished is a per-project setting now, not
+     * something JPQL can know, so the filtering moves to
+     * {@code BugService.blockerOptions}, which has the columns to hand. The
+     * query stays because the board is small and one fetch beats one per card.
+     */
+    @Query("""
+            SELECT b FROM Bug b
+            WHERE b.deletedAt IS NULL
+              AND (:exclude IS NULL OR b.id <> :exclude)
+            ORDER BY b.createdAt DESC
+            """)
+    List<Bug> findLiveBugs(@Param("exclude") Long exclude);
+
+    /* ---- the trash ---- */
+
+    /** What is in the bin, most recently thrown away first. */
+    @Query("SELECT b FROM Bug b WHERE b.deletedAt IS NOT NULL ORDER BY b.deletedAt DESC")
+    List<Bug> findTrash();
+
+    long countByDeletedAtIsNotNull();
+
+    /** Finds a bug whether it is live or trashed — for restoring and purging. */
+    @Query("SELECT b FROM Bug b WHERE b.id = :id")
+    java.util.Optional<Bug> findAnyById(@Param("id") Long id);
 
     /**
      * Gives a project to bugs that predate the field being required. A bulk
@@ -100,13 +172,13 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
     @Query("UPDATE Bug b SET b.project = :project WHERE b.project IS NULL OR TRIM(b.project) = ''")
     int fillMissingProject(@Param("project") String project);
 
-    /** Same idea for priority, which became a required field later. */
-    @Modifying
-    @Query("UPDATE Bug b SET b.priority = :priority WHERE b.priority IS NULL")
-    int fillMissingPriority(@Param("priority") Priority priority);
-
-    /** And for environment. */
+    /** Same idea for environment, added later still. */
     @Modifying
     @Query("UPDATE Bug b SET b.environment = :environment WHERE b.environment IS NULL")
     int fillMissingEnvironment(@Param("environment") Environment environment);
+
+    /** Clears a blocker that no longer exists, so no bug is stuck behind a ghost. */
+    @Modifying
+    @Query("UPDATE Bug b SET b.blockedBy = NULL WHERE b.blockedBy = :id")
+    int clearBlocker(@Param("id") Long id);
 }

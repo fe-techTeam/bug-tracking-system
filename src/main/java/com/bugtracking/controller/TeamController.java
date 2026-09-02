@@ -1,6 +1,5 @@
 package com.bugtracking.controller;
 
-import com.bugtracking.model.Status;
 import com.bugtracking.service.BugService;
 import com.bugtracking.service.TeamMemberService;
 import org.springframework.stereotype.Controller;
@@ -12,7 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-/** The people who can raise or be assigned a bug. */
+/**
+ * The people who can raise or be assigned a bug.
+ *
+ * <p>The roster renders inside Settings now. One person's page is still a page
+ * of its own — it is somewhere you read, not somewhere you administer.
+ */
 @Controller
 @RequestMapping("/team")
 public class TeamController {
@@ -25,12 +29,10 @@ public class TeamController {
         this.bugs = bugs;
     }
 
+    /** Kept so old links and bookmarks still arrive somewhere useful. */
     @GetMapping
-    public String list(Model model) {
-        model.addAttribute("members", service.all());
-        model.addAttribute("usage", service.usageByMemberId());
-        model.addAttribute("workload", service.workloadByMemberId());
-        return "team";
+    public String list() {
+        return "redirect:/settings";
     }
 
     /** One person's page: what they raised, and what is on their plate. */
@@ -41,7 +43,6 @@ public class TeamController {
         model.addAttribute("load", service.workloadOf(member.getName()));
         model.addAttribute("reported", bugs.reportedBy(member.getName()));
         model.addAttribute("assigned", bugs.assignedTo(member.getName()));
-        model.addAttribute("boardStatuses", Status.boardOrder());
         return "team-member";
     }
 
@@ -50,12 +51,18 @@ public class TeamController {
                       @RequestParam String email,
                       RedirectAttributes flash) {
         try {
+            // Asked before the save, or the answer is always yes: adding an
+            // email that is already here renames that person rather than
+            // making a second one, and the flash should say so.
+            boolean existing = service.isOnTeam(email);
             var member = service.add(name, email);
-            flash.addFlashAttribute("message", member.getName() + " is on the team.");
+            flash.addFlashAttribute("message", existing
+                    ? member.getName() + "'s name was updated."
+                    : member.getName() + " is on the team.");
         } catch (IllegalArgumentException e) {
             flash.addFlashAttribute("message", e.getMessage());
         }
-        return "redirect:/team";
+        return "redirect:/settings";
     }
 
     @PostMapping("/{id}/delete")
@@ -66,7 +73,7 @@ public class TeamController {
         } catch (IllegalArgumentException e) {
             flash.addFlashAttribute("message", e.getMessage());
         }
-        return "redirect:/team";
+        return "redirect:/settings";
     }
 
     @PostMapping("/{id}/active")
@@ -77,6 +84,6 @@ public class TeamController {
         flash.addFlashAttribute("message", active
                 ? member.getName() + " is active again."
                 : member.getName() + " is no longer offered in the dropdowns.");
-        return "redirect:/team";
+        return "redirect:/settings";
     }
 }

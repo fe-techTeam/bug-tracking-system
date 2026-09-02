@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('Trash', ~{::section})}">
+<body>
+<section>
+
+    <header class="topbar">
+        <a class="back-link" th:href="@{/bugs}" title="Back to the board" aria-label="Back to the board">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span>Board</span>
+        </a>
+        <h1 class="topbar-title">Trash</h1>
+        <span class="topbar-sub">Deleted bugs keep their comments, files and history until you empty them</span>
+    </header>
+
+    <div class="content">
+    <div class="stack">
+
+        <div class="panel" th:if="${#lists.isEmpty(trashed)}">
+            <div class="empty" id="no-trash">
+                <span class="empty-art" aria-hidden="true">
+                    <svg class="i" style="width:19px;height:19px"><use href="#i-trash"/></svg>
+                </span>
+                <h3>The trash is empty</h3>
+                <p>Deleted bugs land here and can be put back. Nothing is destroyed until you say so.</p>
+                <a class="btn btn-primary" th:href="@{/bugs}">Back to the board</a>
+            </div>
+        </div>
+
+        <div class="panel table-wrap" th:unless="${#lists.isEmpty(trashed)}">
+            <table class="bug-table" id="trash-table">
+                <thead>
+                <tr>
+                    <th><span class="sr-only">Severity</span></th>
+                    <th>Bug</th>
+                    <th class="grow">Title</th>
+                    <th>Project</th>
+                    <th>Deleted</th>
+                    <th>By</th>
+                    <th><span class="sr-only">Actions</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <!-- data-label is the mobile contract: under 780px the row becomes a
+                     card and the CSS prints each label from it, so the value must be
+                     the column's own heading, word for word. Without it Restore sits
+                     370px off the side of a phone, and Restore is the whole page.
+                     The rail is the one exception — a colour bar, not a column, so it
+                     carries the severity as words instead. -->
+                <tr th:each="bug,rs : ${trashed}"
+                    th:attr="data-severity=${bug.severity.label}"
+                    th:style="'--i:' + ${rs.index} + '; --c: var(--sev-' + ${bug.severity} + ')'">
+
+                    <td class="rail">
+                        <span class="sr-only" th:text="${bug.severity.label} + ' severity'">High severity</span>
+                    </td>
+                    <td class="bug-id" data-label="Bug" th:text="'BUG-' + ${bug.id}">BUG-1</td>
+
+                    <td class="grow" data-label="Title">
+                        <span class="trash-title" th:text="${bug.title}">Bug title</span>
+                    </td>
+
+                    <td data-label="Project">
+                        <span class="client-chip" th:if="${bug.project}">
+                            <span class="avatar avatar-sm" th:attr="data-avatar=${bug.project}" aria-hidden="true"></span>
+                            <span class="client-name" th:text="${bug.project}">Godrej</span>
+                        </span>
+                        <span class="muted" th:unless="${bug.project}">—</span>
+                    </td>
+
+                    <td data-label="Deleted">
+                        <span class="when" th:attr="data-time=${bug.deletedAt}"
+                              th:text="${#temporals.format(bug.deletedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+                    </td>
+
+                    <td data-label="By">
+                        <span class="client-chip" th:if="${bug.deletedBy}">
+                            <span class="avatar avatar-sm" th:attr="data-avatar=${bug.deletedBy}" aria-hidden="true"></span>
+                            <span class="client-name" th:text="${bug.deletedBy}">Nishana R</span>
+                        </span>
+                        <span class="muted" th:unless="${bug.deletedBy}">—</span>
+                    </td>
+
+                    <td data-label="Actions" style="text-align:right">
+                        <div class="inline-form" style="justify-content:flex-end">
+                            <form method="post" th:action="@{/bugs/{id}/restore(id=${bug.id})}" class="inline-form">
+                                <input type="hidden" name="actor" class="actor-field">
+                                <input type="hidden" name="from" value="trash">
+                                <!-- Every row's buttons read the same out of context,
+                                     so each one says which bug it acts on. -->
+                                <button type="submit" class="btn btn-sm"
+                                        th:attr="id='restore-' + ${bug.id}, aria-label='Restore BUG-' + ${bug.id}">
+                                    <svg class="i" aria-hidden="true"><use href="#i-undo"/></svg>
+                                    <span>Restore</span>
+                                </button>
+                            </form>
+                            <!-- The only irreversible button in the app, so it says so. -->
+                            <form method="post" th:action="@{/bugs/{id}/purge(id=${bug.id})}" class="inline-form"
+                                  th:attr="data-confirm=|Delete BUG-${bug.id} for good? Its comments, files and history go with it. This cannot be undone.|">
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                        th:attr="id='purge-' + ${bug.id},
+                                                 aria-label='Delete BUG-' + ${bug.id} + ' for good'">Delete for good</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p class="hint" th:unless="${#lists.isEmpty(trashed)}">
+            A bug in the trash is hidden everywhere else — off the board, out of searches, and no
+            longer blocking anything. Restoring puts it back exactly as it was.
+        </p>
+    </div>
+    </div>
+</section>
+</body>
+</html>

@@ -5,16 +5,16 @@
 <section>
     <header class="topbar">
         <h1 class="topbar-title">Not found</h1>
-        <div class="topbar-actions">
-            <div th:replace="~{fragments :: bell}"></div>
-        </div>
     </header>
     <div class="content">
     <div class="panel">
         <div class="empty">
             <span class="empty-art" aria-hidden="true">🕵️</span>
             <h3>Bug not found</h3>
-            <p th:text="${errorMessage}" id="error-message">No bug found.</p>
+            <!-- Without the fallback a missing message leaves an empty paragraph,
+                 which reads as a broken page rather than a missing bug. -->
+            <p th:text="${errorMessage} ?: 'That bug does not exist, or it was deleted for good.'"
+               id="error-message">No bug found.</p>
             <div class="actions">
                 <a class="btn btn-primary" th:href="@{/bugs}">Back to all bugs</a>
                 <a class="btn" th:href="@{/bugs/new}">Raise a bug</a>

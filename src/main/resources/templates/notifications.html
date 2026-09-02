@@ -5,12 +5,16 @@
 <section>
 
     <header class="topbar">
+        <a class="back-link" th:href="@{/bugs}" title="Back to the board" aria-label="Back to the board">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span>Board</span>
+        </a>
         <h1 class="topbar-title">Notifications</h1>
-        <span class="topbar-sub">Raised when a bug is assigned, fixed, reopened or closed.</span>
+        <span class="topbar-sub">Raised when a bug is assigned, unassigned, fixed, reopened or closed.</span>
         <div class="topbar-actions">
-            <div th:replace="~{fragments :: bell}"></div>
             <form method="post" th:action="@{/notifications/read-all}">
-                <button type="submit" class="btn btn-sm" id="mark-all-read">Mark all read</button>
+                <button type="submit" class="btn btn-sm" id="mark-all-read"
+                        title="Mark every notification read" aria-label="Mark every notification read">Mark all read</button>
             </form>
         </div>
     </header>
@@ -37,11 +41,13 @@
                     <span th:case="'fixed'">✓</span>
                     <span th:case="'reopened'">↻</span>
                     <span th:case="'closed'">🏁</span>
+                    <span th:case="'unassigned'">✕</span>
+                    <span th:case="'mention'">@</span>
                     <span th:case="*">•</span>
                 </span>
 
                 <div class="notif-body">
-                    <a class="notif-message" th:href="@{/bugs/{id}(id=${n.bugId})}"
+                    <a class="notif-message" th:href="@{${n.href}}"
                        th:text="${n.message}">BUG-1 was assigned to you</a>
                     <div class="notif-meta">
                         <span class="tag" th:text="${n.recipient}">dev-team</span>
@@ -50,9 +56,13 @@
                     </div>
                 </div>
 
+                <!-- A column of identical "Mark read" buttons says nothing about
+                     which one it marks; the message it belongs to does. -->
                 <form method="post" th:if="${!n.read}"
                       th:action="@{/notifications/{id}/read(id=${n.id})}" class="inline-form">
-                    <button type="submit" class="btn btn-sm btn-ghost">Mark read</button>
+                    <button type="submit" class="btn btn-sm btn-ghost"
+                            th:attr="title='Mark read — ' + ${n.message},
+                                     aria-label='Mark read — ' + ${n.message}">Mark read</button>
                 </form>
                 <span class="muted" th:if="${n.read}">read</span>
             </li>

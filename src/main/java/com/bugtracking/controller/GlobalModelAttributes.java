@@ -1,5 +1,9 @@
 package com.bugtracking.controller;
 
+import com.bugtracking.model.Notification;
+import com.bugtracking.service.BoardColumnService;
+import com.bugtracking.service.BoardColumns;
+import com.bugtracking.service.BugService;
 import com.bugtracking.service.NotificationService;
 import com.bugtracking.service.ProjectService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,11 +12,13 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
+import java.util.List;
 import java.util.Map;
 
 /**
- * Values every page needs — the sidebar is on all of them now, so the project
- * list and the current project live here rather than in one controller.
+ * Values every page needs — the navbar is on all of them, so the project list,
+ * the current project and the notification popover's contents live here rather
+ * than in one controller.
  * Restricted to {@link Controller} so the JSON API does not pay for them.
  */
 @ControllerAdvice(annotations = Controller.class)
@@ -21,18 +27,55 @@ public class GlobalModelAttributes {
     /** Where the last-used project is parked between pages. */
     static final String PROJECT_KEY = "bugtracking.project";
 
+    /** How many notifications the bell popover lists before "View all". */
+    private static final int POPOVER_LIMIT = 8;
+
     private final NotificationService notifications;
     private final ProjectService projects;
+    private final BugService bugs;
+    private final BoardColumnService columns;
 
-    public GlobalModelAttributes(NotificationService notifications, ProjectService projects) {
+    public GlobalModelAttributes(NotificationService notifications,
+                                 ProjectService projects,
+                                 BugService bugs,
+                                 BoardColumnService columns) {
         this.notifications = notifications;
         this.projects = projects;
+        this.bugs = bugs;
+        this.columns = columns;
     }
 
-    /** Drives the count on the Notifications item in the sidebar. */
+    /**
+     * Every project's board columns, for turning the key a bug stores into
+     * wording and a colour.
+     *
+     * <p>Here rather than in a controller because a status badge is not one
+     * page's problem: the board draws them, so do the list, the bug page and a
+     * person's page, and each needs the same lookup. {@code ${cols.column(bug)}}
+     * gives a template the column a bug is in; {@code ${cols.label(bug)}} and
+     * {@code ${cols.token(bug)}} are the two things it usually wants from it.
+     */
+    @ModelAttribute("cols")
+    public BoardColumns columns() {
+        return columns.snapshot();
+    }
+
+    /** Drives the count on the bell in the navbar. */
     @ModelAttribute("unreadNotifications")
     public long unreadNotifications() {
         return notifications.unreadCount();
+    }
+
+    /** What the bell popover lists without leaving the page. */
+    @ModelAttribute("recentNotifications")
+    public List<Notification> recentNotifications() {
+        return notifications.latest(POPOVER_LIMIT);
+    }
+
+    /** How much is in the bin, for the navbar's trash icon. */
+    @ModelAttribute("trashCount")
+    public long trashCount() {
+        return bugs.trashCount();
     }
 
     /** Every project the switcher offers, with its bug count. */
@@ -57,7 +100,7 @@ public class GlobalModelAttributes {
         return remembered instanceof String name && !name.isBlank() ? name : null;
     }
 
-    /** Lets the sidebar mark which section you are in. */
+    /** Lets the navbar mark which section you are in. */
     @ModelAttribute("currentPath")
     public String currentPath(HttpServletRequest request) {
         return request.getRequestURI();

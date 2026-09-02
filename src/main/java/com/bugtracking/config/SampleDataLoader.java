@@ -2,9 +2,7 @@ package com.bugtracking.config;
 
 import com.bugtracking.model.Bug;
 import com.bugtracking.model.Environment;
-import com.bugtracking.model.Priority;
 import com.bugtracking.model.Severity;
-import com.bugtracking.model.Status;
 import com.bugtracking.repository.BugRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -26,7 +24,7 @@ public class SampleDataLoader {
                     "1. Open /login\n2. Enter valid credentials\n3. Click Login once",
                     "User is signed in and lands on the dashboard.",
                     "Nothing happens; the page stays on /login.",
-                    Severity.HIGH, Status.OPEN, Priority.P2, Environment.UAT,
+                    Severity.HIGH, "OPEN", Environment.UAT,
                     "Mahindra Mutual Fund", "Authentication", "nishana", "dev-team"));
 
             repository.save(newBug(
@@ -35,7 +33,7 @@ public class SampleDataLoader {
                     "1. Log in as an investor\n2. Open Holdings\n3. Select a folio with 10+ schemes",
                     "NAV values render within 3 seconds.",
                     "Spinner never resolves; console shows a 504 from /api/nav.",
-                    Severity.CRITICAL, Status.IN_PROGRESS, Priority.P1, Environment.PRODUCTION,
+                    Severity.CRITICAL, "IN_PROGRESS", Environment.PRODUCTION,
                     "Godrej", "Investor", "nishana", "backend-team"));
 
             repository.save(newBug(
@@ -44,7 +42,7 @@ public class SampleDataLoader {
                     "1. Open /about-us\n2. Look at the main heading",
                     "Heading reads 'About Us'.",
                     "Heading reads 'Abuot Us'.",
-                    Severity.LOW, Status.FIXED, Priority.P4, Environment.QA,
+                    Severity.LOW, "READY_FOR_TEST", Environment.QA,
                     "Color Shine", "Public Site", "qa-team", "content-team"));
 
             repository.save(newBug(
@@ -53,23 +51,22 @@ public class SampleDataLoader {
                     "1. Log in\n2. Leave the tab idle for 2 minutes\n3. Click any menu item",
                     "Session stays alive for 30 minutes.",
                     "Redirected to the login page with 'Session expired'.",
-                    Severity.MEDIUM, Status.REOPENED, "Orpat", "Authentication", "qa-team", null));
+                    Severity.MEDIUM, "IN_PROGRESS", "Orpat", "Authentication", "qa-team", null));
         };
     }
 
     private Bug newBug(String title, String description, String steps, String expected,
-                       String actual, Severity severity, Status status, String project,
+                       String actual, Severity severity, String status, String project,
                        String module, String reportedBy, String assignedTo) {
         return newBug(title, description, steps, expected, actual, severity, status,
-                Priority.P3, Environment.QA, project, module, reportedBy, assignedTo);
+                Environment.QA, project, module, reportedBy, assignedTo);
     }
 
     private Bug newBug(String title, String description, String steps, String expected,
-                       String actual, Severity severity, Status status, Priority priority,
+                       String actual, Severity severity, String status,
                        Environment environment, String project, String module,
                        String reportedBy, String assignedTo) {
         Bug bug = new Bug();
-        bug.setPriority(priority);
         bug.setEnvironment(environment);
         bug.setProject(project);
         bug.setTitle(title);

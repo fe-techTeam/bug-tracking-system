@@ -1,20 +1,32 @@
 package com.bugtracking.model;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -62,22 +74,21 @@ public class Bug {
     @Column(nullable = false, length = 20)
     private Severity severity = Severity.MEDIUM;
 
-    @NotNull(message = "Status is required")
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
-    @Column(nullable = false, length = 20)
-    private Status status = Status.OPEN;
-
     /**
-     * Business urgency, kept separate from severity on purpose. Defaults to P3
-     * so bugs raised before this field existed - and any caller that omits it -
-     * still have a usable value.
+     * Which column of its project's board the bug is sitting in, held as that
+     * column's key.
+     *
+     * <p>A plain string rather than an enum, because the columns are rows now:
+     * a project can rename them, add its own and put them in whatever order it
+     * runs. The key is written once, when the column is created, and never
+     * rewritten — so renaming a column changes nothing here, which is exactly
+     * why the two are separate. Resolve it to something readable through
+     * {@code BoardColumns}, which knows the project's wording and colour.
      */
-    @NotNull(message = "Priority is required")
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.VARCHAR)
-    @Column(length = 10)
-    private Priority priority = Priority.P3;
+    @NotBlank(message = "Status is required")
+    @Size(max = 40, message = "Status is too long")
+    @Column(nullable = false, length = 40)
+    private String status = DefaultColumns.FIRST_KEY;
 
     /** Where the bug was seen: QA, UAT or Production. */
     @NotNull(message = "Environment is required")
@@ -106,9 +117,44 @@ public class Bug {
     @Column(name = "reported_by", length = 80)
     private String reportedBy;
 
-    @Size(max = 80, message = "Assignee name must be 80 characters or fewer")
-    @Column(name = "assigned_to", length = 80)
-    private String assignedTo;
+    /**
+     * Everyone working this bug. A list rather than one name, because a fix
+     * often needs a developer and a tester on it at the same time.
+     *
+     * <p>Eager on purpose: {@code spring.jpa.open-in-view=false}, so a lazy
+     * collection would explode the first time a template read it. Ordered, so
+     * "the first assignee" is a stable idea rather than whatever the database
+     * returns — see {@link #getAssignedTo()}, which is what the JSON API and
+     * every older caller still see.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "bug_assignees", joinColumns = @JoinColumn(name = "bug_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "assignee", length = 80)
+    private List<String> assignees = new ArrayList<>();
+
+    /**
+     * The open bug that has to be dealt with before this one can move, if any.
+     * A plain id rather than a relation: a blocker that is later deleted leaves
+     * a dangling number, which reads as "not blocked", instead of taking this
+     * bug down with it.
+     */
+    @Column(name = "blocked_by")
+    private Long blockedBy;
+
+    /**
+     * When this bug was moved to the trash, or null while it is live.
+     *
+     * <p>Deleting is reversible: the row, its comments, its files and its
+     * history all stay exactly where they are and every query simply stops
+     * looking at them. Only emptying the trash actually destroys anything.
+     */
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Size(max = 80)
+    @Column(name = "deleted_by", length = 80)
+    private String deletedBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -185,20 +231,12 @@ public class Bug {
         this.severity = severity;
     }
 
-    public Status getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(Status status) {
+    public void setStatus(String status) {
         this.status = status;
-    }
-
-    public Priority getPriority() {
-        return priority;
-    }
-
-    public void setPriority(Priority priority) {
-        this.priority = priority;
     }
 
     public Environment getEnvironment() {
@@ -233,12 +271,93 @@ public class Bug {
         this.reportedBy = reportedBy;
     }
 
-    public String getAssignedTo() {
-        return assignedTo;
+    public List<String> getAssignees() {
+        return assignees;
     }
 
+    /**
+     * Trims, drops blanks and de-duplicates, so the list is always presentable.
+     *
+     * <p>Trimming comes first and the comparison folds case, because the two
+     * names that reach here as one person's are "Nishana R" and "Nishana R " —
+     * or "nishana r" from a hand-written script. Left as they were, each pair
+     * would draw two faces, count twice in the people bar and split one
+     * person's heat card in half. The casing that survives is the one seen
+     * first, and the order is left alone: the first assignee means something.
+     */
+    public void setAssignees(List<String> people) {
+        List<String> clean = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        if (people != null) {
+            for (String person : people) {
+                if (person == null) {
+                    continue;
+                }
+                String name = person.trim();
+                if (!name.isEmpty() && seen.add(name.toLowerCase(Locale.ROOT))) {
+                    clean.add(name);
+                }
+            }
+        }
+        this.assignees = clean;
+    }
+
+    /**
+     * The first assignee, or null. Keeps {@code setAssignedTo} and every
+     * pre-existing caller working now that a bug can have several people on it.
+     *
+     * <p>Write-only in JSON on purpose: a body carrying both {@code assignees}
+     * and {@code assignedTo} has the second overwrite the first, so a bug read
+     * from the API and sent straight back used to come home with only its first
+     * person on it. Sending {@code assignedTo} in still works; it is only no
+     * longer handed out to be sent back.
+     */
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    public String getAssignedTo() {
+        return assignees.isEmpty() ? null : assignees.get(0);
+    }
+
+    /** Replaces the whole list with one person, or clears it when given blank. */
     public void setAssignedTo(String assignedTo) {
-        this.assignedTo = assignedTo;
+        setAssignees(assignedTo == null || assignedTo.isBlank()
+                ? List.of()
+                : List.of(assignedTo));
+    }
+
+    /** The assignees as one string, for the history trail and flash messages. */
+    @Transient
+    public String getAssigneesLabel() {
+        return assignees.isEmpty() ? null : String.join(", ", assignees);
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public String getDeletedBy() {
+        return deletedBy;
+    }
+
+    public void setDeletedBy(String deletedBy) {
+        this.deletedBy = deletedBy;
+    }
+
+    @Transient
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public Long getBlockedBy() {
+        return blockedBy;
+    }
+
+    public void setBlockedBy(Long blockedBy) {
+        this.blockedBy = blockedBy;
     }
 
     public LocalDateTime getCreatedAt() {

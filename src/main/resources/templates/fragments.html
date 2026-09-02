@@ -2,18 +2,70 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <body>
 
-<!-- The notification bell. Lives in the top bar on every page, so the count is
-     in the same place whatever you are looking at. -->
-<a th:fragment="bell" class="bell" th:href="@{/notifications}" id="notifications-link"
-   th:classappend="${unreadNotifications > 0} ? 'has-unread' : ''"
-   th:title="${unreadNotifications > 0}
-             ? ${unreadNotifications} + ' unread notification' + (${unreadNotifications == 1} ? '' : 's')
-             : 'Notifications'"
-   aria-label="Notifications">
-    <svg class="i" aria-hidden="true"><use href="#i-bell"/></svg>
-    <span class="bell-count num" th:if="${unreadNotifications > 0}" id="notification-count"
-          th:text="${unreadNotifications > 99} ? '99+' : ${unreadNotifications}">3</span>
-</a>
+<!-- The notification bell, in the navbar on every page.
+     It opens in place: <details> means the popover works with JS switched off
+     too, and "View all" is the only thing that leaves the page you are on. -->
+<details th:fragment="bell" class="pop-wrap" id="notifications">
+    <summary>
+        <span class="bell" id="notifications-link"
+              th:classappend="${unreadNotifications > 0} ? 'has-unread' : ''"
+              th:title="${unreadNotifications > 0}
+                        ? ${unreadNotifications} + ' unread notification' + (${unreadNotifications == 1} ? '' : 's')
+                        : 'Notifications'"
+              aria-label="Notifications">
+            <svg class="i" aria-hidden="true"><use href="#i-bell"/></svg>
+            <span class="bell-count num" th:if="${unreadNotifications > 0}" id="notification-count"
+                  th:text="${unreadNotifications > 99} ? '99+' : ${unreadNotifications}">3</span>
+        </span>
+    </summary>
+
+    <div class="pop pop-notif">
+        <div class="pop-head">
+            <span>Notifications</span>
+            <span class="spacer"></span>
+            <form method="post" th:action="@{/notifications/read-all}" class="inline-form"
+                  th:if="${unreadNotifications > 0}">
+                <button type="submit" class="btn btn-sm btn-ghost" id="pop-mark-all"
+                        title="Mark every notification read" aria-label="Mark every notification read">Mark all read</button>
+            </form>
+        </div>
+
+        <div class="pop-list" th:unless="${#lists.isEmpty(recentNotifications)}">
+            <!-- Where it goes is the notification's own business: a bug
+                 notification knows its bug, a mention in a document knows the
+                 document. Neither is rebuilt here. -->
+            <a class="pop-notif-item" th:each="n : ${recentNotifications}"
+               th:href="@{${n.href}}"
+               th:classappend="${n.read} ? 'is-read' : 'is-unread'">
+                <span class="notif-mark" aria-hidden="true" th:switch="${n.type}">
+                    <span th:case="'assigned'">👤</span>
+                    <span th:case="'fixed'">✓</span>
+                    <span th:case="'reopened'">↻</span>
+                    <span th:case="'closed'">🏁</span>
+                    <span th:case="'unassigned'">✕</span>
+                    <span th:case="'mention'">@</span>
+                    <span th:case="*">•</span>
+                </span>
+                <span>
+                    <span class="msg" th:text="${n.message}">BUG-1 was assigned to you</span>
+                    <span class="when" th:attr="data-time=${n.createdAt}"
+                          th:text="${#temporals.format(n.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+                </span>
+            </a>
+        </div>
+
+        <p class="pop-empty" th:if="${#lists.isEmpty(recentNotifications)}">
+            Nothing yet. Assign a bug, fix one or reopen one and it lands here.
+        </p>
+
+        <div class="pop-foot">
+            <span th:if="${unreadNotifications > 0}"
+                  th:text="${unreadNotifications} + ' unread'">3 unread</span>
+            <span th:unless="${unreadNotifications > 0}">All caught up</span>
+            <a th:href="@{/notifications}" id="view-all-notifications">View all →</a>
+        </div>
+    </div>
+</details>
 
 </body>
 </html>

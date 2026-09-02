@@ -4,3 +4,6 @@ data/
 .idea/
 *.iml
 .vscode/
+
+# Credentials. Only .env.example is committed.
+.env

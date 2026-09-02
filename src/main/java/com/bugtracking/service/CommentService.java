@@ -11,12 +11,22 @@ import java.util.List;
 @Transactional
 public class CommentService {
 
+    /** How much of the comment a mention notification quotes back. */
+    private static final int QUOTE_LENGTH = 90;
+
     private final CommentRepository repository;
     private final BugHistoryService history;
+    private final TeamMemberService team;
+    private final NotificationService notifications;
 
-    public CommentService(CommentRepository repository, BugHistoryService history) {
+    public CommentService(CommentRepository repository,
+                          BugHistoryService history,
+                          TeamMemberService team,
+                          NotificationService notifications) {
         this.repository = repository;
         this.history = history;
+        this.team = team;
+        this.notifications = notifications;
     }
 
     public Comment add(Long bugId, String text, String author) {
@@ -26,7 +36,20 @@ public class CommentService {
         comment.setCreatedBy(BugHistoryService.actor(author));
         Comment saved = repository.save(comment);
         history.record(bugId, "comment", null, null, comment.getCreatedBy());
+
+        for (String person : team.mentionedIn(saved.getText())) {
+            if (person.equalsIgnoreCase(saved.getCreatedBy())) {
+                continue;                       // tagging yourself needs no telling
+            }
+            notifications.notify(bugId, "mention", person,
+                    saved.getCreatedBy() + " mentioned you on BUG-" + bugId + ": " + quote(saved.getText()));
+        }
         return saved;
+    }
+
+    private static String quote(String text) {
+        String flat = text.replaceAll("\\s+", " ").trim();
+        return flat.length() <= QUOTE_LENGTH ? flat : flat.substring(0, QUOTE_LENGTH - 1) + "…";
     }
 
     @Transactional(readOnly = true)

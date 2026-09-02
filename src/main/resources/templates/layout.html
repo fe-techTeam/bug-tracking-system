@@ -12,8 +12,7 @@
           href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400..600&display=swap">
     <link rel="stylesheet" th:href="@{/css/style.css}">
 
-    <!-- Applied before first paint: a dark theme never flashes white, and the
-         sidebar never opens wide and then snaps shut. -->
+    <!-- Applied before first paint, so a dark theme never flashes white. -->
     <script>
         (function () {
             var root = document.documentElement;
@@ -22,10 +21,6 @@
                 var t = localStorage.getItem("bugtracking.theme");
                 if (t === "light" || t === "dark") root.setAttribute("data-theme", t);
             } catch (e) { /* private mode: fall back to the system theme */ }
-            try {
-                var s = localStorage.getItem("bugtracking.sidebar");
-                root.setAttribute("data-sidebar", s === "expanded" ? "expanded" : "collapsed");
-            } catch (e) { root.setAttribute("data-sidebar", "collapsed"); }
         })();
     </script>
 </head>
@@ -94,142 +89,267 @@
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/>
     </symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+    </symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24">
+        <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24">
+        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24">
+        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+    </symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24">
+        <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.2 3.2M6.6 6.6A17.4 17.4 0 0 0 2 11s3.6 7 10 7a9 9 0 0 0 5.4-1.6"/>
+        <path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="m2 2 20 20"/>
+    </symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24">
+        <path d="M3 7v6h6"/><path d="M3.5 13a9 9 0 1 0 2.1-9.4L3 7"/>
+    </symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24">
+        <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
+    </symbol>
+    <symbol id="i-blocked" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>
+    </symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24">
+        <path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>
+    </symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>
+        <path d="M9 13h6"/><path d="M9 17h4"/>
+    </symbol>
+    <symbol id="i-table" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="2"/>
+        <path d="M3 9.5h18"/><path d="M3 15h18"/><path d="M9.5 9.5V20"/><path d="M15.5 9.5V20"/>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+        <path d="M12 3v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/>
+    </symbol>
+    <!-- The dots are r=1 against a 1.7 stroke, so they read as filled without
+         breaking the outline-only rule the rest of the sprite follows. -->
+    <symbol id="i-more" viewBox="0 0 24 24">
+        <circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>
+    </symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24">
+        <circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/>
+        <circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/>
+        <circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>
+    </symbol>
+
+    <!-- ---- a project's documents: the filing cabinet and what goes in it ---- -->
+    <symbol id="i-file" viewBox="0 0 24 24">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>
+    </symbol>
+    <symbol id="i-image" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/>
+        <path d="m4 17 4.5-4.5a1.5 1.5 0 0 1 2 0L15 17"/><path d="m13.5 15.5 2-2a1.5 1.5 0 0 1 2 0L20 16"/>
+    </symbol>
+    <symbol id="i-link" viewBox="0 0 24 24">
+        <path d="M10 13a5 5 0 0 0 7.1.1l2.9-2.9a5 5 0 0 0-7.1-7.1L11.3 4.7"/>
+        <path d="M14 11a5 5 0 0 0-7.1-.1L4 13.8a5 5 0 0 0 7.1 7.1l1.5-1.5"/>
+    </symbol>
+    <symbol id="i-external" viewBox="0 0 24 24">
+        <path d="M14 4h6v6"/><path d="M20 4 11 13"/>
+        <path d="M18 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/>
+    </symbol>
+    <symbol id="i-folder-plus" viewBox="0 0 24 24">
+        <path d="M20 20a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+        <path d="M9.5 14.5h5"/><path d="M12 12v5"/>
+    </symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24">
+        <path d="M12 15V4"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M4 20h16"/>
+    </symbol>
+    <symbol id="i-more" viewBox="0 0 24 24">
+        <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+    </symbol>
+    <symbol id="i-caret-right" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7"/></symbol>
+    <symbol id="i-move" viewBox="0 0 24 24">
+        <path d="M14 4h6v6"/><path d="M20 4 12 12"/>
+        <path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"/>
+    </symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/>
+        <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>
+    </symbol>
+
+    <!-- ---- the sheet's formatting bar ---- -->
+    <symbol id="i-redo" viewBox="0 0 24 24">
+        <path d="M21 7v6h-6"/><path d="M20.5 13a9 9 0 1 0-2.1-9.4L21 7"/>
+    </symbol>
+    <symbol id="i-align-left" viewBox="0 0 24 24">
+        <path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h13"/>
+    </symbol>
+    <symbol id="i-align-center" viewBox="0 0 24 24">
+        <path d="M4 6h16"/><path d="M7 12h10"/><path d="M5.5 18h13"/>
+    </symbol>
+    <symbol id="i-align-right" viewBox="0 0 24 24">
+        <path d="M4 6h16"/><path d="M10 12h10"/><path d="M7 18h13"/>
+    </symbol>
+    <symbol id="i-merge" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v3"/><path d="M12 16v3"/>
+        <path d="M7.5 12h9"/><path d="m9.5 10 -2 2 2 2"/><path d="m14.5 10 2 2-2 2"/>
+    </symbol>
+    <symbol id="i-wrap" viewBox="0 0 24 24">
+        <path d="M4 6h16"/><path d="M4 12h13a3 3 0 0 1 0 6h-3"/><path d="m16 16-2 2 2 2"/><path d="M4 18h4"/>
+    </symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24">
+        <path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3Z"/>
+    </symbol>
+    <symbol id="i-paint" viewBox="0 0 24 24">
+        <path d="M11 3 3.5 10.5a2 2 0 0 0 0 2.8l4.2 4.2a2 2 0 0 0 2.8 0L18 10Z"/>
+        <path d="m8 6 6.5 6.5"/><path d="M19.5 15s1.5 2 1.5 3a1.5 1.5 0 0 1-3 0c0-1 1.5-3 1.5-3Z"/>
+    </symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24">
+        <path d="m4.5 15.5 6-6a2 2 0 0 1 2.8 0l4.2 4.2a2 2 0 0 1 0 2.8l-3.5 3.5H8Z"/>
+        <path d="M20 20h-8"/><path d="m8.5 11.5 5 5"/>
+    </symbol>
 </svg>
 
 <div class="app">
 
-    <!-- ================= sidebar: a column, not a floating panel ================= -->
-    <aside class="sidebar" id="sidebar">
+    <!-- ================= the navbar: the only chrome there is =================
+         Which section you are in is worked out once: the bar marks it, and the
+         user menu marks the same items again, because a narrow bar folds the
+         links away and the menu is then the only place they exist. -->
+    <header class="navbar"
+            th:with="onBoard=${currentPath != null and #strings.startsWith(currentPath, '/bugs')},
+                     onDocs=${currentPath != null and (#strings.startsWith(currentPath, '/documents')
+                                  or (#strings.startsWith(currentPath, '/projects/')
+                                      and #strings.contains(currentPath, '/docs')))},
+                     onSettings=${currentPath != null and (#strings.startsWith(currentPath, '/settings')
+                                  or #strings.startsWith(currentPath, '/team')
+                                  or (#strings.startsWith(currentPath, '/projects')
+                                      and not #strings.contains(currentPath, '/docs')))}">
+        <!-- The label is hidden on a narrow bar, and the mark is decorative, so
+             the name has to be on the link itself or this is an unnamed tile. -->
+        <a class="brand" th:href="@{/bugs}" id="nav-brand" aria-label="Bug Tracking — board">
+            <span class="brand-mark" aria-hidden="true">B</span>
+            <span class="lbl">Bug Tracking</span>
+        </a>
 
-        <div class="sidebar-head">
-            <a class="brand" th:href="@{/bugs}" id="sidebar-brand">
-                <span class="brand-mark" aria-hidden="true">B</span>
-                <span class="lbl">Bug Tracking</span>
+        <nav class="nav-links">
+            <a class="nav-link" th:href="@{/bugs}" id="board-link"
+               title="Board" aria-label="Board"
+               th:classappend="${onBoard} ? 'is-active' : ''"
+               th:attr="aria-current=${onBoard ? 'page' : null}">
+                <svg class="i" aria-hidden="true"><use href="#i-board"/></svg>
+                <span>Board</span>
             </a>
-            <!-- Visible in both states: collapsed it is an arrow pointing the way
-                 the rail will open, expanded it is the panel it will close. -->
-            <button type="button" class="icon-btn sidebar-toggle" id="sidebar-toggle"
-                    title="Collapse sidebar" aria-label="Collapse sidebar">
-                <svg class="i ico-collapse" aria-hidden="true"><use href="#i-panel"/></svg>
-                <svg class="i ico-expand" aria-hidden="true"><use href="#i-chevrons-right"/></svg>
-            </button>
-        </div>
-
-        <!-- The project switcher. Closed by default; opens as a dropdown, and
-             beside the rail when the sidebar is collapsed. -->
-        <div class="sidebar-section">
-            <div class="switcher" id="project-switcher"
-                 th:with="shown=${selectedProject != null ? selectedProject : currentProject}">
-                <button type="button" class="switcher-btn" id="switcher-btn"
-                        aria-expanded="false" aria-haspopup="listbox" aria-controls="switcher-menu"
-                        th:data-tip="${shown} ?: 'Switch project'">
-                    <span class="avatar" th:if="${shown}"
-                          th:attr="data-avatar=${shown}" aria-hidden="true"></span>
-                    <span class="avatar" th:unless="${shown}" aria-hidden="true">–</span>
-                    <span class="switcher-text">
-                        <span class="switcher-label">Project</span>
-                        <span class="switcher-name" th:text="${shown} ?: 'Select a project'">Godrej</span>
-                    </span>
-                    <svg class="i switcher-chev" aria-hidden="true"><use href="#i-selector"/></svg>
-                </button>
-
-                <div class="switcher-menu" id="switcher-menu" role="listbox" hidden>
-                    <div class="switcher-search" th:if="${projectCounts != null and projectCounts.size() > 6}">
-                        <input type="text" id="switcher-filter" placeholder="Find a project…"
-                               autocomplete="off" aria-label="Find a project">
-                    </div>
-
-                    <div class="switcher-list" id="switcher-list">
-                        <a class="switcher-item" th:each="entry : ${projectCounts}"
-                           th:href="@{/bugs(project=${entry.key})}"
-                           th:classappend="${entry.key == shown} ? 'is-active' : ''"
-                           th:data-name="${entry.key}" role="option"
-                           th:attr="aria-selected=${entry.key == shown}">
-                            <span class="avatar avatar-sm" th:attr="data-avatar=${entry.key}" aria-hidden="true"></span>
-                            <span class="switcher-item-name" th:text="${entry.key}">Godrej</span>
-                            <span class="switcher-item-count num" th:text="${entry.value}">4</span>
-                        </a>
-                    </div>
-
-                    <p class="switcher-empty" th:if="${projectCounts == null or projectCounts.isEmpty()}">
-                        No projects yet.
-                    </p>
-
-                    <div class="switcher-foot">
-                        <a th:href="@{/projects}">Manage projects</a>
-                        <a th:href="@{/projects}" aria-label="Add a project">+ New</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <nav class="sidebar-section sidenav">
-            <span class="sidebar-caption">Workspace</span>
-
-            <a class="sidenav-item" th:href="@{/bugs}" id="board-link" data-tip="Board"
-               th:classappend="${currentPath != null and #strings.startsWith(currentPath, '/bugs')} ? 'is-active' : ''">
-                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-board"/></svg></span>
-                <span class="lbl">Board</span>
+            <!-- Carries the project you were last on, so Documents opens the
+                 one you are working in rather than the first one alphabetically. -->
+            <a class="nav-link" id="docs-link"
+               th:href="${currentProject != null} ? @{/documents(project=${currentProject})} : @{/documents}"
+               title="Documents" aria-label="Documents"
+               th:classappend="${onDocs} ? 'is-active' : ''"
+               th:attr="aria-current=${onDocs ? 'page' : null}">
+                <svg class="i" aria-hidden="true"><use href="#i-folder"/></svg>
+                <span>Documents</span>
             </a>
-
-            <a class="sidenav-item" th:href="@{/projects}" id="projects-link" data-tip="Projects"
-               th:classappend="${currentPath != null and #strings.startsWith(currentPath, '/projects')} ? 'is-active' : ''">
-                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-folder"/></svg></span>
-                <span class="lbl">Projects</span>
-            </a>
-
-            <a class="sidenav-item" th:href="@{/team}" id="team-link" data-tip="Team"
-               th:classappend="${currentPath != null and #strings.startsWith(currentPath, '/team')} ? 'is-active' : ''">
-                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-users"/></svg></span>
-                <span class="lbl">Team</span>
+            <a class="nav-link" th:href="@{/settings}" id="settings-link"
+               title="Settings" aria-label="Settings"
+               th:classappend="${onSettings} ? 'is-active' : ''"
+               th:attr="aria-current=${onSettings ? 'page' : null}">
+                <svg class="i" aria-hidden="true"><use href="#i-settings"/></svg>
+                <span>Settings</span>
             </a>
         </nav>
 
-        <!-- The two views a developer opens first thing in the morning. Both reach
-             across projects on purpose: your work does not stop at a project line. -->
-        <nav class="sidebar-section sidenav">
-            <span class="sidebar-caption">My work</span>
-
-            <a class="sidenav-item" id="my-assigned"
-               th:href="@{/bugs(assignee=${#authentication.name})}"
-               th:data-tip="'Assigned to ' + ${#authentication.name}"
-               th:classappend="${assignee != null and assignee == #authentication.name} ? 'is-active' : ''">
-                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-inbox"/></svg></span>
-                <span class="lbl">Assigned to me</span>
+        <div class="nav-right">
+            <!-- One label for both: a static aria-label would override the count
+                 badge inside the link, so the number would be on screen and
+                 nowhere in the accessible name. -->
+            <a class="bell" th:href="@{/bugs/trash}" id="trash-link"
+               th:with="trashLabel=${trashCount > 0}
+                        ? ${trashCount} + ' deleted bug' + (${trashCount == 1} ? '' : 's') + ' — restorable'
+                        : 'Trash'"
+               th:classappend="${currentPath != null and #strings.startsWith(currentPath, '/bugs/trash')} ? 'is-active' : ''"
+               th:title="${trashLabel}"
+               th:attr="aria-label=${trashLabel}">
+                <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
+                <span class="bell-count num" th:if="${trashCount > 0}" id="trash-count"
+                      th:text="${trashCount > 99} ? '99+' : ${trashCount}">2</span>
             </a>
 
-            <a class="sidenav-item" id="my-reported"
-               th:href="@{/bugs(reporter=${#authentication.name})}"
-               th:data-tip="'Raised by ' + ${#authentication.name}"
-               th:classappend="${reporter != null and reporter == #authentication.name} ? 'is-active' : ''">
-                <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-pen"/></svg></span>
-                <span class="lbl">Raised by me</span>
-            </a>
-        </nav>
+            <div th:replace="~{fragments :: bell}"></div>
 
-        <div class="sidebar-foot">
-            <!-- Whoever is signed in. Their name is what lands on comments,
-                 status changes and the history trail. -->
-            <span class="sidebar-user" id="current-user"
-                  th:attr="data-tip=${#authentication.name}"
-                  th:title="'Signed in — your name is recorded on comments, status changes and history'">
-                <span class="avatar avatar-sm" th:attr="data-avatar=${#authentication.name}" aria-hidden="true"></span>
-                <span class="sidebar-user-name" th:text="${#authentication.name}">Nishana R</span>
-            </span>
-
-            <button type="button" class="icon-btn" id="theme-toggle" data-tip="Theme"
+            <button type="button" class="icon-btn" id="theme-toggle"
                     title="Switch theme" aria-label="Switch theme">
                 <svg class="i" aria-hidden="true"><use href="#i-moon"/></svg>
             </button>
 
-            <form method="post" th:action="@{/logout}" class="inline-form">
-                <button type="submit" class="icon-btn" id="logout-button" data-tip="Sign out"
-                        title="Sign out" aria-label="Sign out">
-                    <svg class="i" aria-hidden="true"><use href="#i-logout"/></svg>
-                </button>
-            </form>
+            <!-- Who is signed in, where you are, and the two views that are
+                 only about you — everything the bar drops when it narrows. -->
+            <details class="pop-wrap" id="user-menu">
+                <!-- Both children of the button are decorative once the name is
+                     hidden, so without this the only route to Sign out has no
+                     accessible name at all. -->
+                <summary th:attr="aria-label='Signed in as ' + ${#authentication.name} + ' — account menu'">
+                    <span class="user-btn" id="current-user">
+                        <span class="avatar avatar-sm" th:attr="data-avatar=${#authentication.name}"
+                              aria-hidden="true"></span>
+                        <span class="user-name" th:text="${#authentication.name}">Nishana R</span>
+                        <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                    </span>
+                </summary>
+
+                <div class="pop">
+                    <div class="user-card">
+                        <span class="avatar avatar-lg" th:attr="data-avatar=${#authentication.name}"
+                              aria-hidden="true"></span>
+                        <span class="who">
+                            <b th:text="${#authentication.name}">Nishana R</b>
+                            <span>Recorded on your comments and changes</span>
+                        </span>
+                    </div>
+
+                    <!-- The board, because the section links are the first thing
+                         a narrow bar drops and this menu is where they land. -->
+                    <a class="pop-item" id="menu-board" th:href="@{/bugs}"
+                       th:classappend="${onBoard} ? 'is-active' : ''"
+                       th:attr="aria-current=${onBoard ? 'page' : null}">
+                        <svg class="i" aria-hidden="true"><use href="#i-board"/></svg>
+                        <span>Board</span>
+                    </a>
+                    <a class="pop-item" id="menu-docs"
+                       th:href="${currentProject != null} ? @{/documents(project=${currentProject})} : @{/documents}"
+                       th:classappend="${onDocs} ? 'is-active' : ''"
+                       th:attr="aria-current=${onDocs ? 'page' : null}">
+                        <svg class="i" aria-hidden="true"><use href="#i-folder"/></svg>
+                        <span>Documents</span>
+                    </a>
+                    <a class="pop-item" id="my-assigned"
+                       th:href="@{/bugs(assignee=${#authentication.name})}">
+                        <svg class="i" aria-hidden="true"><use href="#i-inbox"/></svg>
+                        <span>Assigned to me</span>
+                    </a>
+                    <a class="pop-item" id="my-reported"
+                       th:href="@{/bugs(reporter=${#authentication.name})}">
+                        <svg class="i" aria-hidden="true"><use href="#i-pen"/></svg>
+                        <span>Raised by me</span>
+                    </a>
+                    <a class="pop-item" id="menu-settings" th:href="@{/settings}"
+                       th:classappend="${onSettings} ? 'is-active' : ''"
+                       th:attr="aria-current=${onSettings ? 'page' : null}">
+                        <svg class="i" aria-hidden="true"><use href="#i-settings"/></svg>
+                        <span>Projects &amp; team</span>
+                    </a>
+
+                    <div class="pop-foot">
+                        <form method="post" th:action="@{/logout}" class="inline-form">
+                            <button type="submit" class="pop-item" id="logout-button">
+                                <svg class="i" aria-hidden="true"><use href="#i-logout"/></svg>
+                                <span>Sign out</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </details>
         </div>
-    </aside>
+    </header>
 
     <!-- ================= everything else ================= -->
     <div class="app-body">
@@ -237,9 +357,28 @@
     </div>
 </div>
 
+<!-- Where an attachment opens. Empty until a thumbnail is clicked; the
+     thumbnail is a real link, so this only saves leaving the page. -->
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Attachment">
+    <div class="lightbox-bar">
+        <span class="lightbox-name" id="lightbox-name">file</span>
+        <a class="btn btn-sm btn-ghost" id="lightbox-open" href="#" target="_blank" rel="noopener">Open</a>
+        <button type="button" class="icon-btn" id="lightbox-close" title="Close" aria-label="Close">
+            <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+    </div>
+    <div class="lightbox-stage" id="lightbox-stage"></div>
+</div>
+
 <div class="toast" th:if="${message}" id="flash-message" role="status">
     <span class="toast-dot" aria-hidden="true">✓</span>
     <span th:text="${message}">Saved.</span>
+    <!-- Undo where it actually helps: right after the thing you might regret. -->
+    <form method="post" th:if="${undoBugId}" class="inline-form"
+          th:action="@{/bugs/{id}/restore(id=${undoBugId})}">
+        <input type="hidden" name="actor" class="actor-field">
+        <button type="submit" class="toast-undo" id="undo-delete">Undo</button>
+    </form>
 </div>
 
 <script th:src="@{/js/app.js}"></script>

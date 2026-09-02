@@ -5,15 +5,27 @@
 <section th:with="me=${#authentication.name}">
 
     <header class="topbar">
+        <a class="back-link" th:href="@{/settings(tab='team')}" title="Back to the team"
+           aria-label="Back to the team">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span>Team</span>
+        </a>
         <span class="avatar" th:attr="data-avatar=${member.name}" aria-hidden="true"></span>
-        <h1 class="topbar-title" th:text="${member.name}">Nishana R</h1>
+        <!-- The page's one <h1> is the hero below; this is the same name again, so
+             it is a label, not a second heading. -->
+        <span class="topbar-title" th:text="${member.name}">Nishana R</span>
         <span class="member-you" th:if="${member.name == me}">You</span>
         <span class="topbar-sub" th:unless="${member.active}">Hidden from the dropdowns</span>
 
         <div class="topbar-actions">
-            <div th:replace="~{fragments :: bell}"></div>
-            <a class="btn btn-sm" th:href="'mailto:' + ${member.email}" th:text="${member.email}">a@b.com</a>
-            <a class="btn btn-sm btn-ghost" th:href="@{/team}">Back to team</a>
+            <!-- .btn cannot shrink, so a real address here pushed the whole bar off
+                 a phone. The icon is the button; the address is read in full in the
+                 hero, which is where you would look for it anyway. -->
+            <a class="icon-btn" th:href="|mailto:${member.email}|"
+               th:title="'Email ' + ${member.email}"
+               th:attr="aria-label='Email ' + ${member.email}">
+                <svg class="i" aria-hidden="true"><use href="#i-mail"/></svg>
+            </a>
         </div>
     </header>
 
@@ -25,11 +37,13 @@
             <span class="avatar avatar-xl" th:attr="data-avatar=${member.name}" aria-hidden="true"></span>
             <div class="person-id">
                 <h1 th:text="${member.name}">Nishana R</h1>
-                <a class="person-mail" th:href="'mailto:' + ${member.email}" th:text="${member.email}">a@b.com</a>
+                <a class="person-mail" th:href="|mailto:${member.email}|" th:text="${member.email}">a@b.com</a>
             </div>
 
             <div class="kpi-row">
-                <a class="kpi" style="--i:0; --c: var(--st-ASSIGNED)" th:href="@{/bugs(reporter=${member.name})}">
+                <!-- Raised is where a bug starts, so it takes the Open colour.
+                     ASSIGNED left the Status enum and its token went with it. -->
+                <a class="kpi" style="--i:0; --c: var(--st-OPEN)" th:href="@{/bugs(reporter=${member.name})}">
                     <span class="kpi-value num" th:attr="data-count=${load.reported}" th:text="${load.reported}">12</span>
                     <span class="kpi-label">Raised</span>
                 </a>
@@ -41,8 +55,8 @@
                     <span class="kpi-value num" th:attr="data-count=${load.open}" th:text="${load.open}">3</span>
                     <span class="kpi-label">Still open</span>
                 </div>
-                <a class="kpi" style="--i:3; --c: var(--pri-P1)"
-                   th:href="@{/bugs(assignee=${member.name}, priority='P1')}"
+                <a class="kpi" style="--i:3; --c: var(--sev-CRITICAL)"
+                   th:href="@{/bugs(assignee=${member.name}, severity='CRITICAL')}"
                    th:classappend="${load.urgent > 0} ? 'is-hot' : ''">
                     <span class="kpi-value num" th:attr="data-count=${load.urgent}" th:text="${load.urgent}">2</span>
                     <span class="kpi-label">
@@ -67,16 +81,17 @@
                 <ol class="mini-list" th:unless="${#lists.isEmpty(assigned)}">
                     <li class="mini-row" th:each="bug,rs : ${assigned}"
                         th:style="'--i:' + ${rs.index} + '; --c: var(--sev-' + ${bug.severity} + ')'">
+                        <!-- The bars are a picture; the word is the only version of
+                             the severity a screen reader or a phone ever gets. -->
                         <span class="meter" th:classappend="'sev-' + ${bug.severity}"
                               th:title="${bug.severity.label + ' severity'}" aria-hidden="true">
                             <i></i><i></i><i></i><i></i>
                         </span>
+                        <span class="sr-only" th:text="${bug.severity.label} + ' severity'">High severity</span>
                         <span class="bug-id" th:text="'BUG-' + ${bug.id}">BUG-1</span>
                         <a class="mini-title" th:href="@{/bugs/{id}(id=${bug.id})}" th:text="${bug.title}">Title</a>
-                        <span class="badge badge-square" th:if="${bug.priority}"
-                              th:classappend="'pri-' + ${bug.priority}" th:text="${bug.priority.label}">P1</span>
-                        <span class="badge" th:classappend="'st-' + ${bug.status}"
-                              th:text="${bug.status.label}">Open</span>
+                        <span class="badge" th:style="'--c:' + ${cols.token(bug)}"
+                              th:text="${cols.label(bug)}">Open</span>
                     </li>
                 </ol>
 
@@ -105,13 +120,16 @@
                               th:title="${bug.severity.label + ' severity'}" aria-hidden="true">
                             <i></i><i></i><i></i><i></i>
                         </span>
+                        <span class="sr-only" th:text="${bug.severity.label} + ' severity'">High severity</span>
                         <span class="bug-id" th:text="'BUG-' + ${bug.id}">BUG-1</span>
                         <a class="mini-title" th:href="@{/bugs/{id}(id=${bug.id})}" th:text="${bug.title}">Title</a>
                         <span class="avatar avatar-sm" th:if="${bug.assignedTo}"
                               th:attr="data-avatar=${bug.assignedTo}"
-                              th:title="'Assigned to ' + ${bug.assignedTo}"></span>
-                        <span class="badge" th:classappend="'st-' + ${bug.status}"
-                              th:text="${bug.status.label}">Open</span>
+                              th:title="'Assigned to ' + ${bug.assignedTo}" aria-hidden="true"></span>
+                        <span class="sr-only" th:if="${bug.assignedTo}"
+                              th:text="'Assigned to ' + ${bug.assignedTo}">Assigned to Nishana R</span>
+                        <span class="badge" th:style="'--c:' + ${cols.token(bug)}"
+                              th:text="${cols.label(bug)}">Open</span>
                     </li>
                 </ol>
 

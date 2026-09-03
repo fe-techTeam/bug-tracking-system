@@ -278,6 +278,25 @@
                     </div>
                 </div>
             </details>
+
+            <details class="fmenu" id="save-filter" th:if="${filtered}">
+                <summary>
+                    <span class="fmenu-btn">
+                        <svg class="i" aria-hidden="true"><use href="#i-bookmark"/></svg>
+                        <span>Save</span>
+                    </span>
+                </summary>
+                <form class="fmenu-pop save-filter-pop" method="post" th:action="@{/filters}">
+                    <input type="hidden" name="query" th:value="${q.query()}">
+                    <input type="hidden" name="project" th:value="${selectedProject}">
+                    <label>
+                        <span>Name this view</span>
+                        <input type="text" name="name" maxlength="60" required placeholder="e.g. My open highs">
+                    </label>
+                    <label class="check"><input type="checkbox" name="allProjects" value="true"> <span>All projects</span></label>
+                    <button type="submit" class="btn btn-sm btn-primary">Save filter</button>
+                </form>
+            </details>
         </div>
 
         <div class="topbar-actions">
@@ -319,6 +338,17 @@
             </a>
         </div>
     </header>
+
+    <!-- The shortcuts everyone keeps coming back to, whether or not the board is filtered right now. -->
+    <div class="chips chips-saved" th:unless="${#lists.isEmpty(savedFilters)}" id="saved-filters">
+        <span class="chips-label">Saved</span>
+        <a class="chip" th:each="f : ${savedFilters}"
+           th:href="@{${'/bugs?' + (selectedProject != null ? 'project=' + #uris.escapeQueryParam(selectedProject) + '&' : '') + (view != 'board' ? 'view=' + view + '&' : '') + f.query}}"
+           th:title="${f.project} ?: 'All projects'">
+            <svg class="i" aria-hidden="true" style="width:11px;height:11px"><use href="#i-bookmark"/></svg>
+            <b th:text="${f.name}">My open highs</b>
+        </a>
+    </div>
 
     <!-- What is currently narrowing the board, spelled out and removable. -->
     <div class="chips" th:if="${filtered}" id="filter-chips">

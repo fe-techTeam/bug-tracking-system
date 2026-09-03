@@ -1150,6 +1150,9 @@ select {
     background: var(--surface-pop);
 }
 
+.save-filter-pop { display: grid; gap: 8px; min-width: 240px; padding: 10px; }
+.save-filter-pop label.check { flex-direction: row; align-items: center; gap: 6px; font-weight: 500; }
+
 /* The faces that used to sit in the bar are gone: they were three of the
    team, a "···" for the rest, and no way to tell from the bar whether any of
    them was on. The whole roster is a section of the Filters menu now, where an

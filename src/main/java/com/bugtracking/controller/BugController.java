@@ -17,6 +17,7 @@ import com.bugtracking.service.BugService;
 import com.bugtracking.service.CommentService;
 import com.bugtracking.service.Dashboard;
 import com.bugtracking.service.ProjectService;
+import com.bugtracking.service.SavedFilterService;
 import com.bugtracking.service.SupportingDocService;
 import com.bugtracking.service.TeamMemberService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -71,6 +72,7 @@ public class BugController {
     private final TeamMemberService team;
     private final SupportingDocService docs;
     private final BugMarkdown markdown;
+    private final SavedFilterService savedFilters;
 
     public BugController(BugService service,
                          BoardColumnService board,
@@ -80,7 +82,8 @@ public class BugController {
                          BugHistoryService history,
                          TeamMemberService team,
                          SupportingDocService docs,
-                         BugMarkdown markdown) {
+                         BugMarkdown markdown,
+                         SavedFilterService savedFilters) {
         this.service = service;
         this.board = board;
         this.projects = projects;
@@ -90,6 +93,7 @@ public class BugController {
         this.team = team;
         this.docs = docs;
         this.markdown = markdown;
+        this.savedFilters = savedFilters;
     }
 
     @GetMapping
@@ -204,6 +208,7 @@ public class BugController {
         model.addAttribute("label", label);
         model.addAttribute("labels", service.labelsIn(project));
         model.addAttribute("due", due);
+        model.addAttribute("savedFilters", savedFilters.forProject(project));
         model.addAttribute("keyword", keyword);
         model.addAttribute("sort", sort);
         model.addAttribute("view", mode);

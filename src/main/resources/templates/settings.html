@@ -22,7 +22,7 @@
              does not go through the browser's own arrow. -->
         <div th:replace="~{fragments :: crumbs(${ {
                  {'Settings', tab == 'projects' ? null : '/settings'},
-                 {tab == 'team' ? 'Team' : null,
+                 {tab == 'team' ? 'Team' : (tab == 'filters' ? 'Saved filters' : null),
                   tab == 'team' and editingMember != null ? '/settings?tab=team' : null},
                  {tab == 'team' and editingMember != null ? editingMember.name : null, null} } })}"></div>
 
@@ -38,6 +38,11 @@
                    id="tab-team">
                     <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
                     <span>Team</span>
+                </a>
+                <a th:href="@{/settings(tab='filters')}" th:classappend="${tab == 'filters'} ? 'is-active' : ''"
+                   id="tab-filters">
+                    <svg class="i" aria-hidden="true"><use href="#i-bookmark"/></svg>
+                    <span>Filters</span>
                 </a>
             </div>
         </div>
@@ -637,6 +642,34 @@
                                     th:attr="aria-label='Remove ' + ${m.name}">Remove from the team</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= filters ================= -->
+        <div th:if="${tab == 'filters'}" class="stack">
+            <div class="panel">
+                <div class="panel-head"><h2>Saved filters</h2></div>
+                <div class="panel-pad" th:if="${#lists.isEmpty(filters)}">
+                    <p class="muted">None yet. Turn on a filter on the board and press Save.</p>
+                </div>
+                <div class="table-wrap" th:unless="${#lists.isEmpty(filters)}">
+                    <table>
+                        <thead><tr><th>Name</th><th>Scope</th><th>Filters</th><th>Made by</th><th></th></tr></thead>
+                        <tbody>
+                        <tr th:each="f : ${filters}">
+                            <td><a th:href="@{${'/bugs?' + (f.project != null ? 'project=' + #uris.escapeQueryParam(f.project) + '&' : '') + f.query}}" th:text="${f.name}">Name</a></td>
+                            <td th:text="${f.project} ?: 'All projects'">Acme</td>
+                            <td class="mono muted" th:text="${f.query}">severity=HIGH</td>
+                            <td th:text="${f.createdBy}">Ana</td>
+                            <td>
+                                <form method="post" th:action="@{/filters/{id}/delete(id=${f.id})}" th:if="${f.ownedBy(me)}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

@@ -306,6 +306,12 @@
                 </a>
             </div>
 
+            <a class="btn btn-ghost btn-sm" id="export-csv" th:if="${view == 'list'}"
+               th:href="@{${'/api/bugs/export.csv' + q.without('view')}}" download>
+                <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>
+                <span>Export CSV</span>
+            </a>
+
             <a class="btn btn-primary" id="raise-bug-link"
                th:href="@{/bugs/new(project=${selectedProject})}">
                 <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>

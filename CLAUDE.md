@@ -1,23 +1,99 @@
-# Bug Tracking — working notes
+# CLAUDE.md
 
-Spring Boot + Thymeleaf, no build step on the front end. `README.md` is the long
-version; this file is the handful of rules that are easy to break.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Running it
+Spring Boot 3.5 + Thymeleaf bug tracker, Java 21, Maven. No front-end build step.
+`README.md` is the long version; this file is the handful of rules that are easy to break.
+
+## Commands
 
 ```bash
 ./run.sh              # foreground; takes the port back if something is already on it
 ./run.sh bg           # background, logging to app.log
-./run.sh stop | status | logs
+./run.sh stop | restart | status | logs
+./run.sh build        # mvn clean package -> target/bugtracking-1.0.0.jar
+./run.sh test         # mvn test
+./run.sh reset-db     # delete the H2 database and start over
 ```
 
-The app is H2-on-disk by default and Supabase (Postgres) under a profile:
+`run.sh` locates a JDK 21 and sets `JAVA_HOME` for that invocation only; prefer it over
+calling `mvn` directly. To run one test class or method:
+
+```bash
+mvn test -Dtest=BugServiceTest
+mvn test -Dtest='BugServiceTest#movesToColumn'
+```
+
+There is no `src/test` directory yet; `spring-boot-starter-test` is on the classpath.
+
+The app is H2-on-disk by default (`http://localhost:8085`, H2 console at `/h2-console`)
+and Supabase (Postgres) under a profile:
 
 ```bash
 SPRING_PROFILES_ACTIVE=supabase ./run.sh bg
+./run.sh migrate     # apply pending Flyway migrations without booting the app
+./run.sh db-info     # what is applied, what is pending
+./run.sh db-repair   # after a failed migrate
 ```
 
 Java changes need a restart; templates and static files are picked up on refresh.
+
+## Comments: one line, and only when required
+
+- **Every comment is a single line.** No multi-line blocks, no Javadoc paragraphs, no banner
+  separators, no narration of a function body.
+- A comment earns its place only for a non-obvious *why*: a workaround, a business rule, a
+  surprising constraint, a unit or format gotcha. Nothing else.
+- Never restate what the code says. Prefer better naming or structure over a comment.
+- Older files carry long Javadoc blocks. Do not add to them, and do not add comments to code
+  you are only touching incidentally.
+
+## Architecture
+
+Layers go **controller → service → repository → database**, under
+`src/main/java/com/bugtracking/`. Controllers handle HTTP only; services hold the rules.
+`*ApiController` classes serve JSON under `/api/**`; the rest render Thymeleaf pages.
+
+### Two databases, two schema owners
+
+- **H2 (default):** Hibernate builds the schema from the entities (`ddl-auto=update`);
+  Flyway is off. Bean-validation constraints do not shape DDL (`apply_to_ddl=false`).
+- **Postgres (`supabase` profile):** Flyway SQL files own the schema and Hibernate only
+  `validate`s. An entity that drifts from the migrated schema fails startup.
+
+### Startup runners in `config/`
+
+Data fixes and seeders are `CommandLineRunner` beans ordered with
+`@Order(Ordered.HIGHEST_PRECEDENCE + n)`. The chain is: `SchemaUpgrade` (widen legacy H2
+ENUM columns) → `StatusMigration` → `ProjectColumnMigration` → `LegacyReportMerge` →
+`AssigneeMigration` → seeders (`ProjectSeeder`, `TeamMemberSeeder`, `AccountSeeder`,
+`FieldDefaultsBackfill`) → `BoardColumnSeed` → `BoardColumnRestyle`. Each is idempotent and
+runs on every start; a new one must be ordered against these and safe to re-run. On Postgres
+the equivalent work lives in the migrations, so most of these find nothing to do there.
+
+### Rules that the code depends on
+
+- **Every stored enum is `VARCHAR`.** `@Enumerated` fields carry
+  `@JdbcTypeCode(SqlTypes.VARCHAR)`; migrations use plain `varchar`, never a native enum or
+  `CHECK` list. Adding a constant must never need DDL.
+- **Bugs name people and projects as text, not foreign keys.** A bug is history and a rename
+  must not rewrite it. Live facts (a project's team) are real relations.
+- **Status is a board column name**, not an enum: each project owns its `board_columns` rows
+  and a bug's status is whichever column it sits in.
+- **`team_members` is the users table.** A row with `password_hash` can sign in; one without
+  is only a name that appears on bugs. `AccountSeeder` copies the accounts in
+  `application.properties` onto matching members without overwriting an existing hash.
+- **Security:** everything is behind login except `/login`, static files, `/error` and
+  `/api/**`. The API is deliberately open and CSRF-exempt; HTML forms need `th:action` to
+  get their CSRF token.
+- **Credentials live in `.env`**, gitignored and imported by `application.properties`.
+  Never write one into a properties file or a migration.
+
+### Frontend
+
+Read `.claude/skills/frontend/SKILL.md` before touching a template, `style.css` or `app.js`.
+Tokens not literals, both themes, reuse the component vocabulary. `[hidden]` is enforced with
+one `!important` rule at the top of `style.css`; never work around it per component.
 
 ## The schema rule: every change ships a migration
 
@@ -45,30 +121,7 @@ src/main/resources/db/migration/postgres/V<next>__what_it_does.sql
 - **`alter table … enable row level security`** on any new table, for the same
   reason `V1` does it: the app reaches Postgres as the owning role over JDBC and
   is unaffected, and it closes the table to Supabase's Data API.
-- Enum-ish columns are plain `varchar`, never a native enum or a `CHECK` list —
-  adding a constant must never need DDL.
 
-Apply and inspect without booting the app:
-
-```bash
-./run.sh migrate     # apply what is pending
-./run.sh db-info     # what is applied, what is pending
-./run.sh db-repair   # after a failed migrate
-```
-
-H2 still builds its own schema from the entities (`ddl-auto=update`), so a local
-run can hide a missing migration entirely. That is exactly why the rule is
-"write the migration with the entity change", not "write it when something
-breaks".
-
-## The rest
-
-- **Frontend work**: read `.claude/skills/frontend/SKILL.md` first. Tokens not
-  literals, both themes, and the component vocabulary is already there.
-- **Bugs name people and projects as text, not foreign keys.** That is
-  deliberate — a bug is history and a rename must not rewrite it. Live facts
-  (a project's team) are real relations; historical ones are strings.
-- `team_members` is the users table. A row with `password_hash` can sign in;
-  one without is only a name that appears on bugs.
-- Credentials live in `.env`, which is gitignored. Never write one into
-  `application.properties` or a migration.
+H2 still builds its own schema from the entities, so a local run can hide a
+missing migration entirely. That is exactly why the rule is "write the migration
+with the entity change", not "write it when something breaks".

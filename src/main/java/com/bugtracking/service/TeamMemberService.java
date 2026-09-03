@@ -4,6 +4,7 @@ import com.bugtracking.model.Bug;
 import com.bugtracking.model.MemberRole;
 import com.bugtracking.model.Severity;
 import com.bugtracking.model.TeamMember;
+import com.bugtracking.model.ThemePreference;
 import com.bugtracking.repository.BugRepository;
 import com.bugtracking.repository.TeamMemberRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -500,5 +501,22 @@ public class TeamMemberService {
         }
         member.setActive(active);
         return repository.save(member);
+    }
+
+    @Transactional(readOnly = true)
+    public ThemePreference themeOf(String name) {
+        if (name == null || name.isBlank()) {
+            return ThemePreference.SYSTEM;
+        }
+        return repository.findFirstByNameIgnoreCase(name.trim())
+                .map(TeamMember::getTheme)
+                .orElse(ThemePreference.SYSTEM);
+    }
+
+    public void setTheme(String name, ThemePreference theme) {
+        repository.findFirstByNameIgnoreCase(name.trim()).ifPresent(member -> {
+            member.setTheme(theme);
+            repository.save(member);
+        });
     }
 }

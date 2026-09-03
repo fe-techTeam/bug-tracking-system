@@ -6,6 +6,7 @@ import com.bugtracking.service.BoardColumns;
 import com.bugtracking.service.BugService;
 import com.bugtracking.service.NotificationService;
 import com.bugtracking.service.ProjectService;
+import com.bugtracking.service.TeamMemberService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -41,15 +42,18 @@ public class GlobalModelAttributes {
     private final ProjectService projects;
     private final BugService bugs;
     private final BoardColumnService columns;
+    private final TeamMemberService team;
 
     public GlobalModelAttributes(NotificationService notifications,
                                  ProjectService projects,
                                  BugService bugs,
-                                 BoardColumnService columns) {
+                                 BoardColumnService columns,
+                                 TeamMemberService team) {
         this.notifications = notifications;
         this.projects = projects;
         this.bugs = bugs;
         this.columns = columns;
+        this.team = team;
     }
 
     /**
@@ -150,6 +154,15 @@ public class GlobalModelAttributes {
         }
         Object remembered = session.getAttribute(VIEW_KEY);
         return remembered instanceof String name && VIEWS.contains(name) ? name : "board";
+    }
+
+    /** null, "light" or "dark" — how the pre-paint script and the toggle agree on the current theme. */
+    @ModelAttribute("themeAttr")
+    public String themeAttr(HttpServletRequest request) {
+        if (request.getDispatcherType() == DispatcherType.ERROR || request.getUserPrincipal() == null) {
+            return null;
+        }
+        return team.themeOf(request.getUserPrincipal().getName()).attr();
     }
 
     /** Lets the navbar mark which section you are in. */

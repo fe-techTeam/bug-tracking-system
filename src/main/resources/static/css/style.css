@@ -1772,6 +1772,9 @@ a.pill-label { text-decoration: none; }
 a.pill-label:hover { background: color-mix(in oklab, var(--c) 22%, transparent); }
 .label-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 
+.chip.is-late, .dot.is-late { --c: var(--danger); }
+.dot.is-week { --c: var(--sev-HIGH); }
+
 /* ---------- the card's own menu ----------
    The two things anybody does to a bug without opening it: move it along, or
    throw it away. The summary is out of the flow, in the corner, so it costs the

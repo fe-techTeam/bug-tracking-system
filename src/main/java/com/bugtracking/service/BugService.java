@@ -57,7 +57,7 @@ public class BugService {
     /** The original three-filter search, kept so existing callers are unaffected. */
     @Transactional(readOnly = true)
     public List<Bug> findAll(String status, Severity severity, String keyword) {
-        return findAll(null, status, severity, null, null, null, null, keyword, null);
+        return findAll(null, status, severity, null, null, null, keyword, null);
     }
 
     /** The board's search without the source filter, for callers that never set one. */
@@ -66,7 +66,7 @@ public class BugService {
                              Environment environment, String assignee, String reporter,
                              String keyword, String sort) {
         return findAll(project, status, severity, environment, assignee, reporter,
-                null, keyword, sort);
+                null, null, keyword, sort);
     }
 
     /**
@@ -77,10 +77,11 @@ public class BugService {
     @Transactional(readOnly = true)
     public List<Bug> findAll(String project, String status, Severity severity,
                              Environment environment, String assignee, String reporter,
-                             Boolean viaGuest, String keyword, String sort) {
+                             Boolean viaGuest, String label, String keyword, String sort) {
         String trimmed = blankToNull(keyword);
         List<Bug> found = repository.search(blankToNull(project), status, severity,
                 environment, blankToNull(assignee), blankToNull(reporter), viaGuest,
+                blankToNull(label),
                 trimmed, idIn(trimmed));
         return sorted(found, sort);
     }
@@ -92,6 +93,11 @@ public class BugService {
         return scope == null
                 ? repository.countByViaGuestTrueAndDeletedAtIsNull()
                 : repository.countByProjectIgnoreCaseAndViaGuestTrueAndDeletedAtIsNull(scope);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> labelsIn(String project) {
+        return repository.distinctLabels(blankToNull(project));
     }
 
     /** Who currently carries work, busiest first — the board's people filter. */
@@ -254,6 +260,7 @@ public class BugService {
         history.recordIfChanged(id, "due", due(existing.getDueDate()), due(changes.getDueDate()), actor);
         history.recordIfChanged(id, "assigned", existing.getAssigneesLabel(),
                 changes.getAssigneesLabel(), actor);
+        history.recordIfChanged(id, "labels", existing.getLabelsLabel(), changes.getLabelsLabel(), actor);
         history.recordIfChanged(id, "blocked", blockerLabel(existing.getBlockedBy()),
                 blockerLabel(changes.getBlockedBy()), actor);
 
@@ -270,6 +277,7 @@ public class BugService {
         existing.setDueDate(changes.getDueDate());
         existing.setReportedBy(changes.getReportedBy());
         existing.setAssignees(changes.getAssignees());
+        existing.setLabels(changes.getLabels());
         existing.setBlockedBy(validBlocker(id, changes.getBlockedBy()));
 
         Bug saved = repository.save(existing);

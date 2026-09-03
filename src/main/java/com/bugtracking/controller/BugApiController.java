@@ -97,10 +97,16 @@ public class BugApiController {
                           @RequestParam(required = false) Environment environment,
                           @RequestParam(required = false) String assignee,
                           @RequestParam(required = false) String reporter,
+                          @RequestParam(required = false) String label,
                           @RequestParam(required = false) String keyword,
                           @RequestParam(required = false) String sort) {
         return service.findAll(project, status, severity, environment,
-                assignee, reporter, keyword, sort);
+                assignee, reporter, null, label, keyword, sort);
+    }
+
+    @GetMapping("/labels")
+    public List<String> labels(@RequestParam(required = false) String project) {
+        return service.labelsIn(project);
     }
 
     @GetMapping("/{id}")

@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security" lang="en"
-      th:fragment="page(title, content)">
+      th:fragment="page(title, content)" th:attr="data-theme=${themeAttr}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf != null} ? ${_csrf.token} : ''">
+    <meta name="_csrf_header" th:content="${_csrf != null} ? ${_csrf.headerName} : ''">
     <title th:text="${title} + ' · Bug Tracking'">Bug Tracking</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,6 +26,7 @@
         (function () {
             var root = document.documentElement;
             root.classList.add("js");
+            if (root.hasAttribute("data-theme")) return;
             try {
                 var t = localStorage.getItem("bugtracking.theme");
                 if (t === "light" || t === "dark") root.setAttribute("data-theme", t);

@@ -51,7 +51,21 @@
         btn.setAttribute("aria-label", btn.title);
     }
 
-    applyTheme(read(THEME_KEY));
+    function saveTheme(theme) {
+        var token = document.querySelector('meta[name="_csrf"]');
+        var header = document.querySelector('meta[name="_csrf_header"]');
+        if (!token || !token.content) return;
+        var headers = { "Content-Type": "application/x-www-form-urlencoded" };
+        headers[header.content] = token.content;
+        fetch("/me/theme", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: headers,
+            body: "theme=" + theme.toUpperCase()
+        }).catch(function () { /* localStorage already has it */ });
+    }
+
+    applyTheme(root.getAttribute("data-theme") || read(THEME_KEY));
 
     /* ---------- theme ---------- */
     document.addEventListener("click", function (e) {
@@ -64,6 +78,7 @@
         var next = isDark ? "light" : "dark";
         store(THEME_KEY, next);
         applyTheme(next);
+        saveTheme(next);
     });
 
     /* ---------- project switcher: closed until you need to move ---------- */

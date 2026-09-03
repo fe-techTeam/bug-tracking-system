@@ -30,7 +30,8 @@
                                     + (selectedSeverity != null ? 1 : 0)
                                     + (selectedEnvironment != null ? 1 : 0)
                                     + (selectedStatus != null ? 1 : 0)
-                                    + (source != null ? 1 : 0)}">
+                                    + (source != null ? 1 : 0)
+                                    + (label != null and !label.isBlank() ? 1 : 0)}">
             <form class="search-wrap" method="get" th:action="@{/bugs}" id="filter-form">
                 <input type="hidden" name="project" th:if="${selectedProject != null}" th:value="${selectedProject}">
                 <input type="hidden" name="view" th:if="${view != 'board'}" th:value="${view}">
@@ -40,6 +41,7 @@
                 <input type="hidden" name="assignee" th:if="${assignee != null}" th:value="${assignee}">
                 <input type="hidden" name="reporter" th:if="${reporter != null}" th:value="${reporter}">
                 <input type="hidden" name="source" th:if="${source != null}" th:value="${source}">
+                <input type="hidden" name="label" th:if="${label != null}" th:value="${label}">
                 <input type="hidden" name="sort" th:if="${sort != null}" th:value="${sort}">
                 <label class="sr-only" for="filter-keyword">Search</label>
                 <!-- The magnifier was decoration; now it is the submit button. Typing
@@ -177,6 +179,21 @@
                                th:classappend="'env-' + ${env} + (${env == selectedEnvironment} ? ' is-active' : '')">
                                 <span class="dot dot-lg"></span>
                                 <span th:text="${env.label}">QA</span>
+                                <span class="opt-count"></span>
+                            </a>
+                        </div>
+
+                        <div class="fmenu-col" th:unless="${#lists.isEmpty(labels)}">
+                            <p class="fmenu-head">Label</p>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.without('label')}}"
+                               th:classappend="${label == null} ? 'is-active' : ''">
+                                <svg class="i tick" aria-hidden="true"><use href="#i-check"/></svg>
+                                <span>Any label</span><span class="opt-count"></span>
+                            </a>
+                            <a class="fmenu-opt" th:each="l : ${labels}"
+                               th:href="@{${'/bugs' + q.toggle('label', l)}}"
+                               th:classappend="${#strings.equalsIgnoreCase(l, label)} ? 'is-active' : ''">
+                                <span class="pill pill-label" th:text="${l}">login</span>
                                 <span class="opt-count"></span>
                             </a>
                         </div>
@@ -323,6 +340,12 @@
                 <svg class="i"><use href="#i-guest"/></svg>
             </span>
             <span>from <b th:text="${source == 'guest'} ? 'a client' : 'the team'">a client</b></span>
+            <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
+        </a>
+
+        <a class="chip" th:if="${label != null and !label.isBlank()}"
+           th:href="@{${'/bugs' + q.without('label')}}">
+            <span>label <b th:text="${label}">login</b></span>
             <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
         </a>
 
@@ -676,6 +699,7 @@
                         <span class="pill" th:if="${bug.environment}"
                               th:classappend="'env-' + ${bug.environment}"
                               th:text="${bug.environment.label}">QA</span>
+                        <span class="pill pill-label" th:each="l : ${bug.labels}" th:text="${l}">login</span>
 
                         <span class="spacer"></span>
 
@@ -855,6 +879,7 @@
                     <th>Bug</th>
                     <th th:replace="~{fragments :: sortHead('title', '-title', 'Title', 'grow')}"></th>
                     <th th:replace="~{fragments :: sortHead('status', '-status', 'Status', '')}"></th>
+                    <th>Labels</th>
                     <th>Assigned</th>
                     <th>Raised by</th>
                     <th th:replace="~{fragments :: sortHead('due', '-due', 'Due', '')}"></th>
@@ -930,6 +955,11 @@
                             </select>
                             <button type="submit" class="btn btn-sm js-off status-go">Move</button>
                         </form>
+                    </td>
+
+                    <td data-label="Labels">
+                        <span class="pill pill-label" th:each="l : ${bug.labels}" th:text="${l}">login</span>
+                        <span class="muted" th:if="${#lists.isEmpty(bug.labels)}">—</span>
                     </td>
 
                     <td data-label="Assigned">

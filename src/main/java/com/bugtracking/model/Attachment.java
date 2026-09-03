@@ -26,6 +26,20 @@ public class Attachment {
     @Column(name = "bug_id", nullable = false)
     private Long bugId;
 
+    /**
+     * The comment this was attached to, or null when it belongs to the bug
+     * itself.
+     *
+     * <p>One table for both, rather than a second one beside it: a screenshot
+     * pasted into a comment is the same thing as a screenshot on the report —
+     * same bytes on disk, same size and type, same route serving it, same
+     * lightbox opening it. All that differs is what it hangs off. The bug id
+     * stays set either way, so deleting a bug still takes every file with it
+     * and nothing has to walk the comments to find them.
+     */
+    @Column(name = "comment_id")
+    private Long commentId;
+
     /** The name the uploader saw. Shown in the UI and used for the download. */
     @Column(name = "file_name", nullable = false, length = 255)
     private String fileName;
@@ -72,6 +86,14 @@ public class Attachment {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getCommentId() {
+        return commentId;
+    }
+
+    public void setCommentId(Long commentId) {
+        this.commentId = commentId;
     }
 
     public Long getBugId() {

@@ -64,9 +64,15 @@
         <path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/>
         <path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>
     </symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24">
+        <path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/>
+    </symbol>
     <symbol id="i-columns" viewBox="0 0 24 24">
         <rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="16" rx="1"/>
         <rect x="16" y="4" width="5" height="16" rx="1"/>
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24">
+        <path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-4"/>
     </symbol>
     <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24">
@@ -78,9 +84,17 @@
     <symbol id="i-logout" viewBox="0 0 24 24">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>
     </symbol>
+    <!-- The bin, empty and holding something. Which one is drawn is the whole
+         of what the navbar says about the trash — a count badge there was a red
+         dot for something nobody has to act on. -->
     <symbol id="i-trash" viewBox="0 0 24 24">
         <path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+    </symbol>
+    <symbol id="i-trash-full" viewBox="0 0 24 24">
+        <path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/>
     </symbol>
     <symbol id="i-paperclip" viewBox="0 0 24 24">
         <path d="M21.4 11.05 12.2 20.2a5 5 0 0 1-7.1-7.1l9.2-9.15a3.33 3.33 0 0 1 4.7 4.7l-9.2 9.15a1.67 1.67 0 0 1-2.35-2.35l8.5-8.45"/>
@@ -125,6 +139,10 @@
     <symbol id="i-table" viewBox="0 0 24 24">
         <rect x="3" y="4" width="18" height="16" rx="2"/>
         <path d="M3 9.5h18"/><path d="M3 15h18"/><path d="M9.5 9.5V20"/><path d="M15.5 9.5V20"/>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="12" height="12" rx="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
     </symbol>
     <symbol id="i-download" viewBox="0 0 24 24">
         <path d="M12 3v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 20h16"/>
@@ -220,16 +238,61 @@
                      onDocs=${currentPath != null and (#strings.startsWith(currentPath, '/documents')
                                   or (#strings.startsWith(currentPath, '/projects/')
                                       and #strings.contains(currentPath, '/docs')))},
-                     onSettings=${currentPath != null and (#strings.startsWith(currentPath, '/settings')
+                     onTeam=${currentPath != null and (#strings.startsWith(currentPath, '/settings')
                                   or #strings.startsWith(currentPath, '/team')
                                   or (#strings.startsWith(currentPath, '/projects')
                                       and not #strings.contains(currentPath, '/docs')))}">
-        <!-- The label is hidden on a narrow bar, and the mark is decorative, so
-             the name has to be on the link itself or this is an unnamed tile. -->
-        <a class="brand" th:href="@{/bugs}" id="nav-brand" aria-label="Bug Tracking — board">
-            <span class="brand-mark" aria-hidden="true">B</span>
-            <span class="lbl">Bug Tracking</span>
-        </a>
+        <!-- The project, in the spot the app's own name used to hold. One
+             app does not need to say what it is on every screen; which project
+             you are looking at is the thing you actually check, and it was a
+             second bar down. Everything it needs is a global model attribute,
+             so it works from every page rather than only the board. -->
+        <div class="switcher" id="project-switcher"
+             th:with="shown=${selectedProject != null ? selectedProject : currentProject}">
+            <button type="button" class="switcher-btn switcher-title" id="switcher-btn"
+                    aria-expanded="false" aria-haspopup="listbox" aria-controls="switcher-menu"
+                    title="Switch project">
+                <span class="avatar" th:if="${shown}"
+                      th:attr="data-avatar=${shown}" aria-hidden="true"></span>
+                <span class="avatar" th:unless="${shown}" aria-hidden="true">–</span>
+                <span class="switcher-name" id="board-title"
+                      th:text="${shown} ?: 'All projects'">Godrej</span>
+                <svg class="i switcher-chev" aria-hidden="true"><use href="#i-selector"/></svg>
+            </button>
+
+            <div class="switcher-menu" id="switcher-menu" role="listbox" hidden>
+                <div class="switcher-search" th:if="${projectCounts != null and projectCounts.size() > 6}">
+                    <!-- A project name is not prose: no capitalising, no autocorrect,
+                         and the phone's return key says Search, not Go. -->
+                    <input type="text" id="switcher-filter" placeholder="Find a project…"
+                           autocomplete="off" aria-label="Find a project"
+                           inputmode="search" enterkeyhint="search"
+                           autocapitalize="none" autocorrect="off" spellcheck="false">
+                </div>
+
+                <div class="switcher-list" id="switcher-list">
+                    <a class="switcher-item" th:each="entry : ${projectCounts}"
+                       th:href="@{/bugs(project=${entry.key})}"
+                       th:classappend="${entry.key == shown} ? 'is-active' : ''"
+                       th:data-name="${entry.key}" role="option"
+                       th:attr="aria-selected=${entry.key == shown}">
+                        <span class="avatar avatar-sm" th:attr="data-avatar=${entry.key}" aria-hidden="true"></span>
+                        <span class="switcher-item-name" th:text="${entry.key}">Godrej</span>
+                        <span class="switcher-item-count num" th:if="${entry.value > 0}"
+                              th:text="${entry.value}">4</span>
+                    </a>
+                </div>
+
+                <p class="switcher-empty" th:if="${projectCounts == null or projectCounts.isEmpty()}">
+                    No projects yet.
+                </p>
+
+                <div class="switcher-foot">
+                    <a th:href="@{/settings}">Manage projects</a>
+                    <a th:href="@{/settings}" aria-label="Add a project">+ New</a>
+                </div>
+            </div>
+        </div>
 
         <nav class="nav-links">
             <a class="nav-link" th:href="@{/bugs}" id="board-link"
@@ -249,16 +312,25 @@
                 <svg class="i" aria-hidden="true"><use href="#i-folder"/></svg>
                 <span>Documents</span>
             </a>
-            <a class="nav-link" th:href="@{/settings}" id="settings-link"
-               title="Settings" aria-label="Settings"
-               th:classappend="${onSettings} ? 'is-active' : ''"
-               th:attr="aria-current=${onSettings ? 'page' : null}">
-                <svg class="i" aria-hidden="true"><use href="#i-settings"/></svg>
-                <span>Settings</span>
+            <!-- Team rather than Settings: the roster is the thing anybody
+                 comes here to look at, and everything else behind Settings —
+                 projects, a board's columns — is a tab away once you land.
+                 The account menu still holds Settings by name. -->
+            <a class="nav-link" th:href="@{/settings(tab='team')}" id="settings-link"
+               title="Team" aria-label="Team"
+               th:classappend="${onTeam} ? 'is-active' : ''"
+               th:attr="aria-current=${onTeam ? 'page' : null}">
+                <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
+                <span>Team</span>
             </a>
         </nav>
 
         <div class="nav-right">
+            <!-- No search box here any more. The board's own filter bar is the
+                 search — it owns the URL and survives JavaScript being off —
+                 and Cmd/Ctrl+K still opens the palette over any page, so the
+                 only thing that went is a second box beside the trash. -->
+
             <!-- One label for both: a static aria-label would override the count
                  badge inside the link, so the number would be on screen and
                  nowhere in the accessible name. -->
@@ -266,13 +338,36 @@
                th:with="trashLabel=${trashCount > 0}
                         ? ${trashCount} + ' deleted bug' + (${trashCount == 1} ? '' : 's') + ' — restorable'
                         : 'Trash'"
-               th:classappend="${currentPath != null and #strings.startsWith(currentPath, '/bugs/trash')} ? 'is-active' : ''"
+               th:classappend="${(trashCount > 0 ? 'is-full ' : '')
+                        + (currentPath != null and #strings.startsWith(currentPath, '/bugs/trash') ? 'is-active' : '')}"
                th:title="${trashLabel}"
                th:attr="aria-label=${trashLabel}">
-                <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
-                <span class="bell-count num" th:if="${trashCount > 0}" id="trash-count"
-                      th:text="${trashCount > 99} ? '99+' : ${trashCount}">2</span>
+                <svg class="i" aria-hidden="true">
+                    <use th:attr="href=${trashCount > 0 ? '#i-trash-full' : '#i-trash'}"/>
+                </svg>
+                <!-- The number is still here and still has its id; it is simply
+                     not a red badge. Nothing in the bin needs acting on — it is
+                     somewhere to look, not something to clear. -->
+                <span class="sr-only" th:if="${trashCount > 0}" id="trash-count"
+                      th:text="${trashCount}">2</span>
             </a>
+
+            <!-- Where a card dropped on the bin goes. A real form rather than
+                 a fetch, because the delete route answers with the flash that
+                 carries Undo — and that undo is what makes dropping a bug on a
+                 bin a safe thing to be able to do by accident.
+
+                 The action is composed in app.js from data-base rather than
+                 written here with a placeholder in it: a name of the shape
+                 __id__ is Thymeleaf's own preprocessing syntax, and it ate the
+                 underscores before the browser ever saw them. -->
+            <!-- th:action, even though app.js overwrites it: the CSRF field is
+                 injected into forms that have one, and without it the post is
+                 rejected before it reaches the route. -->
+            <form method="post" id="trash-drop-form" hidden
+                  th:action="@{/bugs}" th:attr="data-base=@{/bugs}">
+                <input type="hidden" name="actor" class="actor-field">
+            </form>
 
             <div th:replace="~{fragments :: bell}"></div>
 
@@ -281,8 +376,12 @@
                 <svg class="i" aria-hidden="true"><use href="#i-moon"/></svg>
             </button>
 
-            <!-- Who is signed in, where you are, and the two views that are
-                 only about you — everything the bar drops when it narrows. -->
+            <!-- Who is signed in, and the two things that are about the
+                 account rather than the work. The section links used to be
+                 repeated here for a narrow bar; they are not, because the bar
+                 keeps them as icons at every width (see the 900px rule on
+                 .nav-link > span), so this was a second copy of a menu that
+                 never goes away. -->
             <details class="pop-wrap" id="user-menu">
                 <!-- Both children of the button are decorative once the name is
                      hidden, so without this the only route to Sign out has no
@@ -306,36 +405,11 @@
                         </span>
                     </div>
 
-                    <!-- The board, because the section links are the first thing
-                         a narrow bar drops and this menu is where they land. -->
-                    <a class="pop-item" id="menu-board" th:href="@{/bugs}"
-                       th:classappend="${onBoard} ? 'is-active' : ''"
-                       th:attr="aria-current=${onBoard ? 'page' : null}">
-                        <svg class="i" aria-hidden="true"><use href="#i-board"/></svg>
-                        <span>Board</span>
-                    </a>
-                    <a class="pop-item" id="menu-docs"
-                       th:href="${currentProject != null} ? @{/documents(project=${currentProject})} : @{/documents}"
-                       th:classappend="${onDocs} ? 'is-active' : ''"
-                       th:attr="aria-current=${onDocs ? 'page' : null}">
-                        <svg class="i" aria-hidden="true"><use href="#i-folder"/></svg>
-                        <span>Documents</span>
-                    </a>
-                    <a class="pop-item" id="my-assigned"
-                       th:href="@{/bugs(assignee=${#authentication.name})}">
-                        <svg class="i" aria-hidden="true"><use href="#i-inbox"/></svg>
-                        <span>Assigned to me</span>
-                    </a>
-                    <a class="pop-item" id="my-reported"
-                       th:href="@{/bugs(reporter=${#authentication.name})}">
-                        <svg class="i" aria-hidden="true"><use href="#i-pen"/></svg>
-                        <span>Raised by me</span>
-                    </a>
                     <a class="pop-item" id="menu-settings" th:href="@{/settings}"
-                       th:classappend="${onSettings} ? 'is-active' : ''"
-                       th:attr="aria-current=${onSettings ? 'page' : null}">
+                       th:classappend="${onTeam} ? 'is-active' : ''"
+                       th:attr="aria-current=${onTeam ? 'page' : null}">
                         <svg class="i" aria-hidden="true"><use href="#i-settings"/></svg>
-                        <span>Projects &amp; team</span>
+                        <span>Settings</span>
                     </a>
 
                     <div class="pop-foot">
@@ -369,6 +443,110 @@
     </div>
     <div class="lightbox-stage" id="lightbox-stage"></div>
 </div>
+
+<!-- ========================= quick search =========================
+     Cmd+K on a Mac, Ctrl+K everywhere else. Nothing depends on it: every row
+     it renders is a bug page that /bugs?keyword= already reaches, and the
+     trigger beside it is a link to the board with JavaScript off. It is empty
+     until it is opened — app.js fills the results from /bugs/search. -->
+<div class="palette" id="palette" hidden role="dialog" aria-modal="true" aria-label="Search bugs">
+    <div class="palette-box">
+        <div class="palette-field">
+            <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+            <!-- combobox, so the arrow keys moving a highlight inside the list
+                 below are announced instead of being a silent visual change. -->
+            <input type="search" id="palette-input" autocomplete="off" spellcheck="false"
+                   placeholder="Search bugs by title, id, project or person"
+                   aria-label="Search bugs"
+                   role="combobox" aria-expanded="true" aria-autocomplete="list"
+                   aria-controls="palette-results">
+            <button type="button" class="icon-btn" id="palette-close"
+                    title="Close" aria-label="Close search">
+                <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+            </button>
+        </div>
+
+        <div class="palette-results" id="palette-results" role="listbox" aria-label="Search results"></div>
+
+        <!-- Announced without stealing focus: the row count changes as you type
+             and the highlight is the only other thing that moves. -->
+        <p class="sr-only" id="palette-status" role="status" aria-live="polite"></p>
+
+        <div class="palette-foot">
+            <span><kbd>&#8593;</kbd><kbd>&#8595;</kbd> move</span>
+            <span><kbd>&#8629;</kbd> open</span>
+            <span><kbd>Esc</kbd> close</span>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== the team drawer =====================
+     Who is on the project you are looking at, opened from the navbar rather
+     than walked to: the roster with the project's people ticked and sorted to
+     the top, and a + for somebody who is not on the team at all yet. The list
+     is fetched from /team/panel — it carries a CSRF token and a form, so it is
+     rendered by Thymeleaf like every other form in the app rather than built
+     here in script.
+
+     Outside .app on purpose: .navbar and .topbar both carry a backdrop-filter,
+     and that makes them the containing block for a fixed-position descendant —
+     a drawer opened from inside one would be pinned to the bar. -->
+<div class="drawer" id="team-drawer" hidden>
+    <div class="drawer-scrim" data-drawer-close></div>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="team-drawer-title">
+        <header class="drawer-head">
+            <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
+            <h2 id="team-drawer-title">Team</h2>
+
+            <!-- Adding somebody lives in the panel now, under the people you
+                 could tick — which is the moment you find out the one you want
+                 is not among them. A lone + up here said nothing about what it
+                 would add, or to what. -->
+            <!-- No "Full page". Everything the team needs is here, and a
+                 button that leaves for somewhere else is an admission that it
+                 is not. Passwords, hiding and removing are still on
+                 Settings > Team, which is a page in its own right. -->
+            <button type="button" class="icon-btn" data-drawer-close
+                    title="Close" aria-label="Close the team">
+                <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+            </button>
+        </header>
+        <div class="drawer-mount" id="team-drawer-body" aria-busy="true"></div>
+    </aside>
+</div>
+
+<!-- ===================== the documents drawer =====================
+     Documents is a filing cabinet you open to fetch one thing, so it opens
+     beside the page rather than instead of it. The navbar link is a real link
+     to the full page and stays one — app.js intercepts the click and loads
+     /documents/panel in here instead. Every row inside is still a link: a
+     folder reloads the panel, and anything you actually open leaves for the
+     full page, which is where a document is read and edited.
+
+     Outside .app on purpose: .navbar and .topbar both carry a backdrop-filter,
+     and that makes them the containing block for a fixed-position descendant —
+     a drawer opened from inside one would be pinned to the bar. -->
+<div class="drawer" id="docs-drawer" hidden>
+    <div class="drawer-scrim" data-drawer-close></div>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="docs-drawer-title">
+        <header class="drawer-head">
+            <svg class="i" aria-hidden="true"><use href="#i-folder"/></svg>
+            <h2 id="docs-drawer-title">Documents</h2>
+            <!-- No "Full page" either: filing is done here. Opening a page or
+                 a sheet still leaves for its editor, which is a document being
+                 written rather than the cabinet being managed. -->
+            <button type="button" class="icon-btn" data-drawer-close
+                    title="Close" aria-label="Close documents">
+                <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+            </button>
+        </header>
+        <div class="drawer-body" id="docs-drawer-body" aria-busy="true"></div>
+    </aside>
+</div>
+
+<!-- What a screen reader gets from something that only animates. The copy
+     button's tick and its label swap are silent otherwise. -->
+<span class="sr-only" role="status" id="live-note"></span>
 
 <div class="toast" th:if="${message}" id="flash-message" role="status">
     <span class="toast-dot" aria-hidden="true">✓</span>

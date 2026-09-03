@@ -1,6 +1,7 @@
 package com.bugtracking.controller;
 
 import com.bugtracking.model.Project;
+import com.bugtracking.model.TeamMember;
 import com.bugtracking.service.BugService;
 import com.bugtracking.service.Dashboard;
 import com.bugtracking.service.ProjectService;
@@ -41,5 +42,17 @@ public class ProjectApiController {
     @GetMapping("/{name}/dashboard")
     public Dashboard dashboard(@PathVariable String name) {
         return bugs.dashboard(name);
+    }
+
+    /**
+     * Who is on one project.
+     *
+     * <p>Its own route rather than a field on the project above: the relation is
+     * lazy, and serialising it from there would mean loading every project's
+     * team to answer a question about one of them.
+     */
+    @GetMapping("/{name}/team")
+    public List<TeamMember> team(@PathVariable String name) {
+        return service.membersOf(name);
     }
 }

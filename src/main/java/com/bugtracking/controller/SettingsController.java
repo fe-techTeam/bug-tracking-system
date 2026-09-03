@@ -47,9 +47,23 @@ public class SettingsController {
                            HttpSession session,
                            Model model) {
         // A query param rather than script, so the tabs survive JS being off.
-        model.addAttribute("tab", tab != null && TABS.contains(tab) ? tab : "projects");
+        String active = tab != null && TABS.contains(tab) ? tab : "projects";
+        model.addAttribute("tab", active);
         model.addAttribute("projects", projects.all());
         model.addAttribute("usage", projects.usageByProjectId());
+        // Who is on each project, and the same as ids for the tick boxes. Two
+        // maps rather than a walk into project.members: the collection is lazy
+        // and open-in-view is off, so a template cannot load it itself.
+        model.addAttribute("projectTeam", projects.membersByProjectId());
+        model.addAttribute("projectTeamIds", projects.memberIdsByProjectId());
+
+        // Which project's team is being edited. A link rather than a popover in
+        // the table: .table-wrap scrolls horizontally, which clips anything that
+        // opens out of a cell. The name is in the URL, so the editor is
+        // linkable and survives JavaScript being off.
+        model.addAttribute("editingProject", "projects".equals(active) && project != null
+                ? projects.findByName(project).orElse(null)
+                : null);
         model.addAttribute("members", team.all());
         model.addAttribute("memberUsage", team.usageByMemberId());
         model.addAttribute("workload", team.workloadByMemberId());

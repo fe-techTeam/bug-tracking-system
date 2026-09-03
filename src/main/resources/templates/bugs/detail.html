@@ -2,21 +2,57 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout :: page('Bug Detail', ~{::section})}">
 <body>
+<!--
+  One bug, in the same two columns the raise form uses.
+
+  It used to be its own layout — a wide report card with a rail of small cards
+  beside it — which meant reading a bug and writing one looked like two
+  different applications. They are the same screen now: what the bug *says* is
+  the left column, what it *is* is the rail, and the only difference between
+  this page and /bugs/new is that here the fields are already answered.
+
+  Everything on it works with JavaScript switched off. The status, assignee and
+  blocker pickers are all <details> holding real submit buttons.
+-->
 <section th:with="me=${#authentication.name}">
 
     <header class="topbar">
         <a class="back-link" th:href="@{/bugs(project=${bug.project})}" id="back-to-board"
-           title="Back to the board" aria-label="Back to the board">
+           title="Go back" aria-label="Go back">
             <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
-            <span>Board</span>
-        </a>
+            </a>
 
-        <span class="avatar" th:if="${bug.project}" th:attr="data-avatar=${bug.project}" aria-hidden="true"></span>
-        <span class="topbar-title" th:text="'BUG-' + ${bug.id}">BUG-1</span>
-        <span class="topbar-sub" th:if="${bug.project}" th:text="${bug.project}">Godrej</span>
+        <!-- No project face and no BUG-N here: the trail below says both, and
+             the bug's own title is the first line of the page. Three ways of
+             naming the same thing across two bars is what a breadcrumb is for
+             getting rid of. -->
+        <div th:replace="~{fragments :: crumbs(${ {
+                 {'Board', '/bugs'},
+                 {bug.project ?: 'No project', '/bugs?project=' + (bug.project ?: '')},
+                 {'BUG-' + bug.id, null} } })}"></div>
 
         <!-- Edit and Delete live together, where actions on the whole bug belong. -->
         <div class="topbar-actions">
+            <!-- Copy markdown: the whole report, the write-ups and the thread as
+                 one block of Markdown, for handing to an assistant without
+                 retyping any of it. A real link to the same Markdown, so with
+                 JavaScript off it opens in a tab to be copied by hand; the
+                 script only saves that trip. -->
+            <a class="btn btn-sm copy-md" id="copy-markdown"
+               th:href="@{/bugs/{id}/markdown(id=${bug.id})}"
+               th:attr="data-copy-md='BUG-' + ${bug.id}"
+               title="Copy the whole bug as Markdown, ready to paste into Claude (c)"
+               aria-label="Copy markdown">
+                <span class="copy-md-flare" aria-hidden="true"></span>
+                <span class="copy-md-mark" aria-hidden="true">
+                    <svg class="i copy-md-from"><use href="#i-copy"/></svg>
+                    <svg class="i copy-md-to"><use href="#i-check"/></svg>
+                </span>
+                <span class="copy-md-say" aria-hidden="true">
+                    <span class="copy-md-idle">Copy markdown</span>
+                    <span class="copy-md-done">Copied</span>
+                </span>
+            </a>
             <a class="btn btn-sm" th:href="@{/bugs/{id}/edit(id=${bug.id})}" id="edit-bug">
                 <svg class="i" aria-hidden="true"><use href="#i-pen"/></svg>
                 <span>Edit</span>
@@ -32,17 +68,16 @@
     </header>
 
     <div class="content">
-    <div class="detail-grid">
+    <div class="report-grid">
 
-        <!-- ================= the report: one card, read top to bottom ================= -->
-        <div class="detail-main">
+        <!-- ============ what the bug says ============ -->
+        <div class="report-main">
 
             <div class="panel report" id="report" th:style="'--c: var(--sev-' + ${bug.severity} + ')'">
-
                 <div class="report-sec report-head">
                     <h1 id="bug-title" th:text="${bug.title}">Bug title</h1>
 
-                    <!-- Kept here rather than in the facts card: this is not a
+                    <!-- Kept here rather than in the facts: this is not a
                          property of the bug, it is a reason you cannot work it. -->
                     <a class="blocked-note" th:if="${blocker != null and cols.openWork(blocker)}"
                        th:href="@{/bugs/{id}(id=${blocker.id})}">
@@ -52,378 +87,25 @@
                     </a>
                 </div>
 
+                <!-- The whole report, in one box, exactly as it was written. It was
+                     four boxes once — description, steps, expected, actual — and what
+                     those held was folded in here, so there is nothing else to show. -->
                 <div class="report-sec">
-                    <h3>Bug details</h3>
                     <p class="pre" th:text="${#strings.isEmpty(bug.description)} ? 'No details provided.' : ${bug.description}">Description</p>
                 </div>
 
-                <!-- Steps, expected and actual are no longer asked for separately: the
-                     report is one box now. They still show for the bugs raised while
-                     they were, which is why each of these is rendered only when it
-                     holds something rather than printing an empty placeholder. -->
-                <div class="report-sec" th:if="${!#strings.isEmpty(bug.stepsToReproduce)}">
-                    <h3>Steps to reproduce</h3>
-                    <div class="steps" th:text="${bug.stepsToReproduce}">Steps</div>
-                </div>
-
-                <!-- Green for what should happen, red for what does. The mismatch is the bug. -->
-                <div class="report-sec"
-                     th:if="${!#strings.isEmpty(bug.expectedResult) or !#strings.isEmpty(bug.actualResult)}">
-                    <h3>Expected vs actual</h3>
-                    <div class="compare">
-                        <div class="compare-card compare-expected">
-                            <header><svg class="i" aria-hidden="true"><use href="#i-check"/></svg> Expected</header>
-                            <div class="body" th:text="${bug.expectedResult} ?: '—'">Expected</div>
-                        </div>
-                        <div class="compare-card compare-actual">
-                            <header><svg class="i" aria-hidden="true"><use href="#i-x"/></svg> Actual</header>
-                            <div class="body" th:text="${bug.actualResult} ?: '—'">Actual</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ---------- supporting docs ----------
-                 Where the testing gets written down. Two shapes and no more:
-                 a page for prose and a sheet for a grid, because a tester
-                 writing up a run is doing one or the other. Both live on the
-                 bug rather than in somebody's drive. -->
-            <div class="panel" id="docs">
-                <div class="panel-head">
-                    <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-file-text"/></svg>
-                    <h2>Supporting docs</h2>
-                    <span class="count-pill" th:if="${!#lists.isEmpty(docs)}"
-                          th:text="${#lists.size(docs)}">0</span>
-
-                    <!-- One form per type: a plain post, so a new document is
-                         one click and no dialog asking what to call it. -->
-                    <form method="post" class="inline-form" th:each="t : ${docTypes}"
-                          th:action="@{/bugs/{id}/docs(id=${bug.id})}">
-                        <input type="hidden" name="actor" class="actor-field">
-                        <input type="hidden" name="type" th:value="${t}">
-                        <button type="submit" class="btn btn-sm"
-                                th:id="'new-' + ${#strings.toLowerCase(t)}" th:title="${t.blurb}">
-                            <svg class="i" aria-hidden="true"><use th:attr="href='#' + ${t.icon}"/></svg>
-                            <span th:text="'New ' + ${#strings.toLowerCase(t.label)}">New page</span>
-                        </button>
-                    </form>
-                </div>
-
-                <div class="doc-list" th:unless="${#lists.isEmpty(docs)}" id="doc-list">
-                    <div class="doc-row" th:each="d,st : ${docs}"
-                         th:style="'--i:' + ${st.index} + '; --c: var(--doc-' + ${d.type} + ')'">
-                        <a class="doc-open" th:href="@{/bugs/{id}/docs/{did}(id=${bug.id},did=${d.id})}"
-                           th:id="'open-doc-' + ${d.id}">
-                            <span class="doc-kind" aria-hidden="true">
-                                <svg class="i"><use th:attr="href='#' + ${d.type.icon}"/></svg>
-                            </span>
-                            <span class="doc-text">
-                                <span class="doc-name" th:text="${d.title}">Regression notes</span>
-                                <span class="doc-meta">
-                                    <span th:text="${d.type.label}">Page</span>
-                                    <span th:text="${d.summary} ?: 'Empty'">412 words</span>
-                                    <span class="when" th:attr="data-time=${d.updatedAt}"
-                                          th:text="${#temporals.format(d.updatedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
-                                    <span th:if="${d.updatedBy}" th:text="${d.updatedBy}">Nishana R</span>
-                                </span>
-                            </span>
-                        </a>
-
-                        <a class="icon-btn icon-btn-sm" th:id="'download-doc-' + ${d.id}"
-                           th:href="@{/bugs/{id}/docs/{did}/export(id=${bug.id},did=${d.id})}"
-                           th:title="'Download as .' + ${d.type.extension}"
-                           th:attr="aria-label='Download as .' + ${d.type.extension}">
-                            <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>
-                        </a>
-                        <form method="post" class="inline-form"
-                              th:action="@{/bugs/{id}/docs/{did}/delete(id=${bug.id},did=${d.id})}"
-                              th:attr="data-confirm=|Delete ${d.title}? This cannot be undone.|">
-                            <input type="hidden" name="actor" class="actor-field">
-                            <button type="submit" class="icon-btn icon-btn-sm" th:id="'delete-doc-' + ${d.id}"
-                                    th:title="|Delete ${d.title}|"
-                                    th:attr="aria-label=|Delete ${d.title}|">
-                                <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="empty empty-sm" th:if="${#lists.isEmpty(docs)}" id="docs-empty">
-                    <span class="empty-art" aria-hidden="true">
-                        <svg class="i" style="width:18px;height:18px"><use href="#i-file-text"/></svg>
-                    </span>
-                    <h3>Nothing written up yet</h3>
-                    <p>A <b>page</b> for how you tested it and what you saw; a <b>sheet</b> for
-                       test cases, data and their results. Both stay on the bug.</p>
-                </div>
-            </div>
-
-            <!-- ---------- comments ---------- -->
-            <div class="panel" id="comments">
-                <div class="panel-head">
-                    <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-message"/></svg>
-                    <h2>Comments</h2>
-                    <span class="count-pill" th:if="${!#lists.isEmpty(comments)}"
-                          th:text="${#lists.size(comments)}">0</span>
-                </div>
-
-                <!-- data-people drives the @ autocomplete; the server matches
-                     mentions against the roster again on save, so a typed name
-                     still notifies even with JS off. -->
-                <form class="comment-box" method="post"
-                      th:action="@{/bugs/{id}/comments(id=${bug.id})}" id="comment-form"
-                      th:attr="data-people=${#strings.listJoin(people, '|')}">
-                    <input type="hidden" name="actor" class="actor-field">
-                    <div class="comment-row">
-                        <span class="avatar" th:attr="data-avatar=${me}" th:title="${me}"
-                              aria-hidden="true"></span>
-                        <span class="sr-only" th:text="'Commenting as ' + ${me}">Commenting as you</span>
-                        <label>
-                            <span class="sr-only">Comment</span>
-                            <textarea name="text" id="comment-text" rows="2" required
-                                      placeholder="Add a comment… type @ to tag someone"></textarea>
-                        </label>
-                    </div>
-                    <div class="comment-actions">
-                        <button type="submit" class="btn btn-primary btn-sm" id="add-comment">Comment</button>
-                    </div>
-                </form>
-
-                <ol class="thread" th:unless="${#lists.isEmpty(comments)}" id="comment-list">
-                    <li th:each="c,st : ${comments}" th:style="'--i:' + ${st.index}">
-                        <span class="avatar" th:attr="data-avatar=${c.createdBy}" th:title="${c.createdBy}"
-                              aria-hidden="true"></span>
-                        <div class="thread-body">
-                            <div class="thread-head">
-                                <b th:text="${c.createdBy} ?: 'unknown'">qa-team</b>
-                                <span class="when" th:attr="data-time=${c.createdAt}"
-                                      th:text="${#temporals.format(c.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
-                            </div>
-                            <p class="pre comment-text" th:text="${c.text}">Comment text</p>
-                        </div>
-                    </li>
-                </ol>
-            </div>
-        </div>
-
-        <!-- ================= the rail ================= -->
-        <aside class="detail-rail">
-
-            <!-- One card for what the bug *is*: its number, where it is, and
-                 every fixed fact about it. Open, because this is the first
-                 thing you look at and the last thing worth hiding. -->
-            <div class="panel rail-card" id="bug-facts">
-                <div class="facts-top">
-                    <span class="bug-id" th:text="'BUG-' + ${bug.id}">BUG-1</span>
-                    <span class="spacer"></span>
-                    <span class="meter" th:classappend="'sev-' + ${bug.severity}"
-                          th:title="${bug.severity.label + ' severity'}" aria-hidden="true">
-                        <i></i><i></i><i></i><i></i>
-                    </span>
-                </div>
-
-                <!-- The columns of this bug's own project, in that board's
-                     order. The number beside each is simply where it sits on
-                     that board — there is no lifecycle track in the code any
-                     more, only the order somebody put the columns in. -->
-                <details class="statuspick fmenu" id="status-menu"
-                         th:style="'--c:' + ${cols.token(bug)}">
-                    <summary>
-                        <span class="status-current" id="bug-status">
-                            <span class="dot"></span>
-                            <span th:text="${cols.label(bug)}">Open</span>
-                            <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
-                        </span>
-                    </summary>
-
-                    <div class="pop pop-block">
-                        <div class="pop-head"><span>Move to</span></div>
-                        <form method="post" th:action="@{/bugs/{id}/status(id=${bug.id})}" class="status-picker">
-                            <input type="hidden" name="actor" class="actor-field">
-                            <button type="submit" name="status" th:each="c,cs : ${boardColumns}"
-                                    th:value="${c.statusKey}" class="status-opt-row"
-                                    th:style="'--c:' + ${c.token}"
-                                    th:disabled="${c.statusKey == bug.status}"
-                                    th:title="${c.statusKey == bug.status} ? 'Already here' : 'Move to ' + ${c.label}">
-                                <span class="dot" aria-hidden="true"></span>
-                                <span th:text="${c.label}">Open</span>
-                                <svg class="i tick" aria-hidden="true"
-                                     th:if="${c.statusKey == bug.status}"><use href="#i-check"/></svg>
-                                <span class="step-n" th:unless="${c.statusKey == bug.status}"
-                                      th:text="${cs.count}">1</span>
-                            </button>
-                        </form>
-                        <p class="pop-foot hint">
-                            <a th:href="@{/settings(tab='board', project=${bug.project})}">Edit this board's columns</a>
-                        </p>
-                    </div>
-                </details>
-
-                <dl class="rail-facts">
-                    <!-- What the four bars up top say, in words: a tooltip is the
-                         one thing a phone cannot show. Severity is declared worst
-                         first, so the filled count is 4 - ordinal, the same 1..4
-                         the .meter paints. -->
-                    <div class="rail-fact">
-                        <dt>Severity</dt>
-                        <dd th:classappend="'sev-' + ${bug.severity}" id="bug-severity">
-                            <span class="dot"></span>
-                            <span th:text="${bug.severity.label}">High</span>
-                            <span class="num muted"
-                                  th:text="|${4 - bug.severity.ordinal()} of 4|">3 of 4</span>
-                        </dd>
-                    </div>
-                    <div class="rail-fact">
-                        <dt>Environment</dt>
-                        <dd th:classappend="${bug.environment != null} ? 'env-' + ${bug.environment} : ''"
-                            id="bug-environment">
-                            <span class="dot" th:if="${bug.environment}"></span>
-                            <span th:text="${bug.environment != null} ? ${bug.environment.label} : '—'">QA</span>
-                        </dd>
-                    </div>
-                    <div class="rail-fact">
-                        <dt>Module</dt>
-                        <dd><span th:text="${bug.module} ?: '—'">Module</span></dd>
-                    </div>
-                    <div class="rail-fact">
-                        <dt>Project</dt>
-                        <dd id="bug-project">
-                            <span class="avatar avatar-sm" th:if="${bug.project}"
-                                  th:attr="data-avatar=${bug.project}" aria-hidden="true"></span>
-                            <span th:text="${bug.project} ?: '—'">Client</span>
-                        </dd>
-                    </div>
-                    <div class="rail-fact">
-                        <dt>Raised by</dt>
-                        <dd>
-                            <span class="avatar avatar-sm" th:if="${bug.reportedBy}"
-                                  th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
-                            <span th:text="${bug.reportedBy} ?: '—'">Reporter</span>
-                        </dd>
-                    </div>
-                    <div class="rail-fact">
-                        <dt>Raised</dt>
-                        <dd><span class="when" th:attr="data-time=${bug.createdAt}"
-                                  th:text="${#temporals.format(bug.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span></dd>
-                    </div>
-                    <div class="rail-fact">
-                        <dt>Updated</dt>
-                        <dd><span class="when" th:attr="data-time=${bug.updatedAt}"
-                                  th:text="${#temporals.format(bug.updatedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span></dd>
-                    </div>
-                </dl>
-            </div>
-
-            <!-- ---------- who is on it ---------- -->
-            <div class="panel rail-card">
-                <span class="rail-title">
-                    <svg class="i" aria-hidden="true" style="width:12px;height:12px"><use href="#i-user"/></svg>
-                    Assigned to
-                    <span class="count-pill" th:if="${!#lists.isEmpty(bug.assignees)}"
-                          th:text="${#lists.size(bug.assignees)}">2</span>
-                </span>
-
-                <div class="assignee-chips" th:unless="${#lists.isEmpty(bug.assignees)}">
-                    <a class="client-chip" th:each="p : ${bug.assignees}"
-                       th:href="@{/bugs(assignee=${p})}" th:title="'Everything on ' + ${p}">
-                        <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
-                        <span class="client-name" th:text="${p == me} ? ${p} + ' (you)' : ${p}">Vatsal</span>
-                    </a>
-                </div>
-                <p class="assign-hint" th:if="${#lists.isEmpty(bug.assignees)}">
-                    Nobody has picked this up yet.
-                </p>
-
-                <form method="post" th:action="@{/bugs/{id}/assign(id=${bug.id})}" id="assign-form">
-                    <input type="hidden" name="actor" class="actor-field">
-                    <details class="pop-wrap picker" id="assignee-picker">
-                        <summary>
-                            <span class="picker-btn">
-                                <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
-                                <span>Change who is on it</span>
-                                <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
-                            </span>
-                        </summary>
-                        <div class="pop pop-block">
-                            <!-- Save sits at the top: with a long team the button
-                                 at the bottom is below the fold, and you tick a
-                                 name near the top and then have to hunt for it. -->
-                            <div class="pop-head pop-head-sticky">
-                                <span>Assign to</span>
-                                <span class="spacer"></span>
-                                <button type="submit" class="btn btn-sm btn-primary" id="save-assignees">Save</button>
-                            </div>
-
-                            <div class="pick-search">
-                                <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
-                                <input type="text" id="assignee-filter" placeholder="Find someone…"
-                                       autocomplete="off" aria-label="Find someone">
-                            </div>
-
-                            <div class="pop-list" id="assignee-list">
-                                <label class="pick-opt" th:each="p : ${people}" th:attr="data-name=${p}">
-                                    <input type="checkbox" name="assignees" th:value="${p}"
-                                           th:checked="${#lists.contains(bug.assignees, p)}">
-                                    <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
-                                    <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
-                                </label>
-                                <p class="pop-empty" id="assignee-none" hidden>Nobody by that name.</p>
-                            </div>
-
-                            <div class="pop-foot"><span>Nobody ticked = unassigned</span></div>
-                        </div>
-                    </details>
-                </form>
-
-                <!-- Adds you to whoever is already on it, rather than replacing them. -->
-                <form method="post" th:action="@{/bugs/{id}/assign(id=${bug.id})}"
-                      th:unless="${#lists.contains(bug.assignees, me)}">
-                    <input type="hidden" name="actor" class="actor-field">
-                    <input type="hidden" name="assignees" th:each="p : ${bug.assignees}" th:value="${p}">
-                    <input type="hidden" name="assignees" th:value="${me}">
-                    <button type="submit" class="btn btn-sm btn-ghost btn-block" id="assign-to-me">Add me</button>
-                </form>
-            </div>
-
-            <!-- ---------- what is holding it up ---------- -->
-            <div class="panel rail-card" id="blocked-by">
-                <span class="rail-title">
-                    <svg class="i" aria-hidden="true" style="width:12px;height:12px"><use href="#i-blocked"/></svg>
-                    Blocked by
-                </span>
-
-                <form method="post" th:action="@{/bugs/{id}/block(id=${bug.id})}"
-                      id="block-form" style="display:grid;gap:8px">
-                    <input type="hidden" name="actor" class="actor-field">
-                    <label>
-                        <span class="sr-only">Blocked by</span>
-                        <select name="blockedBy" id="block-select" data-autosubmit>
-                            <option value="">— Not blocked —</option>
-                            <option th:each="b : ${blockerOptions}" th:value="${b.id}"
-                                    th:selected="${bug.blockedBy != null and bug.blockedBy == b.id}"
-                                    th:text="'BUG-' + ${b.id} + ' · ' + ${b.title}">BUG-3 · Something</option>
-                        </select>
-                    </label>
-                    <button type="submit" class="btn btn-sm btn-block js-off">Save</button>
-                </form>
-
-                <p class="assign-hint" th:if="${#lists.isEmpty(blockerOptions)}">
-                    No other open bug to wait on.
-                </p>
-            </div>
-
-            <!-- ---------- attachments ----------
-                 The split happens once, here: a screenshot is shown and
-                 everything else is listed, so each container is emitted only
-                 when the split actually put something in it. -->
-            <div class="panel rail-card" id="attachments"
-                 th:with="shots=${attachments.?[image]}, files=${attachments.?[!image]}">
-                <span class="rail-title">
-                    <svg class="i" aria-hidden="true" style="width:12px;height:12px"><use href="#i-paperclip"/></svg>
-                    Attachments
-                    <span class="count-pill" th:if="${!#lists.isEmpty(attachments)}"
-                          th:text="${#lists.size(attachments)}">0</span>
-                </span>
+                <!-- ---------- the report's own files ----------
+                     In the same place the raise form puts them, and holding
+                     only the report's: anything attached to a comment belongs
+                     under that comment, where it was said. -->
+                <div class="report-sec" id="attachments"
+                     th:with="shots=${attachments.?[image]}, files=${attachments.?[!image]}">
+                    <h3>
+                        <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                        Attachments
+                        <span class="count-pill" th:if="${!#lists.isEmpty(attachments)}"
+                              th:text="${#lists.size(attachments)}">0</span>
+                    </h3>
 
                 <!-- The pill is a total and the panel shows two things, so say
                      which is which: "5" over three thumbnails reads as a miscount. -->
@@ -501,65 +183,550 @@
                     </label>
                     <button type="submit" class="btn btn-sm" id="upload-attachment">Upload</button>
                 </form>
+                </div>
             </div>
 
-            <!-- ---------- history: reference, so it starts shut ---------- -->
-            <details class="panel rail-fold" id="history">
+            <!-- ---------- comments ---------- -->
+            <div class="panel" id="comments">
+                <div class="panel-head">
+                    <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-message"/></svg>
+                    <h2>Comments</h2>
+                    <span class="count-pill" th:if="${!#lists.isEmpty(comments)}"
+                          th:text="${#lists.size(comments)}">0</span>
+                </div>
+
+                <!-- data-people drives the @ autocomplete; the server matches
+                     mentions against the roster again on save, so a typed name
+                     still notifies even with JS off.
+                     multipart, because a screenshot is very often the whole
+                     comment — "it still does this, look" — and asking for it
+                     through the attachments box above is how it ended up on
+                     the report instead of on the reply that was about it. -->
+                <form class="comment-box" method="post" enctype="multipart/form-data"
+                      th:action="@{/bugs/{id}/comments(id=${bug.id})}" id="comment-form"
+                      th:attr="data-people=${#strings.listJoin(people, '|')}">
+                    <input type="hidden" name="actor" class="actor-field">
+                    <div class="comment-row">
+                        <span class="avatar" th:attr="data-avatar=${me}" th:title="${me}"
+                              aria-hidden="true"></span>
+                        <span class="sr-only" th:text="'Commenting as ' + ${me}">Commenting as you</span>
+                        <label>
+                            <span class="sr-only">Comment</span>
+                            <textarea name="text" id="comment-text" rows="2"
+                                      placeholder="Add a comment… type @ to tag someone"></textarea>
+                        </label>
+                    </div>
+                    <div class="comment-actions">
+                        <!-- The picker itself is never seen: the label is the
+                             button, and app.js writes what was chosen into the
+                             span beside it. -->
+                        <label class="btn btn-sm btn-ghost comment-clip" for="comment-files">
+                            <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                            <span>Attach</span>
+                            <input type="file" name="files" id="comment-files" multiple>
+                        </label>
+                        <span class="file-note" id="comment-file-note" aria-live="polite"></span>
+                        <span class="spacer"></span>
+                        <button type="submit" class="btn btn-primary btn-sm" id="add-comment">Comment</button>
+                    </div>
+                </form>
+
+                <!-- Oldest first, so a thread reads as a conversation. Each
+                     comment can be answered, and one level of nesting is all
+                     there is: a reply to a reply is filed against the same
+                     parent, which keeps an exchange a run under the thing it
+                     is about rather than a staircase off the right edge. -->
+                <ol class="thread" th:unless="${#lists.isEmpty(comments)}" id="comment-list">
+                    <li th:each="c,st : ${comments}" th:style="'--i:' + ${st.index}"
+                        th:with="kids=${replies.get(c.id)}">
+                        <div th:replace="~{bugs/detail :: comment(${c}, ${me}, ${bug}, ${commentFiles})}"></div>
+
+                        <ol class="thread thread-replies" th:if="${kids != null}">
+                            <li th:each="r : ${kids}">
+                                <div th:replace="~{bugs/detail :: comment(${r}, ${me}, ${bug}, ${commentFiles})}"></div>
+                            </li>
+                        </ol>
+                    </li>
+                </ol>
+            </div>
+
+            <!-- ---------- supporting docs ----------
+                 Where the testing gets written down. Two shapes and no more:
+                 a page for prose and a sheet for a grid, because a tester
+                 writing up a run is doing one or the other. Both live on the
+                 bug rather than in somebody's drive. -->
+            <details class="panel quiet-fold" id="docs" th:attr="open=${!#lists.isEmpty(docs)} ? 'open' : null">
                 <summary>
-                    <span class="rail-title">
-                        <svg class="i" aria-hidden="true" style="width:12px;height:12px"><use href="#i-clock"/></svg>
-                        History
-                        <span class="count-pill" th:if="${!#lists.isEmpty(timeline)}"
-                              th:text="${#lists.size(timeline)}">0</span>
+                    <span class="quiet-title">
+                        <svg class="i" aria-hidden="true"><use href="#i-file-text"/></svg>
+                        <span>Supporting docs</span>
+                        <span class="count-pill" th:if="${!#lists.isEmpty(docs)}"
+                              th:text="${#lists.size(docs)}">0</span>
                     </span>
                     <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
                 </summary>
 
-                <div class="rail-fold-body">
-                    <ol class="timeline" th:unless="${#lists.isEmpty(timeline)}" id="history-list">
-                        <li th:each="h,st : ${timeline}" th:style="'--i:' + ${st.index}"
-                            th:classappend="'ev-' + ${h.action}">
-                            <span class="timeline-dot" aria-hidden="true"></span>
-                            <div class="timeline-body">
-                                <div class="timeline-line">
-                                    <b th:text="${h.actor} ?: 'unknown'">qa-team</b>
-                                    <span th:switch="${h.action}">
-                                        <span th:case="'created'">raised this bug</span>
-                                        <span th:case="'comment'">added a comment</span>
-                                        <span th:case="'attachment'">attached <b th:text="${h.newValue}">file</b></span>
-                                        <span th:case="'attachment-removed'">removed <b th:text="${h.oldValue}">file</b></span>
-                                        <span th:case="'assigned'">
-                                            <span th:if="${h.newValue}">assigned it to <b th:text="${h.newValue}">dev</b></span>
-                                            <span th:unless="${h.newValue}">removed the assignee</span>
-                                        </span>
-                                        <span th:case="'status'">
-                                            moved it from <b th:text="${h.oldValue}">Open</b>
-                                            to <b th:text="${h.newValue}">Fixed</b>
-                                        </span>
-                                        <span th:case="'doc'">added the doc <b th:text="${h.newValue}">Test notes</b></span>
-                                        <span th:case="'doc-renamed'">renamed <b th:text="${h.oldValue}">Untitled page</b>
-                                            to <b th:text="${h.newValue}">Test notes</b></span>
-                                        <span th:case="'doc-removed'">deleted the doc <b th:text="${h.oldValue}">Test notes</b></span>
-                                        <span th:case="*">
-                                            changed <b th:text="${h.action}">title</b>
-                                            <span th:if="${h.oldValue}">from “<span th:text="${h.oldValue}">old</span>”</span>
-                                            <span th:if="${h.newValue}">to “<span th:text="${h.newValue}">new</span>”</span>
-                                        </span>
+                <div class="quiet-body">
+                    <!-- One form per type: a plain post, so a new document is
+                         one click and no dialog asking what to call it. -->
+                    <div class="quiet-actions">
+                        <form method="post" class="inline-form" th:each="t : ${docTypes}"
+                              th:action="@{/bugs/{id}/docs(id=${bug.id})}">
+                            <input type="hidden" name="actor" class="actor-field">
+                            <input type="hidden" name="type" th:value="${t}">
+                            <button type="submit" class="btn btn-sm"
+                                    th:id="'new-' + ${#strings.toLowerCase(t)}" th:title="${t.blurb}">
+                                <svg class="i" aria-hidden="true"><use th:attr="href='#' + ${t.icon}"/></svg>
+                                <span th:text="'New ' + ${#strings.toLowerCase(t.label)}">New page</span>
+                            </button>
+                        </form>
+                    </div>
+
+                <div class="doc-list" th:unless="${#lists.isEmpty(docs)}" id="doc-list">
+                    <div class="doc-row" th:each="d,st : ${docs}"
+                         th:style="'--i:' + ${st.index} + '; --c: var(--doc-' + ${d.type} + ')'">
+                        <a class="doc-open" th:href="@{/bugs/{id}/docs/{did}(id=${bug.id},did=${d.id})}"
+                           th:id="'open-doc-' + ${d.id}">
+                            <span class="doc-kind" aria-hidden="true">
+                                <svg class="i"><use th:attr="href='#' + ${d.type.icon}"/></svg>
+                            </span>
+                            <span class="doc-text">
+                                <span class="doc-name" th:text="${d.title}">Regression notes</span>
+                                <span class="doc-meta">
+                                    <span th:text="${d.type.label}">Page</span>
+                                    <span th:text="${d.summary} ?: 'Empty'">412 words</span>
+                                    <span class="when" th:attr="data-time=${d.updatedAt}"
+                                          th:text="${#temporals.format(d.updatedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+                                    <span th:if="${d.updatedBy}" th:text="${d.updatedBy}">Nishana R</span>
+                                </span>
+                            </span>
+                        </a>
+
+                        <a class="icon-btn icon-btn-sm" th:id="'download-doc-' + ${d.id}"
+                           th:href="@{/bugs/{id}/docs/{did}/export(id=${bug.id},did=${d.id})}"
+                           th:title="'Download as .' + ${d.type.extension}"
+                           th:attr="aria-label='Download as .' + ${d.type.extension}">
+                            <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>
+                        </a>
+                        <form method="post" class="inline-form"
+                              th:action="@{/bugs/{id}/docs/{did}/delete(id=${bug.id},did=${d.id})}"
+                              th:attr="data-confirm=|Delete ${d.title}? This cannot be undone.|">
+                            <input type="hidden" name="actor" class="actor-field">
+                            <button type="submit" class="icon-btn icon-btn-sm" th:id="'delete-doc-' + ${d.id}"
+                                    th:title="|Delete ${d.title}|"
+                                    th:attr="aria-label=|Delete ${d.title}|">
+                                <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="empty empty-sm" th:if="${#lists.isEmpty(docs)}" id="docs-empty">
+                    <span class="empty-art" aria-hidden="true">
+                        <svg class="i" style="width:18px;height:18px"><use href="#i-file-text"/></svg>
+                    </span>
+                    <h3>Nothing written up yet</h3>
+                    <p>A <b>page</b> for how you tested it and what you saw; a <b>sheet</b> for
+                       test cases, data and their results. Both stay on the bug.</p>
+                </div>
+            </div>
+            </details>
+        </div>
+
+        <!-- ============ what the bug is ============ -->
+        <!-- One card of sections, exactly as the raise form's rail is: the
+             things you pick, in the order you pick them. -->
+        <aside class="report-side">
+            <div class="panel">
+
+                <div class="report-sec">
+                    <span class="field-label">
+                        <svg class="i" aria-hidden="true"><use href="#i-columns"/></svg>
+                        Status
+                    </span>
+                <!-- The columns of this bug's own project, in that board's
+                     order. The number beside each is simply where it sits on
+                     that board — there is no lifecycle track in the code any
+                     more, only the order somebody put the columns in. -->
+                <details class="statuspick fmenu" id="status-menu"
+                         th:style="'--c:' + ${cols.token(bug)}">
+                    <summary>
+                        <span class="status-current" id="bug-status">
+                            <span class="dot"></span>
+                            <span th:text="${cols.label(bug)}">Open</span>
+                            <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                        </span>
+                    </summary>
+
+                    <div class="pop pop-block">
+                        <div class="pop-head"><span>Move to</span></div>
+                        <form method="post" th:action="@{/bugs/{id}/status(id=${bug.id})}" class="status-picker">
+                            <input type="hidden" name="actor" class="actor-field">
+                            <button type="submit" name="status" th:each="c,cs : ${boardColumns}"
+                                    th:value="${c.statusKey}" class="status-opt-row"
+                                    th:style="'--c:' + ${c.token}"
+                                    th:disabled="${c.statusKey == bug.status}"
+                                    th:title="${c.statusKey == bug.status} ? 'Already here' : 'Move to ' + ${c.label}">
+                                <span class="dot" aria-hidden="true"></span>
+                                <span th:text="${c.label}">Open</span>
+                                <svg class="i tick" aria-hidden="true"
+                                     th:if="${c.statusKey == bug.status}"><use href="#i-check"/></svg>
+                                <span class="step-n" th:unless="${c.statusKey == bug.status}"
+                                      th:text="${cs.count}">1</span>
+                            </button>
+                        </form>
+                        <p class="pop-foot hint">
+                            <a th:href="@{/settings(tab='board', project=${bug.project})}">Edit this board's columns</a>
+                        </p>
+                    </div>
+                </details>
+                </div>
+
+                <div class="report-sec">
+                    <span class="field-label" id="assignee-label">
+                        <svg class="i" aria-hidden="true"><use href="#i-user"/></svg>
+                        Assigned to
+                        <span class="count-pill" th:if="${!#lists.isEmpty(bug.assignees)}"
+                              th:text="${#lists.size(bug.assignees)}">2</span>
+
+                        <!-- One control, not three. It was "Change who is on
+                             it" over an "Add me" over the faces — two buttons
+                             saying the same thing in different words. Edit
+                             opens the same tick list the team drawer uses, and
+                             adding yourself is ticking your own name. -->
+                        <span class="spacer"></span>
+                        <label class="btn btn-sm field-edit" for="assignee-toggle">
+                            <svg class="i" aria-hidden="true"><use href="#i-pen"/></svg>
+                            <span>Edit</span>
+                        </label>
+                    </span>
+
+                    <!-- A checkbox, not script: the list opens with JavaScript
+                         off exactly as it does with it on, and the label above
+                         is what toggles it. -->
+                    <input type="checkbox" id="assignee-toggle" class="sr-only field-edit-toggle">
+
+                    <div class="assignee-chips" th:unless="${#lists.isEmpty(bug.assignees)}">
+                        <a class="client-chip" th:each="p : ${bug.assignees}"
+                           th:href="@{/bugs(assignee=${p})}" th:title="'Everything on ' + ${p}">
+                            <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
+                            <span class="client-name" th:text="${p == me} ? ${p} + ' (you)' : ${p}">Vatsal</span>
+                        </a>
+                    </div>
+                    <p class="assign-hint" th:if="${#lists.isEmpty(bug.assignees)}">
+                        Nobody has picked this up yet.
+                    </p>
+
+                    <form method="post" th:action="@{/bugs/{id}/assign(id=${bug.id})}" id="assign-form"
+                          class="field-editor">
+                        <input type="hidden" name="actor" class="actor-field">
+
+                        <div class="pick-search">
+                            <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+                            <input type="text" id="assignee-filter" placeholder="Find someone…"
+                                   autocomplete="off" aria-label="Find someone">
+                        </div>
+
+                        <div class="pick-list" id="assignee-list">
+                            <label class="pick-opt" th:each="p : ${people}" th:attr="data-name=${p}">
+                                <input type="checkbox" name="assignees" th:value="${p}"
+                                       th:checked="${#lists.contains(bug.assignees, p)}">
+                                <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
+                                <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
+                            </label>
+                            <p class="pop-empty" id="assignee-none" hidden>Nobody by that name.</p>
+                        </div>
+                        <p class="pop-empty" th:if="${#lists.isEmpty(people)}">
+                            Nobody on this project yet.
+                        </p>
+
+                        <div class="field-editor-foot">
+                            <button type="submit" class="btn btn-sm btn-primary" id="save-assignees">Save</button>
+                            <span class="hint">Nobody ticked = unassigned</span>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="report-sec">
+                    <span class="field-label">
+                        <svg class="i" aria-hidden="true"><use href="#i-blocked"/></svg>
+                        Blocked by
+                    </span>
+                    <!-- A picker rather than a <select>. A native option is text
+                         and only text, so "BUG-3 · Something" was the one control
+                         on this page that could not show what it was talking
+                         about; every row here carries the severity meter and the
+                         status dot the board draws, the same way the docs list
+                         carries its type icon. Still a form of submit buttons, so
+                         it posts with JavaScript off exactly as the select did. -->
+                <!-- Shown whenever there is something to choose *or* something
+                     to clear. Hiding it on an empty list left a bug that is
+                     blocked with no way to say it is not — which is exactly the
+                     state scoping the list to the project can create, when the
+                     bug in the way turns out to be on another board. -->
+                    <form method="post" th:action="@{/bugs/{id}/block(id=${bug.id})}"
+                          id="block-form"
+                          th:if="${!#lists.isEmpty(blockerOptions) or bug.blockedBy != null}">
+                        <input type="hidden" name="actor" class="actor-field">
+                        <details class="pop-wrap picker" id="block-picker">
+                            <summary aria-label="Choose the bug that is blocking this one">
+                                <span class="picker-btn">
+                                    <span th:if="${blocker != null}" class="blocker-current">
+                                        <span class="meter" th:classappend="'sev-' + ${blocker.severity}"
+                                              aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                                        <span class="mono" th:text="'BUG-' + ${blocker.id}">BUG-3</span>
                                     </span>
+                                    <span th:if="${blocker == null}" class="muted">Not blocked</span>
+                                    <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                                </span>
+                            </summary>
+
+                            <div class="pop pop-block">
+                                <div class="pop-head"><span>Waiting on</span></div>
+                                <div class="pop-list">
+                                    <button type="submit" name="blockedBy" value=""
+                                            class="pick-opt block-opt" id="block-none">
+                                        <svg class="i tick" aria-hidden="true"
+                                             th:if="${bug.blockedBy == null}"><use href="#i-check"/></svg>
+                                        <span class="block-mark" th:unless="${bug.blockedBy == null}"
+                                              aria-hidden="true"></span>
+                                        <span>Not blocked</span>
+                                    </button>
+
+                                    <button type="submit" name="blockedBy" th:each="b : ${blockerOptions}"
+                                            th:value="${b.id}" class="pick-opt block-opt"
+                                            th:style="'--c:' + ${cols.token(b)}"
+                                            th:classappend="${bug.blockedBy != null and bug.blockedBy == b.id} ? 'is-active' : ''">
+                                        <span class="meter" th:classappend="'sev-' + ${b.severity}"
+                                              aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                                        <span class="block-text">
+                                            <span class="block-title" th:text="${b.title}">Something</span>
+                                            <span class="block-meta">
+                                                <span class="mono" th:text="'BUG-' + ${b.id}">BUG-3</span>
+                                                <span class="dot" aria-hidden="true"></span>
+                                                <span th:text="${cols.label(b)}">Open</span>
+                                            </span>
+                                        </span>
+                                    </button>
                                 </div>
-                                <span class="when" th:attr="data-time=${h.changedAt}"
-                                      th:text="${#temporals.format(h.changedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
                             </div>
-                        </li>
-                    </ol>
-                    <p class="muted" th:if="${#lists.isEmpty(timeline)}">
-                        Nothing recorded yet.
+                        </details>
+                    </form>
+
+                    <p class="assign-hint" th:if="${#lists.isEmpty(blockerOptions) and bug.blockedBy == null}">
+                        No other open bug on this project to wait on.
                     </p>
                 </div>
-            </details>
+
+                <div class="report-sec">
+                    <span class="field-label">
+                        <svg class="i" aria-hidden="true"><use href="#i-list"/></svg>
+                        Details
+                    </span>
+                    <dl class="rail-facts">
+                        <!-- What the meter says, in words: a tooltip is the one
+                             thing a phone cannot show. Severity is declared worst
+                             first, so the filled count is 4 - ordinal, the same
+                             1..4 the .meter paints. -->
+                        <div class="rail-fact">
+                            <dt>Severity</dt>
+                            <dd th:classappend="'sev-' + ${bug.severity}" id="bug-severity">
+                                <span class="dot"></span>
+                                <span th:text="${bug.severity.label}">High</span>
+                                <span class="num muted"
+                                      th:text="|${4 - bug.severity.ordinal()} of 4|">3 of 4</span>
+                            </dd>
+                        </div>
+                        <div class="rail-fact">
+                            <dt>Environment</dt>
+                            <dd th:classappend="${bug.environment != null} ? 'env-' + ${bug.environment} : ''"
+                                id="bug-environment">
+                                <span class="dot" th:if="${bug.environment}"></span>
+                                <span th:text="${bug.environment != null} ? ${bug.environment.label} : '—'">QA</span>
+                            </dd>
+                        </div>
+                        <div class="rail-fact">
+                            <dt>Module</dt>
+                            <dd><span th:text="${bug.module} ?: '—'">Module</span></dd>
+                        </div>
+                        <div class="rail-fact">
+                            <dt>Project</dt>
+                            <dd id="bug-project">
+                                <span class="avatar avatar-sm" th:if="${bug.project}"
+                                      th:attr="data-avatar=${bug.project}" aria-hidden="true"></span>
+                                <span th:text="${bug.project} ?: '—'">Client</span>
+                            </dd>
+                        </div>
+                        <div class="rail-fact">
+                            <dt>Raised by</dt>
+                            <dd>
+                                <span class="avatar avatar-sm" th:if="${bug.reportedBy}"
+                                      th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
+                                <span th:text="${bug.reportedBy} ?: '—'">Reporter</span>
+                            </dd>
+                        </div>
+                        <div class="rail-fact">
+                            <dt>Raised</dt>
+                            <dd><span class="when" th:attr="data-time=${bug.createdAt}"
+                                      th:text="${#temporals.format(bug.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span></dd>
+                        </div>
+                        <div class="rail-fact">
+                            <dt>Updated</dt>
+                            <dd><span class="when" th:attr="data-time=${bug.updatedAt}"
+                                      th:text="${#temporals.format(bug.updatedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span></dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+                <!-- ---------- history: reference, so it starts shut ---------- -->
+                <details class="panel rail-fold" id="history">
+                    <summary>
+                        <span class="rail-title">
+                            <svg class="i" aria-hidden="true" style="width:12px;height:12px"><use href="#i-clock"/></svg>
+                            History
+                            <span class="count-pill" th:if="${!#lists.isEmpty(timeline)}"
+                                  th:text="${#lists.size(timeline)}">0</span>
+                        </span>
+                        <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                    </summary>
+
+                    <div class="rail-fold-body">
+                        <ol class="timeline" th:unless="${#lists.isEmpty(timeline)}" id="history-list">
+                            <li th:each="h,st : ${timeline}" th:style="'--i:' + ${st.index}"
+                                th:classappend="'ev-' + ${h.action}">
+                                <span class="timeline-dot" aria-hidden="true"></span>
+                                <div class="timeline-body">
+                                    <div class="timeline-line">
+                                        <b th:text="${h.actor} ?: 'unknown'">qa-team</b>
+                                        <span th:switch="${h.action}">
+                                            <span th:case="'created'">raised this bug</span>
+                                            <span th:case="'comment'">added a comment</span>
+                                            <span th:case="'attachment'">attached <b th:text="${h.newValue}">file</b></span>
+                                            <span th:case="'attachment-removed'">removed <b th:text="${h.oldValue}">file</b></span>
+                                            <span th:case="'assigned'">
+                                                <span th:if="${h.newValue}">assigned it to <b th:text="${h.newValue}">dev</b></span>
+                                                <span th:unless="${h.newValue}">removed the assignee</span>
+                                            </span>
+                                            <span th:case="'status'">
+                                                moved it from <b th:text="${h.oldValue}">Open</b>
+                                                to <b th:text="${h.newValue}">Fixed</b>
+                                            </span>
+                                            <span th:case="'doc'">added the doc <b th:text="${h.newValue}">Test notes</b></span>
+                                            <span th:case="'doc-renamed'">renamed <b th:text="${h.oldValue}">Untitled page</b>
+                                                to <b th:text="${h.newValue}">Test notes</b></span>
+                                            <span th:case="'doc-removed'">deleted the doc <b th:text="${h.oldValue}">Test notes</b></span>
+                                            <span th:case="*">
+                                                changed <b th:text="${h.action}">title</b>
+                                                <span th:if="${h.oldValue}">from “<span th:text="${h.oldValue}">old</span>”</span>
+                                                <span th:if="${h.newValue}">to “<span th:text="${h.newValue}">new</span>”</span>
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <span class="when" th:attr="data-time=${h.changedAt}"
+                                          th:text="${#temporals.format(h.changedAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+                                </div>
+                            </li>
+                        </ol>
+                        <p class="muted" th:if="${#lists.isEmpty(timeline)}">
+                            Nothing recorded yet.
+                        </p>
+                    </div>
+                </details>
         </aside>
     </div>
     </div>
 </section>
+
+<!-- ==========================================================================
+     One comment. The same markup whether it opens a thread or answers one —
+     a reply is a comment with a parent, not a different kind of thing.
+     Reply is for everybody; Edit and Delete only for what you wrote, and the
+     server checks that again on the post, because hiding a button is a
+     courtesy rather than a rule.
+     ========================================================================== -->
+<div th:fragment="comment(c, me, bug, commentFiles)" class="comment"
+     th:with="files=${commentFiles.get(c.id)}, mine=${c.createdBy != null and c.createdBy == me}">
+    <span class="avatar" th:attr="data-avatar=${c.createdBy}" th:title="${c.createdBy}"
+          aria-hidden="true"></span>
+
+    <div class="thread-body">
+        <div class="thread-head">
+            <b th:text="${c.createdBy} ?: 'unknown'">qa-team</b>
+            <span class="when" th:attr="data-time=${c.createdAt}"
+                  th:text="${#temporals.format(c.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
+            <span class="tag" th:if="${c.edited}"
+                  th:title="'Edited ' + ${#temporals.format(c.editedAt, 'dd MMM yyyy, HH:mm')}">edited</span>
+        </div>
+
+        <p class="pre comment-text" th:unless="${#strings.isEmpty(c.text)}"
+           th:text="${c.text}">Comment text</p>
+
+        <!-- What was attached to this comment, under it. A picture is shown;
+             anything else is a line. -->
+        <div class="comment-files" th:if="${files != null}">
+            <a class="comment-shot" th:each="a : ${files}" th:if="${a.image}"
+               th:href="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
+               th:attr="data-lightbox=${a.fileName}"
+               target="_blank" rel="noopener" th:title="${a.fileName}">
+                <img th:src="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
+                     th:alt="${a.fileName}" loading="lazy">
+            </a>
+            <a class="comment-file" th:each="a : ${files}" th:unless="${a.image}"
+               th:href="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
+               target="_blank" rel="noopener">
+                <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                <span class="nm" th:text="${a.fileName}">server.log</span>
+                <span class="mt" th:text="${a.readableSize}">412 KB</span>
+            </a>
+        </div>
+
+        <!-- Each control opens its own form below the comment. <details>, so
+             all three work with JavaScript switched off. -->
+        <div class="comment-tools">
+            <details class="comment-tool">
+                <summary><span>Reply</span></summary>
+                <form class="comment-inline" method="post" enctype="multipart/form-data"
+                      th:action="@{/bugs/{id}/comments(id=${bug.id})}">
+                    <input type="hidden" name="actor" class="actor-field">
+                    <input type="hidden" name="parentId" th:value="${c.id}">
+                    <label>
+                        <span class="sr-only">Reply</span>
+                        <textarea name="text" rows="2" required
+                                  th:placeholder="'Reply to ' + ${c.createdBy}"></textarea>
+                    </label>
+                    <div class="comment-inline-foot">
+                        <button type="submit" class="btn btn-sm btn-primary">Reply</button>
+                    </div>
+                </form>
+            </details>
+
+            <details class="comment-tool" th:if="${mine}">
+                <summary><span>Edit</span></summary>
+                <form class="comment-inline" method="post"
+                      th:action="@{/bugs/{id}/comments/{cid}(id=${bug.id},cid=${c.id})}">
+                    <input type="hidden" name="actor" class="actor-field">
+                    <label>
+                        <span class="sr-only">Comment</span>
+                        <textarea name="text" rows="3" required th:text="${c.text}"></textarea>
+                    </label>
+                    <div class="comment-inline-foot">
+                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                    </div>
+                </form>
+            </details>
+
+            <form method="post" class="inline-form" th:if="${mine}"
+                  th:action="@{/bugs/{id}/comments/{cid}/delete(id=${bug.id},cid=${c.id})}"
+                  th:attr="data-confirm=${c.parentId == null}
+                           ? 'Delete this comment? Its replies and their files go with it.'
+                           : 'Delete this reply?'">
+                <input type="hidden" name="actor" class="actor-field">
+                <button type="submit" class="comment-tool-btn is-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>

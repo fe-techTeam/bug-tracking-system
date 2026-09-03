@@ -19,8 +19,7 @@
            th:href="@{/projects/{p}/docs(p=${project.id},folder=${doc.parentId})}"
            title="Back to the documents" aria-label="Back to the documents">
             <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
-            <span th:text="${#lists.isEmpty(trail)} ? 'Documents' : ${trail[#lists.size(trail) - 1].name}">Documents</span>
-        </a>
+            </a>
 
         <span class="badge badge-square" th:style="'--c: var(--doc-' + ${doc.kind} + ')'"
               th:text="${doc.kind.label}">Page</span>

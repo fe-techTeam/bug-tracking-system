@@ -45,21 +45,19 @@ public class Bug {
     @Column(nullable = false, length = 150)
     private String title;
 
+    /**
+     * The whole report, in one box.
+     *
+     * <p>It used to be four: a description, then steps to reproduce, then an
+     * expected and an actual result. People wrote the story in the first one
+     * anyway and left the rest empty, so raising a bug is one field now and
+     * this is it. What older bugs held in those three was folded in here — see
+     * {@code LegacyReportMerge} and the {@code V3} migration — so nothing that
+     * was written down was lost.
+     */
     @Size(max = 4000, message = "Description is too long")
     @Column(length = 4000)
     private String description;
-
-    @Size(max = 4000, message = "Steps to reproduce are too long")
-    @Column(name = "steps_to_reproduce", length = 4000)
-    private String stepsToReproduce;
-
-    @Size(max = 1000)
-    @Column(name = "expected_result", length = 1000)
-    private String expectedResult;
-
-    @Size(max = 1000)
-    @Column(name = "actual_result", length = 1000)
-    private String actualResult;
 
     /*
      * The @JdbcTypeCode on every enum below is deliberate. Left to itself,
@@ -197,30 +195,6 @@ public class Bug {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public String getStepsToReproduce() {
-        return stepsToReproduce;
-    }
-
-    public void setStepsToReproduce(String stepsToReproduce) {
-        this.stepsToReproduce = stepsToReproduce;
-    }
-
-    public String getExpectedResult() {
-        return expectedResult;
-    }
-
-    public void setExpectedResult(String expectedResult) {
-        this.expectedResult = expectedResult;
-    }
-
-    public String getActualResult() {
-        return actualResult;
-    }
-
-    public void setActualResult(String actualResult) {
-        this.actualResult = actualResult;
     }
 
     public Severity getSeverity() {

@@ -5,6 +5,7 @@ import com.bugtracking.model.Severity;
 import com.bugtracking.model.TeamMember;
 import com.bugtracking.repository.BugRepository;
 import com.bugtracking.repository.TeamMemberRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,20 +16,30 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Service
 @Transactional
 public class TeamMemberService {
 
+    /**
+     * How short a password is refused. Low, because this is a small internal
+     * tool and a rule nobody can satisfy is a rule people work around — but not
+     * absent, because "" would otherwise be a valid account password.
+     */
+    private static final int MIN_PASSWORD = 8;
+
     private final TeamMemberRepository repository;
     private final BugRepository bugs;
     private final BoardColumnService columns;
+    private final PasswordEncoder encoder;
 
     public TeamMemberService(TeamMemberRepository repository, BugRepository bugs,
-                             BoardColumnService columns) {
+                             BoardColumnService columns, PasswordEncoder encoder) {
         this.repository = repository;
         this.bugs = bugs;
         this.columns = columns;
+        this.encoder = encoder;
     }
 
     /**
@@ -195,6 +206,18 @@ public class TeamMemberService {
      * silent no-op reported as a success.
      */
     public TeamMember add(String name, String email) {
+        return add(name, email, null);
+    }
+
+    /**
+     * The same, optionally giving them a password so they can sign in.
+     *
+     * <p>A blank password means "no account", not "an empty one": most of the
+     * roster are names on bugs and never sign in at all. Re-adding somebody
+     * with a password set is how their password gets changed, which is the
+     * same rule the name already follows.
+     */
+    public TeamMember add(String name, String email, String rawPassword) {
         String cleanName = name == null ? "" : name.trim();
         String cleanEmail = email == null ? "" : email.trim().toLowerCase();
 
@@ -205,9 +228,65 @@ public class TeamMemberService {
             throw new IllegalArgumentException("\"" + email + "\" is not a valid email address.");
         }
 
-        return repository.findByEmailIgnoreCase(cleanEmail)
+        // Checked before anything is written, so a password too short does not
+        // leave a half-made member behind for the second attempt to trip over.
+        String hash = rawPassword == null || rawPassword.isBlank() ? null : hash(rawPassword);
+
+        TeamMember member = repository.findByEmailIgnoreCase(cleanEmail)
                 .map(existing -> rename(existing, cleanName))
                 .orElseGet(() -> repository.save(new TeamMember(cleanName, cleanEmail)));
+
+        if (hash != null) {
+            member.setPasswordHash(hash);
+            member = repository.save(member);
+        }
+        return member;
+    }
+
+    /**
+     * Gives somebody a sign-in password, or changes the one they have.
+     *
+     * <p>What is stored is the BCrypt hash and only ever the hash — the plain
+     * text is not written to the row, the log or the flash message. There is
+     * deliberately no way to read a password back out; the only thing that can
+     * be done with it afterwards is to replace it.
+     */
+    public TeamMember setPassword(Long id, String rawPassword) {
+        TeamMember member = repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No team member found with id " + id));
+        member.setPasswordHash(hash(rawPassword));
+        return repository.save(member);
+    }
+
+    /** Takes the account away again, leaving the person on the roster. */
+    public TeamMember clearPassword(Long id) {
+        TeamMember member = repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No team member found with id " + id));
+        member.setPasswordHash(null);
+        return repository.save(member);
+    }
+
+    private String hash(String rawPassword) {
+        String raw = rawPassword == null ? "" : rawPassword;
+        if (raw.trim().isEmpty()) {
+            throw new IllegalArgumentException("A password cannot be blank.");
+        }
+        // Length on the raw value, spaces included: a space is a character in a
+        // password, and trimming it here would accept something shorter than
+        // what the sign-in form will later send.
+        if (raw.length() < MIN_PASSWORD) {
+            throw new IllegalArgumentException(
+                    "A password needs at least " + MIN_PASSWORD + " characters.");
+        }
+        return encoder.encode(raw);
+    }
+
+    /** One person by the address they sign in with — how sign-in finds them. */
+    @Transactional(readOnly = true)
+    public Optional<TeamMember> findByEmail(String email) {
+        return email == null || email.isBlank()
+                ? Optional.empty()
+                : repository.findByEmailIgnoreCase(email.trim().toLowerCase(Locale.ROOT));
     }
 
     /**

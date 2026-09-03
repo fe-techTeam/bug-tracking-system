@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
@@ -81,12 +82,65 @@ public class ProjectDocController {
                 .orElse("redirect:/settings");
     }
 
+    /**
+     * The same folder, as a fragment for the navbar's drawer.
+     *
+     * <p>Documents is a filing cabinet you open to fetch one thing, so the
+     * navbar opens it beside the page rather than instead of it. This answers
+     * with the panel's markup only — the drawer is chrome that already exists
+     * in the layout — and every row it draws is a link to where that thing
+     * actually lives, so the drawer is a shortcut and never the only route.
+     *
+     * <p>A page route rather than another {@code /api} one, deliberately:
+     * {@code /api/**} is left open for scripts, and a document's name is not
+     * something to hand out unauthenticated.
+     */
+    @GetMapping("/documents/panel")
+    public String panel(@RequestParam(required = false) String project,
+                        @RequestParam(required = false) Long folder,
+                        HttpSession session,
+                        Model model) {
+        Object remembered = session.getAttribute(GlobalModelAttributes.PROJECT_KEY);
+        Optional<Project> found = projects.findByName(project)
+                .or(() -> remembered instanceof String name ? projects.findByName(name) : Optional.empty())
+                .or(() -> projects.active().stream().findFirst());
+        if (found.isEmpty()) {
+            return "fragments :: docsNone";
+        }
+
+        // A folder id from a stale panel belongs to a folder that has since
+        // been deleted; the root is a better answer than a 404 inside a drawer.
+        Long projectId = found.get().getId();
+        ProjectDocService.Listing listing;
+        try {
+            listing = docs.browse(projectId, folder);
+        } catch (NoSuchElementException e) {
+            listing = docs.browse(projectId, null);
+        }
+
+        model.addAttribute("listing", listing);
+        model.addAttribute("project", listing.project());
+        // The panel manages the filing as well as showing it, so it needs the
+        // two kinds a document can be and everywhere one can be moved to.
+        model.addAttribute("newKinds", List.of(ResourceKind.PAGE, ResourceKind.SHEET));
+        model.addAttribute("folderTargets", docs.moveTargets(projectId, null));
+        return "fragments :: docsPanel";
+    }
+
     // ---------------------------------------------------------------- browse
 
+    /**
+     * The documents of one project, as a page.
+     *
+     * <p>It renders the same fragment the drawer does, full width. The drawer
+     * is where filing is actually done — it opens over whatever you are on,
+     * which is where you want it — and this is where its "Full page" goes and
+     * what a browser with JavaScript off gets instead of it. One fragment, so
+     * there is one design and one set of forms to keep right.
+     */
     @GetMapping("/projects/{projectId}/docs")
     public String browse(@PathVariable Long projectId,
                          @RequestParam(required = false) Long folder,
-                         @RequestParam(required = false) String q,
                          HttpSession session,
                          Model model) {
         ProjectDocService.Listing listing = docs.browse(projectId, folder);
@@ -107,10 +161,9 @@ public class ProjectDocController {
         model.addAttribute("newKinds", List.of(ResourceKind.PAGE, ResourceKind.SHEET));
         model.addAttribute("folderTargets", docs.moveTargets(projectId, null));
 
-        if (q != null && !q.isBlank()) {
-            model.addAttribute("results", docs.search(projectId, q));
-            model.addAttribute("keyword", q.trim());
-        }
+        // The search box went with the card grid. Finding a document is what
+        // the folder list and the drawer's own trail are for at this size, and
+        // a second search beside the app's own was a box nobody used.
         return "projects/docs";
     }
 

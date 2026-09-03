@@ -119,6 +119,15 @@ public class BugService {
         for (Severity severity : Severity.values()) {
             bySeverity.put(severity.getLabel(), scope.stream().filter(b -> b.getSeverity() == severity).count());
         }
+        // Environment is optional on a bug, so the tally carries a bucket for
+        // the ones that never named one. Without it the bars would sum to less
+        // than the total and read as a counting error rather than a blank field.
+        Map<String, Long> byEnvironment = new LinkedHashMap<>();
+        for (Environment environment : Environment.values()) {
+            byEnvironment.put(environment.getLabel(),
+                    scope.stream().filter(b -> b.getEnvironment() == environment).count());
+        }
+        byEnvironment.put("Not set", scope.stream().filter(b -> b.getEnvironment() == null).count());
         // "Urgent" used to be P1 + P2. With priority gone it is the top two
         // severities, still open — the same question, asked of the field that
         // is left: what should not be sitting in this queue?
@@ -128,9 +137,10 @@ public class BugService {
                 .count();
         long open = scope.stream().filter(board::openWork).count();
         long maxStatus = byStatus.values().stream().mapToLong(Long::longValue).max().orElse(0);
+        long unassigned = scope.stream().filter(b -> b.getAssignees().isEmpty()).count();
 
-        return new Dashboard(scopeName, scope.size(), byStatus, bySeverity,
-                urgent, open, maxStatus, scope.stream().map(Bug::getId).toList());
+        return new Dashboard(scopeName, scope.size(), byStatus, bySeverity, byEnvironment,
+                urgent, open, maxStatus, unassigned, scope.stream().map(Bug::getId).toList());
     }
 
     /** A live bug. A trashed one reads as gone, because that is what it is. */
@@ -201,19 +211,6 @@ public class BugService {
 
         existing.setTitle(changes.getTitle());
         existing.setDescription(changes.getDescription());
-        // The report is one box now, and the form no longer posts these three.
-        // An absent field arrives as null, so assigning it straight across would
-        // wipe the steps and results off every bug raised before the change the
-        // first time anyone edited it. Only a value actually sent replaces one.
-        if (changes.getStepsToReproduce() != null) {
-            existing.setStepsToReproduce(changes.getStepsToReproduce());
-        }
-        if (changes.getExpectedResult() != null) {
-            existing.setExpectedResult(changes.getExpectedResult());
-        }
-        if (changes.getActualResult() != null) {
-            existing.setActualResult(changes.getActualResult());
-        }
         existing.setSeverity(changes.getSeverity());
         existing.setEnvironment(changes.getEnvironment());
         existing.setStatus(changes.getStatus());
@@ -340,8 +337,28 @@ public class BugService {
      */
     @Transactional(readOnly = true)
     public List<Bug> blockerOptions(Long exclude) {
+        return blockerOptions(exclude, null);
+    }
+
+    /**
+     * What this bug could be waiting on: the open bugs <em>on its own
+     * project</em>, itself excluded.
+     *
+     * <p>Scoped to the project because it was not, and the list offered every
+     * open bug in the database — so a bug on one client's board could be shown
+     * as blocked by a bug on another's, which is not a thing that can be true.
+     * A null project keeps the old behaviour, for the raise form before a
+     * project has been settled.
+     */
+    @Transactional(readOnly = true)
+    public List<Bug> blockerOptions(Long exclude, String project) {
         BoardColumns board = columns.snapshot();
-        return repository.findLiveBugs(exclude).stream().filter(board::openWork).toList();
+        String scope = project == null ? null : project.trim();
+        return repository.findLiveBugs(exclude).stream()
+                .filter(board::openWork)
+                .filter(bug -> scope == null || scope.isEmpty()
+                        || scope.equalsIgnoreCase(bug.getProject()))
+                .toList();
     }
 
     /**

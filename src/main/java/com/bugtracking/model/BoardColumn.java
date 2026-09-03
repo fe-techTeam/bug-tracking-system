@@ -10,6 +10,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotBlank;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -64,7 +66,17 @@ public class BoardColumn {
     @Column(nullable = false, length = 40)
     private String label;
 
+    /**
+     * {@code @JdbcTypeCode} is not decoration. Without it Hibernate maps an
+     * enum onto H2's native ENUM type, which writes today's constants into the
+     * column type itself — so adding Red and Brown to {@link ColumnColour} made
+     * every board fail with "Value not permitted for column", and ddl-auto will
+     * not widen a type that already exists. VARCHAR remembers no list. Every
+     * other enum in this model carries the same annotation for the same reason;
+     * these two were missed.
+     */
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private ColumnColour colour = ColumnColour.SLATE;
 
@@ -81,6 +93,7 @@ public class BoardColumn {
     private boolean doneState;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private ColumnNotify notify = ColumnNotify.NOBODY;
 

@@ -37,25 +37,38 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
      * with what clicking it returns. The keyword is a free-text search box and
      * stays a substring.
      */
+    /*
+     * Every string parameter is CAST before it is used. It reads like noise and
+     * is not: an unset filter arrives as a null String, and Postgres asks the
+     * parameter what type it is before it asks what it holds. With nothing to
+     * infer from, LOWER(?) resolves to lower(bytea), which does not exist, and
+     * the whole board answers 500 - not just the filtered board, because an
+     * unfiltered one is this same query with every filter null. The cast is the
+     * answer to "what type", so it never has to be guessed.
+     *
+     * H2 infers happily and never needed this, which is why it only ever showed
+     * up on Supabase.
+     */
     @Query("""
             SELECT b FROM Bug b
             WHERE b.deletedAt IS NULL
-              AND (:project IS NULL OR LOWER(b.project) = LOWER(:project))
+              AND (:project IS NULL OR LOWER(b.project) = LOWER(CAST(:project AS string)))
               AND (:status IS NULL OR b.status = :status)
               AND (:severity IS NULL OR b.severity = :severity)
               AND (:environment IS NULL OR b.environment = :environment)
               AND (:assignee IS NULL OR EXISTS (
                        SELECT a FROM Bug ab JOIN ab.assignees a
-                       WHERE ab.id = b.id AND LOWER(a) = LOWER(:assignee)))
-              AND (:reporter IS NULL OR LOWER(b.reportedBy) = LOWER(:reporter))
+                       WHERE ab.id = b.id AND LOWER(a) = LOWER(CAST(:assignee AS string))))
+              AND (:reporter IS NULL OR LOWER(b.reportedBy) = LOWER(CAST(:reporter AS string)))
               AND (:keyword IS NULL
-                   OR LOWER(b.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                   OR LOWER(b.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                   OR LOWER(b.module) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                   OR LOWER(b.project) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                   OR LOWER(b.reportedBy) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(b.title) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
+                   OR LOWER(b.description) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
+                   OR LOWER(b.module) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
+                   OR LOWER(b.project) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
+                   OR LOWER(b.reportedBy) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
                    OR EXISTS (SELECT a FROM Bug kb JOIN kb.assignees a
-                              WHERE kb.id = b.id AND LOWER(a) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                              WHERE kb.id = b.id
+                                AND LOWER(a) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
                    OR (:keywordId IS NOT NULL AND b.id = :keywordId))
             ORDER BY b.createdAt DESC
             """)
@@ -74,10 +87,6 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
     List<Bug> findByDeletedAtIsNullOrderByCreatedAtDesc();
 
     long countByProjectIgnoreCaseAndDeletedAtIsNull(String project);
-
-    /** Bug counts per project name, including names no longer in the projects table. */
-    @Query("SELECT b.project, COUNT(b) FROM Bug b WHERE b.deletedAt IS NULL GROUP BY b.project")
-    List<Object[]> countGroupedByProject();
 
     long countByStatusAndDeletedAtIsNull(String status);
 

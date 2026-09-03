@@ -208,10 +208,10 @@ public class GlobalExceptionHandler {
      */
     private void navbar(Model model, HttpServletRequest request) {
         try {
-            model.addAttribute("unreadNotifications", globals.unreadNotifications());
-            model.addAttribute("recentNotifications", globals.recentNotifications());
-            model.addAttribute("trashCount", globals.trashCount());
-            model.addAttribute("projectCounts", globals.projectCounts());
+            model.addAttribute("unreadNotifications", globals.unreadNotifications(request));
+            model.addAttribute("recentNotifications", globals.recentNotifications(request));
+            model.addAttribute("trashCount", globals.trashCount(request));
+            model.addAttribute("projectCounts", globals.projectCounts(request));
             model.addAttribute("currentProject", globals.currentProject(request, request.getSession()));
             model.addAttribute("currentPath", request.getRequestURI());
         } catch (RuntimeException e) {

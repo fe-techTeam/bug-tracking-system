@@ -19,6 +19,9 @@
 #   ./run.sh db-info      which migrations are applied, which are pending
 #   ./run.sh db-repair    fix the migration history after a failed migrate
 #
+# Starting takes the port back: an instance already serving it is stopped and
+# replaced, so start and restart do the same thing to a running app.
+#
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -122,10 +125,16 @@ Or point JAVA_HOME at a JDK 21 you already have and run this again."
 
 app_pid() { lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null || true; }
 
-require_free_port() {
+# Starting while something is already serving used to be an error you had to
+# clear by hand, and it is almost always the instance you meant to replace -
+# you changed a file and want it running again. So start takes the port back.
+# It is still cmd_stop that does it, so the shutdown is the clean one that lets
+# the database file flush before the new process opens it.
+free_the_port() {
   local pid; pid=$(app_pid)
   [[ -z "$pid" ]] && return 0
-  die "Port $PORT is already in use by pid $pid. Stop it first:  ./run.sh stop"
+  warn "Port $PORT is already serving (pid $pid) - replacing it."
+  cmd_stop
 }
 
 wait_until_up() {
@@ -146,14 +155,14 @@ wait_until_up() {
 
 cmd_start() {
   setup_java
-  require_free_port
+  free_the_port
   info "Java $("$JAVA_HOME/bin/javac" -version 2>&1 | cut -d' ' -f2)  ·  port $PORT  ·  Ctrl+C to stop"
   exec mvn spring-boot:run
 }
 
 cmd_bg() {
   setup_java
-  require_free_port
+  free_the_port
   info "Starting in the background, logging to $LOG_FILE ..."
   mvn spring-boot:run > "$LOG_FILE" 2>&1 &
 

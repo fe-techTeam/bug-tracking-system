@@ -87,6 +87,26 @@ public final class BoardQuery {
         return render(next);
     }
 
+    /**
+     * The same filters plus this one, on the board rather than wherever you are.
+     *
+     * <p>For the numbers on the Stats view: "2 urgent" is a link to those two
+     * bugs, and leaving the view where it was would apply the filter to a page
+     * of totals that does not show a bug at all. Dropping the view falls back
+     * to the board, which is where those bugs are.
+     */
+    public String board(String key, Object value) {
+        Map<String, String> next = new LinkedHashMap<>(params);
+        next.remove("view");
+        String text = value == null ? null : String.valueOf(value).trim();
+        if (text == null || text.isEmpty()) {
+            next.remove(key);
+        } else {
+            next.put(key, text);
+        }
+        return render(next);
+    }
+
     /** Everything off except the project and the view you are looking at. */
     public String cleared() {
         Map<String, String> next = new LinkedHashMap<>();

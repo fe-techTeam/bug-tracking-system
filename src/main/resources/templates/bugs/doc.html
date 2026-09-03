@@ -17,8 +17,7 @@
         <a class="back-link" th:href="@{/bugs/{id}(id=${bug.id})}" id="back-to-bug"
            th:title="'Back to BUG-' + ${bug.id}" th:attr="aria-label='Back to BUG-' + ${bug.id}">
             <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
-            <span th:text="'BUG-' + ${bug.id}">BUG-1</span>
-        </a>
+            </a>
 
         <span class="badge badge-square" th:classappend="'dk-' + ${doc.type}"
               th:text="${doc.type.label}">Page</span>

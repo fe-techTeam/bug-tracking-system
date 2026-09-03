@@ -32,7 +32,12 @@ public class SchemaUpgrade {
             new String[]{"BUGS", "STATUS", "20"},
             new String[]{"BUGS", "SEVERITY", "20"},
             new String[]{"BUGS", "PRIORITY", "10"},
-            new String[]{"BUGS", "ENVIRONMENT", "20"});
+            new String[]{"BUGS", "ENVIRONMENT", "20"},
+            // A board's own two. Missed when columns became rows, and found
+            // the moment Red and Brown were added to the palette: the column
+            // type still held the eight colours that existed when it was made.
+            new String[]{"BOARD_COLUMNS", "COLOUR", "20"},
+            new String[]{"BOARD_COLUMNS", "NOTIFY", "20"});
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)          // before any backfill touches a row

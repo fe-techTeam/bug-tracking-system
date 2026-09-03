@@ -5,10 +5,10 @@
 <section>
 
     <header class="topbar">
-        <a class="back-link" th:href="@{/bugs}" title="Back to the board" aria-label="Back to the board">
+        <div th:replace="~{fragments :: crumbs(${ { {'Board', '/bugs'}, {'Trash', null} } })}"></div>
+        <a class="back-link" th:href="@{/bugs}" title="Go back" aria-label="Go back">
             <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
-            <span>Board</span>
-        </a>
+            </a>
         <h1 class="topbar-title">Trash</h1>
         <span class="topbar-sub">Deleted bugs keep their comments, files and history until you empty them</span>
     </header>

@@ -28,6 +28,17 @@ public class Comment {
     @Column(name = "bug_id", nullable = false)
     private Long bugId;
 
+    /**
+     * The comment this one answers, or null when it opens a thread.
+     *
+     * <p>One level and no more. A reply to a reply is a conversation that has
+     * outgrown a bug, and an unbounded tree in a 380px column is unreadable —
+     * so a reply to a reply is filed against the same parent, which keeps every
+     * exchange as one flat run under the thing it is about.
+     */
+    @Column(name = "parent_id")
+    private Long parentId;
+
     @NotBlank(message = "Comment cannot be empty")
     @Size(max = 2000, message = "Comment must be 2000 characters or fewer")
     @Column(nullable = false, length = 2000)
@@ -40,9 +51,34 @@ public class Comment {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** When it was last changed, or null if it never has been. */
+    @Column(name = "edited_at")
+    private LocalDateTime editedAt;
+
     @PrePersist
     void onCreate() {
         this.createdAt = LocalDateTime.now();
+    }
+
+    /** True once somebody has changed the words, so the thread can say so. */
+    public boolean isEdited() {
+        return editedAt != null;
+    }
+
+    public Long getParentId() {
+        return parentId;
+    }
+
+    public void setParentId(Long parentId) {
+        this.parentId = parentId;
+    }
+
+    public LocalDateTime getEditedAt() {
+        return editedAt;
+    }
+
+    public void setEditedAt(LocalDateTime editedAt) {
+        this.editedAt = editedAt;
     }
 
     public Long getId() {

@@ -11,14 +11,17 @@ import java.util.Locale;
  * <p>This is the old {@code Status} enum, demoted. It is no longer a type — a
  * bug's status is a string key now, and which keys exist is a per-project
  * question answered by the {@code board_columns} table. What survives here is
- * the shape: Open → In Progress → On Hold → Ready for Test → Retest → Closed,
- * with the colours and the who-hears-about-it rules the app has always had, so
- * a project that has never been touched behaves exactly as it did before any
- * of this was editable.
+ * the shape a new project opens on: Open → In Progress → Ready to test →
+ * Testing → Closed, with On Hold parked at the end because it is off the track
+ * rather than a step along it. Every one of them is renameable, recolourable
+ * and movable from the moment the project exists.
  *
- * <p>The keys are the old enum constant names on purpose. Every bug already in
- * the database holds one of them, and {@code StatusMigration} maps the older
- * spellings onto them on the way in.
+ * <p>The keys are the old enum constant names on purpose, and they do not
+ * change when a label does. Every bug already in the database holds one of
+ * them, {@code StatusMigration} maps the older spellings onto them on the way
+ * in, and a key that moved would strand every bug carrying it. So "Retest"
+ * being renamed to "Testing" is a label change and nothing else — {@code
+ * RETEST} is what the rows still say, and no bug moves column for it.
  */
 public final class DefaultColumns {
 
@@ -32,15 +35,30 @@ public final class DefaultColumns {
     }
 
     private static final List<Seed> SEEDS = List.of(
-            new Seed("OPEN", "Open", ColumnColour.SLATE, false, ColumnNotify.NOBODY),
+            new Seed("OPEN", "Open", ColumnColour.RED, false, ColumnNotify.NOBODY),
             new Seed("IN_PROGRESS", "In Progress", ColumnColour.BLUE, false, ColumnNotify.NOBODY),
-            // Parked on something outside the team, so the people carrying it
-            // are the ones who need telling.
-            new Seed("ON_HOLD", "On Hold", ColumnColour.VIOLET, false, ColumnNotify.ASSIGNEES),
             // Past QA's door: not open work any more, and the reporter's turn.
-            new Seed("READY_FOR_TEST", "Ready for Test", ColumnColour.TEAL, true, ColumnNotify.REPORTER),
-            new Seed("RETEST", "Retest", ColumnColour.AMBER, true, ColumnNotify.REPORTER),
-            new Seed("CLOSED", "Closed", ColumnColour.GREEN, true, ColumnNotify.EVERYONE));
+            new Seed("READY_FOR_TEST", "Ready to test", ColumnColour.BROWN, true, ColumnNotify.REPORTER),
+            new Seed("RETEST", "Testing", ColumnColour.VIOLET, true, ColumnNotify.REPORTER),
+            new Seed("CLOSED", "Closed", ColumnColour.GREEN, true, ColumnNotify.EVERYONE),
+            // Last, not fourth: it is a siding, not a step. Parked on something
+            // outside the team, so the people carrying it are the ones to tell.
+            new Seed("ON_HOLD", "On Hold", ColumnColour.SLATE, false, ColumnNotify.ASSIGNEES));
+
+    /**
+     * The set this app shipped before the colours above. Only
+     * {@code BoardColumnRestyle} reads it, to tell a board nobody has touched
+     * from one somebody has.
+     */
+    public static List<String[]> stock() {
+        return List.of(
+                new String[]{"OPEN", "Open", "SLATE"},
+                new String[]{"IN_PROGRESS", "In Progress", "BLUE"},
+                new String[]{"ON_HOLD", "On Hold", "VIOLET"},
+                new String[]{"READY_FOR_TEST", "Ready for Test", "TEAL"},
+                new String[]{"RETEST", "Retest", "AMBER"},
+                new String[]{"CLOSED", "Closed", "GREEN"});
+    }
 
     private DefaultColumns() {
     }

@@ -19,7 +19,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -97,6 +99,17 @@ public class AttachmentService {
     }
 
     public Attachment store(Long bugId, MultipartFile file, String uploadedBy) {
+        return store(bugId, null, file, uploadedBy);
+    }
+
+    /**
+     * The same, hung off a comment rather than off the report.
+     *
+     * <p>{@code bugId} is still set: it is what makes deleting a bug take every
+     * file with it without walking the thread first, and what the serving route
+     * checks the file against.
+     */
+    public Attachment store(Long bugId, Long commentId, MultipartFile file, String uploadedBy) {
         if (file == null || file.isEmpty()) {
             throw new RejectedFileException("Pick a file before uploading.");
         }
@@ -132,6 +145,7 @@ public class AttachmentService {
 
         Attachment attachment = new Attachment();
         attachment.setBugId(bugId);
+        attachment.setCommentId(commentId);
         attachment.setFileName(fileName);
         attachment.setStoredName(storedName);
         attachment.setContentType(mediaTypeFor(fileName).toString());
@@ -139,7 +153,12 @@ public class AttachmentService {
         attachment.setUploadedBy(BugHistoryService.actor(uploadedBy));
 
         Attachment saved = repository.save(attachment);
-        history.record(bugId, "attachment", null, fileName, attachment.getUploadedBy());
+        // Only the report's own files earn a history line. A file on a comment
+        // arrives with the comment, which is already recorded — two entries a
+        // second apart saying the same thing is noise in a trail people read.
+        if (commentId == null) {
+            history.record(bugId, "attachment", null, fileName, attachment.getUploadedBy());
+        }
         return saved;
     }
 
@@ -150,9 +169,55 @@ public class AttachmentService {
      */
     @Transactional(readOnly = true)
     public List<Attachment> forBug(Long bugId) {
-        return repository.findByBugIdOrderByUploadedAtAsc(bugId).stream()
+        return ordered(repository.findByBugIdAndCommentIdIsNullOrderByUploadedAtAsc(bugId));
+    }
+
+    /**
+     * Every comment's files on this bug, grouped by comment id.
+     *
+     * <p>One query for the whole thread rather than one per comment: the page
+     * draws every comment anyway, and a bug with forty of them would otherwise
+     * be forty round trips to find that most of them have no files at all.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, List<Attachment>> byComment(Long bugId) {
+        Map<Long, List<Attachment>> byId = new LinkedHashMap<>();
+        for (Attachment attachment : ordered(
+                repository.findByBugIdAndCommentIdIsNotNullOrderByUploadedAtAsc(bugId))) {
+            byId.computeIfAbsent(attachment.getCommentId(), any -> new ArrayList<>()).add(attachment);
+        }
+        return byId;
+    }
+
+    /** The files on one comment — for taking them with it when it is deleted. */
+    @Transactional(readOnly = true)
+    public List<Attachment> forComment(Long commentId) {
+        return ordered(repository.findByCommentIdOrderByUploadedAtAsc(commentId));
+    }
+
+    private static List<Attachment> ordered(List<Attachment> rows) {
+        return rows.stream()
                 .sorted(Comparator.comparing(Attachment::getUploadedAt).thenComparing(Attachment::getId))
                 .toList();
+    }
+
+    /**
+     * How many each of these bugs has, keyed by bug id, in one query.
+     *
+     * <p>For the board: a card shows the number, and a count per card is a
+     * query per card. Bugs with none are simply absent from the map, which is
+     * what a template checking {@code != null} wants anyway.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Long> countsFor(List<Long> bugIds) {
+        if (bugIds == null || bugIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Long> counts = new LinkedHashMap<>();
+        for (Object[] row : repository.countGroupedByBugId(bugIds)) {
+            counts.put((Long) row[0], (Long) row[1]);
+        }
+        return counts;
     }
 
     @Transactional(readOnly = true)

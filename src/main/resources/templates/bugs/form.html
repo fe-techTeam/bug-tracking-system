@@ -8,27 +8,39 @@
         <a class="back-link" th:href="${editing} ? @{/bugs/{id}(id=${bug.id})} : @{/bugs(project=${bug.project})}"
            id="form-back" title="Go back" aria-label="Go back">
             <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
-            <span th:text="${editing} ? 'Bug' : 'Board'">Board</span>
-        </a>
+            </a>
         <h1 class="topbar-title"
             th:text="${editing} ? 'Edit BUG-' + ${bug.id} : 'Raise a bug'">Raise a bug</h1>
-        <span class="topbar-sub" th:unless="${editing}">Title is the only thing you have to write.</span>
+        <div th:replace="~{fragments :: crumbs(${ {
+                 {'Board', '/bugs'},
+                 {bug.project ?: 'No project', '/bugs?project=' + (bug.project ?: '')},
+                 {editing ? 'BUG-' + bug.id : 'New bug', editing ? '/bugs/' + bug.id : null},
+                 {editing ? 'Edit' : null, null} } })}"></div>
         <div class="topbar-actions">
             <a class="btn btn-sm btn-ghost" th:href="@{/bugs(project=${bug.project})}">Cancel</a>
         </div>
     </header>
 
     <div class="content">
-    <div class="stack stack-form">
+    <!-- Two columns, not one long scroll. What you write is the left 65% —
+         the title, the story, the screenshot — and everything you pick from a
+         list is a rail beside it. It used to be six stacked sections, so a
+         short bug still meant scrolling past Classification and People to
+         reach the button. -->
+    <form class="report-grid" method="post" id="bug-form"
+          th:action="${editing} ? @{/bugs/{id}(id=${bug.id})} : @{/bugs}"
+          th:object="${bug}" enctype="multipart/form-data">
 
-        <form class="panel report" method="post" id="bug-form"
-              th:action="${editing} ? @{/bugs/{id}(id=${bug.id})} : @{/bugs}"
-              th:object="${bug}" enctype="multipart/form-data">
-
-            <!-- ---------- the bug itself ---------- -->
+        <!-- ============ what you write ============ -->
+        <div class="report-main">
+            <div class="panel">
             <div class="report-sec">
                 <label>
-                    <span>Title <span class="req">*</span> <span class="hint">— up to 150 characters</span></span>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-pen"/></svg>
+                        Title <span class="req">*</span>
+                        <span class="hint">— up to 150 characters</span>
+                    </span>
                     <input type="text" th:field="*{title}" id="title" autocomplete="off"
                            class="input-lg" placeholder="Short summary of what is broken"
                            enterkeyhint="next" autocapitalize="sentences">
@@ -41,10 +53,12 @@
                      is the story. Bugs raised before the change keep those fields and the
                      detail page still shows them. The cap is the column width, and the
                      error line is what tells you a long paste was cut rather than saved. -->
-                <label style="margin-top:12px">
-                    <span>Bug details
-                        <span class="hint">— what happens, where, how to see it, and what you expected instead
-                              (up to 4000 characters)</span></span>
+                <label style="margin-top:14px">
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-file-text"/></svg>
+                        Bug details
+                        <span class="hint">— what happens, where, how to see it, and what you expected instead</span>
+                    </span>
                     <textarea rows="16" th:field="*{description}" id="description"
                               class="detail-box"
                               placeholder="What happens, and where.&#10;&#10;How to see it:&#10;1. Open ...&#10;2. Click ...&#10;3. Observe ...&#10;&#10;Expected: ...&#10;Actual: ..."
@@ -54,94 +68,12 @@
                 </label>
             </div>
 
-            <!-- ---------- how bad, and where ---------- -->
-            <div class="report-sec">
-                <h3>Classification</h3>
-                <div class="field-row">
-                    <label>
-                        <span>Project <span class="req">*</span></span>
-                        <select th:field="*{project}" id="project">
-                            <option value="">— Select project —</option>
-                            <option th:each="p : ${projectOptions}" th:value="${p}" th:text="${p}">Godrej</option>
-                        </select>
-                        <span class="field-error" th:if="${#fields.hasErrors('project')}"
-                              th:errors="*{project}">Project error</span>
-                    </label>
-                    <label>
-                        <span>Severity <span class="req">*</span></span>
-                        <select th:field="*{severity}" id="severity">
-                            <option th:each="s : ${severities}" th:value="${s}" th:text="${s.label}">High</option>
-                        </select>
-                        <span class="field-error" th:if="${#fields.hasErrors('severity')}"
-                              th:errors="*{severity}">Severity error</span>
-                    </label>
-                    <label>
-                        <span>Environment <span class="req">*</span></span>
-                        <select th:field="*{environment}" id="environment">
-                            <option th:each="e : ${environments}" th:value="${e}" th:text="${e.label}">QA</option>
-                        </select>
-                        <span class="field-error" th:if="${#fields.hasErrors('environment')}"
-                              th:errors="*{environment}">Environment error</span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- ---------- people ---------- -->
-            <div class="report-sec">
-                <h3>People</h3>
-                <div class="field-row">
-                    <label>
-                        <span>Reported by</span>
-                        <select th:field="*{reportedBy}" id="reportedBy">
-                            <option value="">— Nobody selected —</option>
-                            <option th:each="p : ${people}" th:value="${p}"
-                                    th:text="${p == me} ? ${p} + ' (me)' : ${p}">Nishana R</option>
-                        </select>
-                        <span class="field-error" th:if="${#fields.hasErrors('reportedBy')}"
-                              th:errors="*{reportedBy}">Reporter error</span>
-                    </label>
-
-                    <div class="field">
-                        <span class="field-label" id="assignee-label">Assigned to</span>
-                        <!-- A list, because a fix often needs a developer and a
-                             tester on it at once. Checkboxes rather than a
-                             multi-select: nobody knows to ctrl-click. -->
-                        <details class="pop-wrap picker" id="assignee-picker">
-                            <!-- A <span> label cannot be a <label for>, so the control
-                                 borrows it and keeps its own "2 assigned" reading. -->
-                            <summary aria-labelledby="assignee-label assignee-summary">
-                                <span class="picker-btn" id="assignee-summary">
-                                    <span class="picker-faces" th:if="${!#lists.isEmpty(bug.assignees)}">
-                                        <span class="avatar avatar-sm" th:each="p : ${bug.assignees}"
-                                              th:attr="data-avatar=${p}" th:title="${p}" aria-hidden="true"></span>
-                                    </span>
-                                    <span th:if="${#lists.isEmpty(bug.assignees)}" class="muted">Unassigned</span>
-                                    <span th:if="${!#lists.isEmpty(bug.assignees)}"
-                                          th:text="${#lists.size(bug.assignees)} + ' assigned'">2 assigned</span>
-                                    <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
-                                </span>
-                            </summary>
-                            <div class="pop pop-block">
-                                <div class="pop-head"><span>Assign to</span></div>
-                                <div class="pop-list">
-                                    <label class="pick-opt" th:each="p : ${people}">
-                                        <input type="checkbox" th:field="*{assignees}" th:value="${p}">
-                                        <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
-                                        <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
-                                    </label>
-                                </div>
-                                <p class="pop-empty" th:if="${#lists.isEmpty(people)}">
-                                    Nobody on the team yet.
-                                </p>
-                            </div>
-                        </details>
-                    </div>
-                </div>
-            </div>
-
             <!-- ---------- evidence ---------- -->
             <div class="report-sec" th:unless="${editing}">
-                <h3>Attachments</h3>
+                <h3>
+                    <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                    Attachments
+                </h3>
                 <label class="file-drop" for="files">
                     <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
                     <span class="file-drop-text" id="file-name">
@@ -163,25 +95,142 @@
             <!-- Editing keeps uploads on the bug itself, where the existing
                  files are listed and can be seen. -->
             <div class="report-sec" th:if="${editing}">
-                <h3>Attachments</h3>
+                <h3>
+                    <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                    Attachments
+                </h3>
                 <p class="hint">
                     Files are added on
                     <a th:href="@{/bugs/{id}(id=${bug.id})} + '#attachments'">the bug itself</a>,
                     where you can see the ones already on it.
                 </p>
             </div>
+            </div>
+        </div>
+
+        <!-- ============ what you pick ============ -->
+        <aside class="report-side">
+            <div class="panel">
+            <div class="report-sec">
+                <label>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-user"/></svg>
+                        Reported by
+                    </span>
+                    <select th:field="*{reportedBy}" id="reportedBy">
+                        <option value="">— Nobody selected —</option>
+                        <option th:each="p : ${people}" th:value="${p}"
+                                th:text="${p == me} ? ${p} + ' (me)' : ${p}">Nishana R</option>
+                    </select>
+                    <span class="field-error" th:if="${#fields.hasErrors('reportedBy')}"
+                          th:errors="*{reportedBy}">Reporter error</span>
+                </label>
+
+                <div class="field" style="margin-top:12px">
+                    <span class="field-label" id="assignee-label">
+                        <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
+                        Assigned to
+                    </span>
+                    <!-- A list, because a fix often needs a developer and a
+                         tester on it at once. Checkboxes rather than a
+                         multi-select: nobody knows to ctrl-click. -->
+                    <details class="pop-wrap picker" id="assignee-picker">
+                        <!-- A <span> label cannot be a <label for>, so the control
+                             borrows it and keeps its own "2 assigned" reading. -->
+                        <summary aria-labelledby="assignee-label assignee-summary">
+                            <span class="picker-btn" id="assignee-summary">
+                                <span class="picker-faces" th:if="${!#lists.isEmpty(bug.assignees)}">
+                                    <span class="avatar avatar-sm" th:each="p : ${bug.assignees}"
+                                          th:attr="data-avatar=${p}" th:title="${p}" aria-hidden="true"></span>
+                                </span>
+                                <span th:if="${#lists.isEmpty(bug.assignees)}" class="muted">Unassigned</span>
+                                <span th:if="${!#lists.isEmpty(bug.assignees)}"
+                                      th:text="${#lists.size(bug.assignees)} + ' assigned'">2 assigned</span>
+                                <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                            </span>
+                        </summary>
+                        <div class="pop pop-block">
+                            <div class="pop-head"><span>Assign to</span></div>
+
+                            <!-- The same search the bug page's picker has. The
+                                 list is this project's team rather than the
+                                 whole company, but a project can still be a
+                                 dozen people and typing three letters beats
+                                 reading twelve rows. -->
+                            <div class="pick-search">
+                                <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+                                <input type="text" id="assignee-filter" placeholder="Find someone…"
+                                       autocomplete="off" aria-label="Find someone">
+                            </div>
+
+                            <div class="pop-list" id="assignee-list">
+                                <label class="pick-opt" th:each="p : ${people}" th:attr="data-name=${p}">
+                                    <input type="checkbox" th:field="*{assignees}" th:value="${p}">
+                                    <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
+                                    <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
+                                </label>
+                                <p class="pop-empty" id="assignee-none" hidden>Nobody by that name.</p>
+                            </div>
+                            <p class="pop-empty" th:if="${#lists.isEmpty(people)}">
+                                Nobody on this project yet.
+                            </p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <div class="report-sec">
+                <label>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-chart"/></svg>
+                        Severity <span class="req">*</span>
+                    </span>
+                    <select th:field="*{severity}" id="severity">
+                        <option th:each="s : ${severities}" th:value="${s}" th:text="${s.label}">High</option>
+                    </select>
+                    <span class="field-error" th:if="${#fields.hasErrors('severity')}"
+                          th:errors="*{severity}">Severity error</span>
+                </label>
+
+                <label style="margin-top:12px">
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-board"/></svg>
+                        Environment <span class="req">*</span>
+                    </span>
+                    <select th:field="*{environment}" id="environment">
+                        <option th:each="e : ${environments}" th:value="${e}" th:text="${e.label}">QA</option>
+                    </select>
+                    <span class="field-error" th:if="${#fields.hasErrors('environment')}"
+                          th:errors="*{environment}">Environment error</span>
+                </label>
+            </div>
 
             <!-- ---------- the rest, folded away ---------- -->
             <!-- Folded away, unless something in here is what failed — an error
                  behind a closed summary is an error nobody reads. -->
             <details class="report-sec form-more"
-                     th:open="${#fields.hasErrors('module') or #fields.hasErrors('blockedBy') or #fields.hasErrors('status')}">
+                     th:open="${#fields.hasErrors('module') or #fields.hasErrors('blockedBy')
+                               or #fields.hasErrors('status') or #fields.hasErrors('project')}">
                 <summary>
                     <span>More — module, blocker<span th:if="${editing}">, status</span></span>
                     <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
                 </summary>
 
-                <div class="field-row" style="margin-top:12px">
+                <div class="side-fields">
+                    <!-- Only where the form could not work one out. Raising from
+                         a board already knows the project, so it is a hidden
+                         field below rather than a question; a database with no
+                         project at all is the one case that still has to ask. -->
+                    <label th:if="${bug.project == null or bug.project.isBlank()}">
+                        <span>Project <span class="req">*</span></span>
+                        <select th:field="*{project}" id="project">
+                            <option value="">— Select project —</option>
+                            <option th:each="p : ${projectOptions}" th:value="${p}" th:text="${p}">Godrej</option>
+                        </select>
+                        <span class="field-error" th:if="${#fields.hasErrors('project')}"
+                              th:errors="*{project}">Project error</span>
+                    </label>
+
                     <label>
                         <span>Module <span class="hint">— up to 80 characters</span></span>
                         <input type="text" th:field="*{module}" id="module"
@@ -204,10 +253,10 @@
                     </label>
 
                     <!-- The columns of the project this bug is on. data-columns
-                         carries every project's, so picking a different project
-                         above re-offers the right ones; with JavaScript off the
-                         list stays as it loaded and the server remaps a status
-                         that does not belong to the project it is saved against. -->
+                         carries every project's, so a project changed elsewhere
+                         re-offers the right ones; with JavaScript off the list
+                         stays as it loaded and the server remaps a status that
+                         does not belong to the project it is saved against. -->
                     <label th:if="${editing}">
                         <span>Status</span>
                         <select th:field="*{status}" id="status" th:attr="data-columns=${columnsJson}">
@@ -220,19 +269,33 @@
                 </div>
             </details>
 
+            <!-- The project the board already told us. A hidden field rather
+                 than a dropdown: you are standing on the project, so being
+                 asked which one it is was a question with one answer. It keeps
+                 its id, so it still posts and is still findable. -->
+            <input type="hidden" th:field="*{project}" id="project"
+                   th:if="${bug.project != null and !bug.project.isBlank()}">
+
+            <!-- And the column, when the + on one of them started this. Raising
+                 has no status picker — a new bug goes to the first column — so
+                 without this the column you clicked in would be forgotten
+                 between the board and the save. -->
+            <input type="hidden" th:field="*{status}" th:unless="${editing}">
+
             <!-- Stamped with whoever is signed in, for the history trail. -->
             <input type="hidden" name="actor" class="actor-field">
 
-            <div class="report-sec form-foot">
-                <button type="submit" class="btn btn-primary" id="submit-bug">
+            <div class="report-sec side-foot">
+                <button type="submit" class="btn btn-primary btn-block" id="submit-bug">
                     <span th:text="${editing} ? 'Save changes' : 'Raise bug'">Raise bug</span>
                 </button>
-                <a class="btn btn-ghost" th:href="@{/bugs(project=${bug.project})}">Cancel</a>
-                <span class="spacer"></span>
-                <span class="hint" th:unless="${editing}">Filed as Open</span>
+                <a class="btn btn-ghost btn-block" th:href="@{/bugs(project=${bug.project})}">Cancel</a>
+                <p class="hint" th:unless="${editing}">Filed as Open, on
+                    <b th:text="${bug.project}">Godrej</b>.</p>
             </div>
-        </form>
-    </div>
+            </div>
+        </aside>
+    </form>
     </div>
 </section>
 </body>

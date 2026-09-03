@@ -14,11 +14,16 @@ import java.util.Map;
  *                    different columns the same thing and the whole-board view
  *                    shows both
  * @param bySeverity  count per severity label, worst first
+ * @param byEnvironment count per environment label, plus "Not set" for the
+ *                    bugs that never named one — a blank environment is a fact
+ *                    about the report, not a row to leave out of the total
  * @param urgent      Critical + High severity, still open — the ones that
  *                    should not be sitting in the queue
  * @param open        sitting in a column its project does not count as done:
  *                    the actual workload
  * @param maxStatus   the largest per-status count, so bars can be scaled
+ * @param unassigned  bugs with nobody on them at all, whatever column they
+ *                    are sitting in — the queue nobody has picked up
  * @param bugIds      ids in scope, used to narrow the activity timeline
  */
 public record Dashboard(
@@ -26,9 +31,11 @@ public record Dashboard(
         long total,
         Map<String, Long> byStatus,
         Map<String, Long> bySeverity,
+        Map<String, Long> byEnvironment,
         long urgent,
         long open,
         long maxStatus,
+        long unassigned,
         List<Long> bugIds) {
 
     public boolean isEmpty() {
@@ -52,5 +59,13 @@ public record Dashboard(
     /** Percentage of the scope, for the stacked distribution bar. */
     public double percent(long count) {
         return total == 0 ? 0 : (count * 100.0) / total;
+    }
+
+    /**
+     * How much of the scope is finished, as a whole number — the one figure
+     * that answers "how is this project going" without another one beside it.
+     */
+    public long donePercent() {
+        return total == 0 ? 0 : Math.round((done() * 100.0) / total);
     }
 }

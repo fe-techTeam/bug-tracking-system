@@ -12,9 +12,17 @@ import org.springframework.core.annotation.Order;
 import java.util.List;
 
 /**
- * The projects, seeded on startup. Matched on name and inserted only if
- * missing, so this is safe to re-run and new projects can just be appended.
- * Anything added on the Projects page is left alone.
+ * The projects a brand new database starts with.
+ *
+ * <p>Only ever into an <em>empty</em> table. It used to insert whichever of
+ * these names was missing on every boot, which meant a project removed in
+ * Settings came straight back on the next restart — the delete worked, and the
+ * seeder undid it. A list of examples is a starting point, not a set of rows
+ * this app insists on, so once there is a single project here this does
+ * nothing at all.
+ *
+ * <p>Adding a name below therefore only reaches a database that has no
+ * projects. Add it in Settings instead, which is the same table.
  */
 @Configuration
 public class ProjectSeeder {
@@ -31,9 +39,12 @@ public class ProjectSeeder {
     @Order(Ordered.HIGHEST_PRECEDENCE + 20)     // after the schema is settled
     CommandLineRunner seedProjects(ProjectService service) {
         return args -> {
+            if (!service.all().isEmpty()) {
+                return;                          // somebody's projects; leave them alone
+            }
             int added = service.addMissing(PROJECTS);
             if (added > 0) {
-                log.info("Added {} project(s) to the projects table.", added);
+                log.info("Seeded {} project(s) into an empty projects table.", added);
             }
         };
     }

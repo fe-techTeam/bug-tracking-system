@@ -10,11 +10,16 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 
 /**
- * The team, seeded on startup.
+ * The team a brand new database starts with.
  *
- * <p>Matched on email and added only if missing, so this is safe to re-run and
- * new names can simply be appended to the list. Anyone added through the Team
- * page is left alone, and deactivating somebody here does not bring them back.
+ * <p>Only ever into an <em>empty</em> table, for the same reason as
+ * {@link ProjectSeeder}: filling in whatever was missing on every boot meant
+ * somebody removed from the team reappeared at the next restart. Once there is
+ * one person here this does nothing.
+ *
+ * <p>So a name added to the list below only reaches a database with nobody in
+ * it. Everywhere else, Settings &gt; Team — or the board's team drawer — is
+ * how somebody joins, and that writes to this same table.
  */
 @Configuration
 public class TeamMemberSeeder {
@@ -44,9 +49,12 @@ public class TeamMemberSeeder {
     @Bean
     CommandLineRunner seedTeam(TeamMemberService service) {
         return args -> {
+            if (!service.all().isEmpty()) {
+                return;                          // somebody's roster; leave it alone
+            }
             int added = service.addMissing(TEAM);
             if (added > 0) {
-                log.info("Added {} team member(s) to the team_members table.", added);
+                log.info("Seeded {} team member(s) into an empty team_members table.", added);
             }
         };
     }

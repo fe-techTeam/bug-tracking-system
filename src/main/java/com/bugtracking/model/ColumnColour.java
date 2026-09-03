@@ -12,15 +12,20 @@ package com.bugtracking.model;
  * knows a hex value; {@link #getToken()} hands the template a {@code var()}.
  *
  * <p>Listed along the journey, so the picker reads left to right the way the
- * board does. Rose sits at the end for the columns that are an ending without
- * being a success — Rejected, Won't fix, Duplicate.
+ * board does: red where a bug is raised and untouched, through the blues and
+ * browns of work in flight and work handed on, to green. Rose sits at the end
+ * for the columns that are an ending without being a success — Rejected,
+ * Won't fix, Duplicate; slate is for a column off the track altogether, which
+ * is what On Hold is.
  */
 public enum ColumnColour {
 
+    RED("Red", "raised, not started"),
     SLATE("Slate", "waiting"),
     BLUE("Blue", "in flight"),
     INDIGO("Indigo", "in flight"),
-    VIOLET("Violet", "parked"),
+    BROWN("Brown", "handed over"),
+    VIOLET("Violet", "being tested"),
     TEAL("Teal", "with QA"),
     AMBER("Amber", "needs a person"),
     GREEN("Green", "done"),

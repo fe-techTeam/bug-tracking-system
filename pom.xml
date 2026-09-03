@@ -87,6 +87,18 @@
       <scope>runtime</scope>
     </dependency>
 
+    <!-- Versioned schema migrations (src/main/resources/db/migration). Only
+         the "supabase" profile runs them - H2 keeps ddl-auto=update. -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <!-- Flyway 10+ ships each database's support separately. -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+
     <!-- S3 client and presigner, for attachment storage in a bucket. -->
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
@@ -105,6 +117,39 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!-- Migration commands against Supabase, without starting the app:
+             ./run.sh migrate    apply pending migrations   (mvn flyway:migrate)
+             ./run.sh db-info    show applied vs pending    (mvn flyway:info)
+             ./run.sh db-repair  fix the history table      (mvn flyway:repair)
+           run.sh reads .env and exports FLYWAY_URL/USER/PASSWORD, which win
+           over anything configured here - so no credential lives in this file. -->
+      <plugin>
+        <groupId>org.flywaydb</groupId>
+        <artifactId>flyway-maven-plugin</artifactId>
+        <configuration>
+          <!-- filesystem: so the goals work without a compile first. -->
+          <locations>
+            <location>filesystem:src/main/resources/db/migration/postgres</location>
+          </locations>
+          <!-- Adopt a database Hibernate already built instead of refusing it;
+               the IF NOT EXISTS baseline then walks through it harmlessly. -->
+          <baselineOnMigrate>true</baselineOnMigrate>
+          <baselineVersion>0</baselineVersion>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <version>${flyway.version}</version>
+          </dependency>
+        </dependencies>
       </plugin>
     </plugins>
   </build>

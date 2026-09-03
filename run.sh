@@ -15,6 +15,9 @@
 #   ./run.sh build        mvn clean package (produces the runnable jar)
 #   ./run.sh test         mvn test
 #   ./run.sh reset-db     delete the H2 database and start over
+#   ./run.sh migrate      apply pending SQL migrations to Supabase
+#   ./run.sh db-info      which migrations are applied, which are pending
+#   ./run.sh db-repair    fix the migration history after a failed migrate
 #
 set -euo pipefail
 
@@ -212,6 +215,49 @@ cmd_logs() {
 cmd_build() { setup_java; mvn clean package; }
 cmd_test()  { setup_java; mvn test; }
 
+# --- database migrations (Supabase/Postgres only) ---------------------------
+# The migrate/db-info/db-repair commands drive the Flyway maven plugin against
+# the Supabase database named in .env. They exist so a migration can be
+# applied or inspected without booting the whole app - the app also applies
+# pending migrations itself on startup under the supabase profile.
+#
+# H2 needs none of this: locally, Hibernate still builds the schema itself.
+
+env_value() {
+  # Prints one key's value from .env. Read with sed rather than `source`:
+  # Spring reads .env as a properties file, so a password there is unquoted
+  # and could contain characters the shell would eat.
+  sed -n "s/^[[:space:]]*$1=//p" .env 2>/dev/null | tail -1
+}
+
+setup_flyway_env() {
+  [[ -f .env ]] || die \
+"No .env file. Copy .env.example to .env and fill in the SUPABASE_DB_* block."
+
+  local host port name user pass
+  host=$(env_value SUPABASE_DB_HOST)
+  port=$(env_value SUPABASE_DB_PORT)
+  name=$(env_value SUPABASE_DB_NAME)
+  user=$(env_value SUPABASE_DB_USER)
+  pass=$(env_value SUPABASE_DB_PASSWORD)
+
+  [[ -n "$host" && "$host" != *'<'* ]] || die \
+"SUPABASE_DB_HOST in .env is missing or still a placeholder.
+Dashboard > Project Settings > Database > Connection string > JDBC."
+  [[ -n "$pass" && "$pass" != *'<'* ]] || die \
+"SUPABASE_DB_PASSWORD in .env is missing or still a placeholder."
+
+  # Environment variables outrank the plugin's pom configuration, so the
+  # credentials never have to appear in pom.xml or on the command line.
+  export FLYWAY_URL="jdbc:postgresql://$host:${port:-5432}/${name:-postgres}?sslmode=require"
+  export FLYWAY_USER="$user"
+  export FLYWAY_PASSWORD="$pass"
+}
+
+cmd_migrate()   { setup_java; setup_flyway_env; mvn flyway:migrate; }
+cmd_db_info()   { setup_java; setup_flyway_env; mvn flyway:info; }
+cmd_db_repair() { setup_java; setup_flyway_env; mvn flyway:repair; }
+
 cmd_reset_db() {
   [[ -z "$(app_pid)" ]] || die "Stop the app first, it holds the database open:  ./run.sh stop"
   if [[ ! -d "$DATA_DIR" ]]; then
@@ -242,6 +288,9 @@ case "${1:-start}" in
   build)             cmd_build ;;
   test)              cmd_test ;;
   reset-db)          cmd_reset_db ;;
+  migrate)           cmd_migrate ;;
+  db-info)           cmd_db_info ;;
+  db-repair)         cmd_db_repair ;;
   -h|--help|help)    usage ;;
   *)                 die "Unknown command: $1
 

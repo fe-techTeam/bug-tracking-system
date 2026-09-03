@@ -651,13 +651,40 @@ Supabase host, SSL, and a small connection pool (Supabase counts connections acr
 on the project, so a laptop should not hold a large one open).
 
 Supabase offers three ways in. The **session pooler** on port 5432 is the default here because it
-behaves like a plain Postgres server, so Hibernate's `ddl-auto=update` can create the tables the
-same way it does on H2. The **transaction pooler** on 6543 is cheaper on connections but has no
-session state — use `SUPABASE_DB_DDL=validate` with it. The **direct** connection is IPv6 only
-unless you have the IPv4 add-on.
+behaves like a plain Postgres server. The **transaction pooler** on 6543 is cheaper on connections
+but has no session state. The **direct** connection is IPv6 only unless you have the IPv4 add-on.
 
 Leave a setting out and startup stops with a message naming it, rather than failing later as a
 confusing hostname error. Without the profile, none of this is read and the app is on H2 as before.
+
+### Schema migrations (Flyway)
+
+On Postgres the schema is **not** built by Hibernate. It is owned by the numbered SQL files in
+`src/main/resources/db/migration/postgres`, applied in order and recorded in the
+`flyway_schema_history` table — the same model as Alembic or Rails migrations. Hibernate runs in
+`validate` mode there and only checks that the entities and the migrated schema still agree.
+(H2 is untouched by all of this: locally, `ddl-auto=update` still builds the schema from the
+entities, and Flyway is switched off.)
+
+```bash
+./run.sh migrate      # apply pending migrations to Supabase (alembic upgrade head)
+./run.sh db-info      # applied vs pending, with checksums   (alembic history/current)
+./run.sh db-repair    # fix the history after a failed migrate
+```
+
+These read the `SUPABASE_DB_*` block of `.env`; the app also applies pending migrations itself
+when started with the supabase profile, so `migrate` exists for doing it deliberately.
+
+To change the schema, add a new file — `V2__add_due_date_to_bugs.sql` — next to the baseline.
+Never edit a file that has been applied: its checksum is recorded, and a mismatch stops startup.
+`V1__baseline_schema.sql` is written with `if not exists` throughout and `baseline-on-migrate`
+is on, so a Supabase database that Hibernate built in the old days is adopted as-is, and a fresh
+one gets the whole schema.
+
+The baseline also **enables row level security on every table**: Supabase's Data API exposes the
+`public` schema to anyone with the project's anon key, and this app never uses that API — all its
+access is JDBC as the table owner, which RLS does not bind. No policies means the Data API is
+closed, full stop.
 
 ### S3 for attachment files
 

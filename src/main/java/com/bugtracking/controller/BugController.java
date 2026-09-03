@@ -104,6 +104,7 @@ public class BugController {
                        // should mean "no filter", and Spring binds that to false.
                        @RequestParam(required = false) String source,
                        @RequestParam(required = false) String label,
+                       @RequestParam(required = false) String due,
                        @RequestParam(required = false) String keyword,
                        @RequestParam(required = false) String sort,
                        @RequestParam(required = false) String view,
@@ -116,7 +117,7 @@ public class BugController {
         // /bugs?assignee=X still means what it says.
         boolean noFilters = isBlank(status) && severity == null
                 && environment == null && isBlank(assignee) && isBlank(reporter)
-                && isBlank(source) && isBlank(label) && isBlank(keyword) && isBlank(sort);
+                && isBlank(source) && isBlank(label) && isBlank(due) && isBlank(keyword) && isBlank(sort);
         if (isBlank(project) && noFilters) {
             String landing = landingProject(session);
             if (landing != null) {
@@ -149,7 +150,7 @@ public class BugController {
         Dashboard dashboard = service.dashboard(project);
         Boolean fromClient = sourceFilter(source);
         List<Bug> bugs = service.findAll(project, status, severity,
-                environment, assignee, reporter, fromClient, label, keyword, sort);
+                environment, assignee, reporter, fromClient, label, due, keyword, sort);
 
         // The board this project actually runs, in the order it runs it.
         List<BoardColumn> boardColumns = board.forProject(project);
@@ -202,6 +203,7 @@ public class BugController {
         model.addAttribute("guestRaised", service.guestRaisedIn(project));
         model.addAttribute("label", label);
         model.addAttribute("labels", service.labelsIn(project));
+        model.addAttribute("due", due);
         model.addAttribute("keyword", keyword);
         model.addAttribute("sort", sort);
         model.addAttribute("view", mode);
@@ -215,6 +217,7 @@ public class BugController {
                 .put("assignee", assignee)
                 .put("reporter", reporter)
                 .put("label", label)
+                .put("due", due)
                 .put("keyword", keyword)
                 .put("sort", sort)
                 .put("view", "board".equals(mode) ? null : mode)

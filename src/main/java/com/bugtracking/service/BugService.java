@@ -66,7 +66,7 @@ public class BugService {
                              Environment environment, String assignee, String reporter,
                              String keyword, String sort) {
         return findAll(project, status, severity, environment, assignee, reporter,
-                null, null, keyword, sort);
+                null, null, null, keyword, sort);
     }
 
     /**
@@ -77,13 +77,32 @@ public class BugService {
     @Transactional(readOnly = true)
     public List<Bug> findAll(String project, String status, Severity severity,
                              Environment environment, String assignee, String reporter,
-                             Boolean viaGuest, String label, String keyword, String sort) {
+                             Boolean viaGuest, String label, String due, String keyword, String sort) {
         String trimmed = blankToNull(keyword);
         List<Bug> found = repository.search(blankToNull(project), status, severity,
                 environment, blankToNull(assignee), blankToNull(reporter), viaGuest,
                 blankToNull(label),
                 trimmed, idIn(trimmed));
-        return sorted(found, sort);
+        return sorted(dueFiltered(found, blankToNull(due)), sort);
+    }
+
+    // "overdue" or "week"; anything else is no filter. Week is today through seven days out.
+    private List<Bug> dueFiltered(List<Bug> bugs, String due) {
+        if (due == null) {
+            return bugs;
+        }
+        BoardColumns board = columns.snapshot();
+        LocalDate today = LocalDate.now();
+        LocalDate weekOut = today.plusDays(7);
+        return switch (due) {
+            case "overdue" -> bugs.stream().filter(board::late).toList();
+            case "week" -> bugs.stream()
+                    .filter(b -> b.getDueDate() != null
+                            && !b.getDueDate().isBefore(today)
+                            && !b.getDueDate().isAfter(weekOut))
+                    .toList();
+            default -> bugs;
+        };
     }
 
     /** How many of a project's live bugs came in from a client. */

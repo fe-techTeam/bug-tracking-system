@@ -13,7 +13,6 @@ Spring Boot 3.5 + Thymeleaf bug tracker, Java 21, Maven. No front-end build step
 ./run.sh stop | restart | status | logs
 ./run.sh build        # mvn clean package -> target/bugtracking-1.0.0.jar
 ./run.sh test         # mvn test
-./run.sh reset-db     # delete the H2 database and start over
 ```
 
 `run.sh` locates a JDK 21 and sets `JAVA_HOME` for that invocation only; prefer it over
@@ -26,11 +25,11 @@ mvn test -Dtest='BugServiceTest#movesToColumn'
 
 There is no `src/test` directory yet; `spring-boot-starter-test` is on the classpath.
 
-The app is H2-on-disk by default (`http://localhost:8085`, H2 console at `/h2-console`)
-and Supabase (Postgres) under a profile:
+The app serves `http://localhost:8085` and talks to one database: the Supabase
+(Postgres) project named by `SUPABASE_DB_*` in `.env`. No profile switches it on and
+there is nothing to run without it.
 
 ```bash
-SPRING_PROFILES_ACTIVE=supabase ./run.sh bg
 ./run.sh migrate     # apply pending Flyway migrations without booting the app
 ./run.sh db-info     # what is applied, what is pending
 ./run.sh db-repair   # after a failed migrate
@@ -54,12 +53,17 @@ Layers go **controller → service → repository → database**, under
 `src/main/java/com/bugtracking/`. Controllers handle HTTP only; services hold the rules.
 `*ApiController` classes serve JSON under `/api/**`; the rest render Thymeleaf pages.
 
-### Two databases, two schema owners
+### One database, and Flyway owns its schema
 
-- **H2 (default):** Hibernate builds the schema from the entities (`ddl-auto=update`);
-  Flyway is off. Bean-validation constraints do not shape DDL (`apply_to_ddl=false`).
-- **Postgres (`supabase` profile):** Flyway SQL files own the schema and Hibernate only
-  `validate`s. An entity that drifts from the migrated schema fails startup.
+Supabase Postgres is the only datasource. There is no embedded database on the
+classpath and no default for the connection settings, so a checkout without
+`SUPABASE_DB_*` in `.env` stops at startup naming what is missing — it never falls
+back onto a private local database whose projects nobody else can see. Never add an
+embedded driver, a second profile, or a default connection URL to bring one back.
+
+Flyway SQL files own the schema and Hibernate only `validate`s. An entity that drifts
+from the migrated schema fails startup. Bean-validation constraints do not shape DDL
+(`apply_to_ddl=false`).
 
 ### Startup runners in `config/`
 
@@ -68,8 +72,8 @@ Data fixes and seeders are `CommandLineRunner` beans ordered with
 ENUM columns) → `StatusMigration` → `ProjectColumnMigration` → `LegacyReportMerge` →
 `AssigneeMigration` → `FieldDefaultsBackfill` / `BootstrapAdmin` → `BoardColumnSeed` →
 `BoardColumnRestyle`. Each is idempotent and runs on every start; a new one must be ordered
-against these and safe to re-run. On Postgres the equivalent work lives in the migrations,
-so most of these find nothing to do there.
+against these and safe to re-run. Most now find nothing to do — the equivalent work lives
+in the migrations — and the older ones still carry H2-era SQL that is inert on Postgres.
 
 ### Rules that the code depends on
 
@@ -110,8 +114,8 @@ one `!important` rule at the top of `style.css`; never work around it per compon
 
 ## The schema rule: every change ships a migration
 
-**On Postgres the schema is owned by the SQL files in
-`src/main/resources/db/migration/postgres`, not by Hibernate.** That profile runs
+**The schema is owned by the SQL files in
+`src/main/resources/db/migration/postgres`, not by Hibernate.** The app runs
 `ddl-auto=validate`, so an entity that has drifted from the migrated schema does
 not quietly fix itself — the application fails to start.
 
@@ -135,6 +139,6 @@ src/main/resources/db/migration/postgres/V<next>__what_it_does.sql
   reason `V1` does it: the app reaches Postgres as the owning role over JDBC and
   is unaffected, and it closes the table to Supabase's Data API.
 
-H2 still builds its own schema from the entities, so a local run can hide a
-missing migration entirely. That is exactly why the rule is "write the migration
-with the entity change", not "write it when something breaks".
+Every run is a Postgres run, so a missing migration now breaks startup on the
+first one — which is the cheap version of the same lesson. Write the migration
+with the entity change, not when something breaks.

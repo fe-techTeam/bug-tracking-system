@@ -4,7 +4,6 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.EnvironmentAware;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -14,8 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Refuses to start the "supabase" profile with connection settings missing,
- * and says which ones.
+ * Refuses to start with the database connection settings missing, and says
+ * which ones.
  *
  * <p>Without this, an unset variable is left in the property as the literal
  * text {@code ${SUPABASE_DB_HOST}} and surfaces much later as
@@ -26,7 +25,6 @@ import java.util.Map;
  * DataSource is built, rather than racing it.
  */
 @Component
-@Profile("supabase")
 public class SupabaseConnectionCheck implements BeanFactoryPostProcessor, EnvironmentAware {
 
     /** Property to check, and the .env key a reader should go and fill in. */
@@ -69,10 +67,12 @@ public class SupabaseConnectionCheck implements BeanFactoryPostProcessor, Enviro
 
         if (!missing.isEmpty()) {
             throw new IllegalStateException(
-                    "The \"supabase\" profile is active but these are not set: " + String.join(", ", missing)
+                    "The Supabase database is the only one this app has, and these are not set: "
+                            + String.join(", ", missing)
                             + ". Copy .env.example to .env and fill in the Supabase section "
-                            + "(Dashboard > Project Settings > Database > Connection string > JDBC), "
-                            + "or drop SPRING_PROFILES_ACTIVE=supabase to run on the local H2 database.");
+                            + "(Dashboard > Project Settings > Database > Connection string > JDBC). "
+                            + "There is no local database to fall back to - that is deliberate, so a "
+                            + "checkout cannot quietly collect projects nobody else can see.");
         }
     }
 }

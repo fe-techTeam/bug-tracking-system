@@ -1,14 +1,18 @@
 # Bug Tracking
 
-A simple bug raising and tracking web application built with **Spring Boot 3.5**, **Thymeleaf** and an
-**H2 file database**. No database install needed — everything runs from one command.
+A simple bug raising and tracking web application built with **Spring Boot 3.5**, **Thymeleaf** and a
+**Supabase (Postgres) database**. Everyone who runs it is looking at the same one — there is no local
+database, so a checkout cannot drift off into projects nobody else can see.
 
 This is a standalone project. It is completely separate from the Selenium project on the Desktop.
 
 ## How to run
 
+You need the database settings before the app will start. Copy the template and fill in the
+`SUPABASE_DB_*` block — ask whoever runs the project for the values:
+
 ```powershell
-cd C:\Users\nishana\OneDrive\Desktop\bugtracking
+copy .env.example .env
 mvn spring-boot:run
 ```
 
@@ -21,10 +25,13 @@ mvn clean package
 java -jar target\bugtracking-1.0.0.jar
 ```
 
-The first startup gives you an empty tracker: no bugs, no projects, nobody on the team. Everything
-comes from the database and is created in the app. See [Accounts](#signing-in) for how the
-first administrator gets in. Data is stored in `data\bugtracking.mv.db` and survives restarts.
-Delete the `data` folder to start over.
+**Without those settings the app refuses to start**, and says which ones are missing. That is
+deliberate: there is no embedded database to fall back to, because a fallback is how two people
+running the same app end up with two different sets of projects.
+
+Everything you see — bugs, projects, the team — lives in that one database and is created in the
+app. Nothing is seeded. See [Accounts](#signing-in) for how the first administrator gets in.
+Only attachment *files* are local, under `data\attachments`, until S3 is turned on.
 
 ## What you can do
 
@@ -46,7 +53,7 @@ Delete the `data` folder to start over.
 | Change your own password | *Your account* in the top-right menu, or `/account` |
 | Make somebody an admin, or set their password | `/settings?tab=team` — admins only |
 | Turn on email, and test it | `.env`, then `/settings?tab=team` |
-| Inspect the raw database | `/h2-console` (sign in first; JDBC URL `jdbc:h2:file:./data/bugtracking`, user `sa`, no password) |
+| Inspect the raw database | the Supabase dashboard's SQL editor |
 
 A bug has: title, **description — the whole report, in one box**,
 severity (Critical / High / Medium / Low), **environment (QA / UAT / Production)**,
@@ -210,8 +217,6 @@ Sign out with the ⏻ button in the top bar.
 - **`/api/**` stays open and CSRF-exempt**, so scripts and test helpers keep working unchanged. That
   is a deliberate, reversible choice for a localhost tool — one line in `SecurityConfig` closes it:
   change `.requestMatchers("/api/**").permitAll()` to `.authenticated()`.
-- **`/h2-console` now needs a login** (it was open before), and frame options are relaxed to
-  same-origin so the console renders.
 - **Selenium tests need a sign-in step first.** New ids: `login-form`, `email`, `password`,
   `login-button`, `login-error`, `logout-button`. Every other id is unchanged.
 
@@ -1069,7 +1074,7 @@ Invoke-RestMethod -Uri "http://localhost:8085/api/bugs" -Method Post -ContentTyp
 bugtracking\
   pom.xml
   README.md
-  data\                            H2 database file (created on first run)
+  data\attachments\                uploaded files (the rows live in the database)
   target\                          build output + runnable jar
   src\main\java\com\bugtracking\
     BugTrackingApplication.java    entry point
@@ -1099,7 +1104,7 @@ bugtracking\
                  ProjectColumnMigration.java  carries client values into project
                  FieldDefaultsBackfill.java  same for environment
                  AssigneeMigration.java      one assignee -> the assignees list
-                 SchemaUpgrade.java      widens legacy H2 ENUM columns to VARCHAR
+                 SchemaUpgrade.java      widens legacy ENUM columns to VARCHAR
                  BootstrapAdmin.java     the first admin, from .env, only when nobody can sign in
                  AccountPrincipal.java   who is signed in: name, id, email, role
                  EmailProperties.java    from, base URL, subject prefix, the switch
@@ -1110,8 +1115,7 @@ bugtracking\
                  ConnectionsStartupLog.java    logs the live database and file store
   .env.example                       credential template; copy to .env
   src\main\resources\
-    application.properties
-    application-supabase.properties  Postgres settings for the "supabase" profile
+    application.properties           everything, database included
     templates\   layout.html             navbar and icon sprite
                  fragments.html          the notification bell popover
                  login.html, settings.html, notifications.html, account.html
@@ -1124,7 +1128,7 @@ bugtracking\
 ```
 
 The layers go: **controller → service → repository → database**. The controller only handles
-web requests, the service holds the rules, the repository talks to H2.
+web requests, the service holds the rules, the repository talks to Postgres.
 
 ## Note for Selenium practice
 
@@ -1264,8 +1268,8 @@ as plain text. `bugtracking.mail.include-details=false` cuts it back to the titl
 
 ## Supabase and S3
 
-The app runs on **H2 on disk with attachments in `data\attachments`** unless told otherwise.
-Both alternatives are wired up but switched off, so nothing changes until you turn one on.
+The app talks to **one Supabase database**, named in `.env`. Attachment *files* are the one thing
+still kept locally, in `data\attachments`, until S3 is turned on.
 
 Credentials go in a `.env` file in the project root, which is gitignored. `application.properties`
 imports it with `spring.config.import=optional:file:.env[.properties]`, so anything set there
@@ -1275,35 +1279,34 @@ behaves like a normal Spring property, and real environment variables override t
 copy .env.example .env
 ```
 
-### Supabase as the database
+### Supabase is the database
 
 Fill in the Supabase block of `.env` from **Dashboard > Project Settings > Database >
-Connection string > JDBC**, then start with the profile on:
+Connection string > JDBC**, and start normally — there is no profile to switch on and nothing to
+switch off:
 
 ```powershell
-$env:SPRING_PROFILES_ACTIVE = "supabase"
 mvn spring-boot:run
 ```
-
-That layers `application-supabase.properties` over everything else: the Postgres driver, the
-Supabase host, SSL, and a small connection pool (Supabase counts connections across every client
-on the project, so a laptop should not hold a large one open).
 
 Supabase offers three ways in. The **session pooler** on port 5432 is the default here because it
 behaves like a plain Postgres server. The **transaction pooler** on 6543 is cheaper on connections
 but has no session state. The **direct** connection is IPv6 only unless you have the IPv4 add-on.
+The pool is kept small on purpose: Supabase counts connections across every client on the project,
+so a laptop should not hold a large one open.
 
 Leave a setting out and startup stops with a message naming it, rather than failing later as a
-confusing hostname error. Without the profile, none of this is read and the app is on H2 as before.
+confusing hostname error. There is no embedded database on the classpath to fall back to. That is
+the whole point — an app that starts anyway would be an app quietly collecting projects, bugs and
+people that only exist on one person's laptop.
 
 ### Schema migrations (Flyway)
 
-On Postgres the schema is **not** built by Hibernate. It is owned by the numbered SQL files in
+The schema is **not** built by Hibernate. It is owned by the numbered SQL files in
 `src/main/resources/db/migration/postgres`, applied in order and recorded in the
 `flyway_schema_history` table — the same model as Alembic or Rails migrations. Hibernate runs in
-`validate` mode there and only checks that the entities and the migrated schema still agree.
-(H2 is untouched by all of this: locally, `ddl-auto=update` still builds the schema from the
-entities, and Flyway is switched off.)
+`validate` mode and only checks that the entities and the migrated schema still agree, so an entity
+that has drifted from the schema stops startup instead of quietly diverging.
 
 ```bash
 ./run.sh migrate      # apply pending migrations to Supabase (alembic upgrade head)
@@ -1311,8 +1314,8 @@ entities, and Flyway is switched off.)
 ./run.sh db-repair    # fix the history after a failed migrate
 ```
 
-These read the `SUPABASE_DB_*` block of `.env`; the app also applies pending migrations itself
-when started with the supabase profile, so `migrate` exists for doing it deliberately.
+These read the `SUPABASE_DB_*` block of `.env`; the app also applies pending migrations itself on
+every start, so `migrate` exists for doing it deliberately.
 
 To change the schema, add a new file — `V2__add_due_date_to_bugs.sql` — next to the baseline.
 Never edit a file that has been applied: its checksum is recorded, and a mismatch stops startup.
@@ -1344,12 +1347,13 @@ changes the startup log and nothing else.
 Two lines at startup, read from the live connection rather than from the settings meant to shape it:
 
 ```
-c.b.config.ConnectionsStartupLog : Database: H2 2.3.232 (2024-08-11)  jdbc:h2:file:./data/bugtracking
+c.b.config.ConnectionsStartupLog : Database: PostgreSQL 17.6  jdbc:postgresql://aws-1-<region>.pooler.supabase.com:5432/postgres
 c.b.config.ConnectionsStartupLog : Attachments: local disk at data/attachments
 ```
 
-A profile that quietly failed to activate otherwise looks exactly like one that worked, until data
-goes missing.
+There is only one database to be on, but a `.env` pointing at the wrong Supabase project looks
+exactly like one pointing at the right project, until data goes missing. Read the host in that
+line, not the one you meant to configure.
 
 ## Change the port
 

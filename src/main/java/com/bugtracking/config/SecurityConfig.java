@@ -148,10 +148,7 @@ public class SecurityConfig {
             // CSRF protects the HTML forms (Thymeleaf adds the token to any form
             // with th:action). The API has no browser session to ride on, so it
             // is exempt — otherwise every script POST would need a token.
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**", "/h2-console/**"))
-
-            // The H2 console renders itself in frames.
-            .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"));
 
         // No HTTP Basic on purpose: with it configured alongside form login,
         // Spring answers an unauthenticated request with 401 + WWW-Authenticate

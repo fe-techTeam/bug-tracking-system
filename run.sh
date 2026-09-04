@@ -14,7 +14,6 @@
 #   ./run.sh logs         follow app.log
 #   ./run.sh build        mvn clean package (produces the runnable jar)
 #   ./run.sh test         mvn test
-#   ./run.sh reset-db     delete the H2 database and start over
 #   ./run.sh migrate      apply pending SQL migrations to Supabase
 #   ./run.sh db-info      which migrations are applied, which are pending
 #   ./run.sh db-repair    fix the migration history after a failed migrate
@@ -28,7 +27,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 readonly LOG_FILE="app.log"
 readonly PROPS="src/main/resources/application.properties"
-readonly DATA_DIR="data"
 
 # --- pretty output, but only when a human is watching -----------------------
 
@@ -128,8 +126,8 @@ app_pid() { lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null || true; }
 # Starting while something is already serving used to be an error you had to
 # clear by hand, and it is almost always the instance you meant to replace -
 # you changed a file and want it running again. So start takes the port back.
-# It is still cmd_stop that does it, so the shutdown is the clean one that lets
-# the database file flush before the new process opens it.
+# It is still cmd_stop that does it, so the shutdown is the clean one that
+# returns the pooled connections before the new process opens its own.
 free_the_port() {
   local pid; pid=$(app_pid)
   [[ -z "$pid" ]] && return 0
@@ -186,7 +184,7 @@ cmd_stop() {
   info "Stopping pid $pid ..."
   kill "$pid" 2>/dev/null || true
 
-  # Give it a moment to shut down cleanly and flush the H2 file, then insist.
+  # Give it a moment to shut down cleanly, then insist.
   local waited=0
   while (( waited < 15 )) && [[ -n "$(app_pid)" ]]; do
     sleep 1
@@ -224,13 +222,11 @@ cmd_logs() {
 cmd_build() { setup_java; mvn clean package; }
 cmd_test()  { setup_java; mvn test; }
 
-# --- database migrations (Supabase/Postgres only) ---------------------------
+# --- database migrations ----------------------------------------------------
 # The migrate/db-info/db-repair commands drive the Flyway maven plugin against
 # the Supabase database named in .env. They exist so a migration can be
-# applied or inspected without booting the whole app - the app also applies
-# pending migrations itself on startup under the supabase profile.
-#
-# H2 needs none of this: locally, Hibernate still builds the schema itself.
+# applied or inspected without booting the whole app - the app applies pending
+# migrations itself on every start.
 
 env_value() {
   # Prints one key's value from .env. Read with sed rather than `source`:
@@ -267,19 +263,6 @@ cmd_migrate()   { setup_java; setup_flyway_env; mvn flyway:migrate; }
 cmd_db_info()   { setup_java; setup_flyway_env; mvn flyway:info; }
 cmd_db_repair() { setup_java; setup_flyway_env; mvn flyway:repair; }
 
-cmd_reset_db() {
-  [[ -z "$(app_pid)" ]] || die "Stop the app first, it holds the database open:  ./run.sh stop"
-  if [[ ! -d "$DATA_DIR" ]]; then
-    info "No $DATA_DIR/ directory - nothing to reset."
-    return 0
-  fi
-  warn "This deletes $DATA_DIR/ (the H2 database and any attachments)."
-  read -r -p "Type 'yes' to confirm: " reply
-  [[ "$reply" == "yes" ]] || { info "Left alone."; return 0; }
-  rm -rf "$DATA_DIR"
-  ok "Deleted. The next start seeds fresh sample data."
-}
-
 usage() {
   # The header comment above is the help text: print the comment block that
   # follows the shebang, stopping at the first line that is not a comment, so
@@ -296,7 +279,6 @@ case "${1:-start}" in
   logs)              cmd_logs ;;
   build)             cmd_build ;;
   test)              cmd_test ;;
-  reset-db)          cmd_reset_db ;;
   migrate)           cmd_migrate ;;
   db-info)           cmd_db_info ;;
   db-repair)         cmd_db_repair ;;

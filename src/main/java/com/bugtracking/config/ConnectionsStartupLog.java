@@ -17,9 +17,9 @@ import java.sql.SQLException;
  * One line at startup naming the database, the attachment store and the mail
  * setup that are actually live.
  *
- * <p>With H2, Supabase and S3 all configurable, "which one am I talking to?"
- * stops being obvious — and a profile that silently failed to activate looks
- * exactly like one that worked until data goes missing. This answers it in the
+ * <p>There is only one database now, but "which one am I talking to?" is still
+ * worth answering out loud: a .env pointing at the wrong Supabase project looks
+ * exactly like the right one until data goes missing. This answers it in the
  * log, from the real connection rather than from the properties that were
  * meant to shape it.
  *

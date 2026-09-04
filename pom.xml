@@ -80,22 +80,17 @@
       <artifactId>thymeleaf-extras-springsecurity6</artifactId>
     </dependency>
 
-    <!-- File-based H2 database, no install needed. The default. -->
-    <dependency>
-      <groupId>com.h2database</groupId>
-      <artifactId>h2</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-
-    <!-- Postgres driver: Supabase is Postgres. Used by the "supabase" profile. -->
+    <!-- Postgres driver: Supabase is Postgres, and the only database this app
+         has. No embedded database is on the classpath on purpose - one would
+         let a checkout without credentials boot onto its own private data. -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
 
-    <!-- Versioned schema migrations (src/main/resources/db/migration). Only
-         the "supabase" profile runs them - H2 keeps ddl-auto=update. -->
+    <!-- Versioned schema migrations (src/main/resources/db/migration/postgres),
+         applied on every start. They own the schema; Hibernate only validates. -->
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-core</artifactId>

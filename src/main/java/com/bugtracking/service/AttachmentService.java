@@ -74,6 +74,21 @@ public class AttachmentService {
             // with a broken play button on it.
             "video/mp4", "video/webm", "video/ogg", "video/quicktime");
 
+    /**
+     * What a client may send in. A picture of the screen, a recording of it, or
+     * a PDF — the three things a report is ever actually made of. SVG is absent
+     * for the reason it is absent from INLINE_TYPES, and every archive, document
+     * and log format is absent because none of them is evidence of a bug and all
+     * of them are surface.
+     */
+    private static final Set<String> GUEST_TYPES = Set.of(
+            "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp",
+            "image/heic", "image/heif", "application/pdf",
+            "video/mp4", "video/webm", "video/ogg", "video/quicktime");
+
+    /** How many files can ride along with one report or one reply. */
+    public static final int GUEST_MAX_FILES = 3;
+
     /** As much of a name as the file_name column holds. */
     private static final int MAX_FILE_NAME = 255;
 
@@ -144,29 +159,74 @@ public class AttachmentService {
      * checks the file against.
      */
     public Attachment store(Long bugId, Long commentId, MultipartFile file, String uploadedBy) {
-        if (file == null || file.isEmpty()) {
-            throw new RejectedFileException("Pick a file before uploading.");
-        }
+        return store(bugId, commentId, file, uploadedBy, false);
+    }
 
-        String original = Paths.get(file.getOriginalFilename() == null ? "file" : file.getOriginalFilename())
-                .getFileName().toString();          // strips any path the browser sent
+    /**
+     * The same, saying whether the client who raised the bug may download it.
+     *
+     * <p>Taken from the comment the file arrives with rather than asked
+     * separately — a file on a shared comment is shared, one on an internal
+     * comment is not — and true for what a guest uploads themselves. There is
+     * no control of its own, so nothing can be shared by ticking the wrong box.
+     */
+    /**
+     * Why this file cannot be stored, or null when it can.
+     *
+     * <p>An answer rather than an exception, and that is what it is for. This
+     * class is transactional, so a {@link RejectedFileException} thrown from
+     * inside {@link #store} marks the caller's transaction rollback-only —
+     * catching it is not enough, and a caller that saves a report and then
+     * attaches to it would lose the report along with the file. Asking first
+     * keeps the two separable: the words are saved, and the file is reported as
+     * left off.
+     *
+     * <p>{@code guest} narrows it to what a client may send. Same size rules,
+     * shorter list of things: see {@link #GUEST_TYPES}.
+     */
+    public String refusalFor(MultipartFile file, boolean guest) {
+        if (file == null || file.isEmpty()) {
+            return "Pick a file before uploading.";
+        }
+        String original = nameOf(file);
         String extension = extensionOf(original);
 
         if (!properties.getAllowedExtensions().contains(extension)) {
-            throw new RejectedFileException("\"" + original + "\" is not an allowed file type. Allowed: "
-                    + String.join(", ", properties.getAllowedExtensions()) + ".");
+            return "\"" + original + "\" is not an allowed file type. Allowed: "
+                    + String.join(", ", properties.getAllowedExtensions()) + ".";
+        }
+        MediaType type = mediaTypeFor(original);
+        if (guest && !GUEST_TYPES.contains(type.getType() + "/" + type.getSubtype())) {
+            return "\"" + original + "\" was not attached — a report takes a screenshot,"
+                    + " a screen recording or a PDF.";
         }
         // Video is measured against its own, much larger ceiling: see
         // AttachmentProperties.maxVideoSizeBytes for why the general one is not
         // simply raised to meet it.
-        long ceiling = isVideo(mediaTypeFor(original))
-                ? properties.getMaxVideoSizeBytes()
-                : properties.getMaxSizeBytes();
+        long ceiling = isVideo(type) ? properties.getMaxVideoSizeBytes() : properties.getMaxSizeBytes();
         if (file.getSize() > ceiling) {
-            throw new RejectedFileException("\"" + original + "\" is "
+            return "\"" + original + "\" is "
                     + Math.round(file.getSize() / (1024.0 * 1024.0) * 10) / 10.0 + " MB - the limit is "
-                    + Math.round(ceiling / (1024.0 * 1024.0)) + " MB.");
+                    + Math.round(ceiling / (1024.0 * 1024.0)) + " MB.";
         }
+        return null;
+    }
+
+    /** The name the browser sent, with any path it came with stripped off. */
+    private static String nameOf(MultipartFile file) {
+        String sent = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
+        return Paths.get(sent).getFileName().toString();
+    }
+
+    public Attachment store(Long bugId, Long commentId, MultipartFile file, String uploadedBy,
+                            boolean shared) {
+        String refusal = refusalFor(file, false);
+        if (refusal != null) {
+            throw new RejectedFileException(refusal);
+        }
+
+        String original = nameOf(file);
+        String extension = extensionOf(original);
 
         // Trimmed before anything is written: the column stops at 255, and an
         // insert that fails on the length would leave the bytes behind on disk.
@@ -191,6 +251,7 @@ public class AttachmentService {
         attachment.setContentType(mediaTypeFor(fileName).toString());
         attachment.setSizeBytes(file.getSize());
         attachment.setUploadedBy(BugHistoryService.actor(uploadedBy));
+        attachment.setShared(shared);
 
         Attachment saved = repository.save(attachment);
         // Only the report's own files earn a history line. A file on a comment
@@ -203,6 +264,23 @@ public class AttachmentService {
     }
 
     /**
+     * The same, for a file arriving from outside the company.
+     *
+     * <p>Narrower than {@link #store}, and narrower on purpose. The general
+     * allow-list exists so a colleague can attach a log, a zip or a spreadsheet
+     * to a bug they are working; none of that is what a client is doing, and
+     * every extension on a list is one more thing an outside uploader can put
+     * on this server. What is left is what a report is actually made of: a
+     * picture of the screen, a recording of it, or the PDF somebody was sent.
+     *
+     * <p>Stored shared, because a client who cannot see the screenshot they
+     * just attached would reasonably think it never arrived.
+     */
+    public Attachment storeFromGuest(Long bugId, Long commentId, MultipartFile file, String uploadedBy) {
+        return store(bugId, commentId, file, uploadedBy, true);
+    }
+
+    /**
      * Oldest first. A multi-file upload stamps several rows inside the same
      * tick, so uploadedAt on its own leaves the thumbnail order to chance from
      * one page load to the next; the id breaks the tie the way the upload did.
@@ -210,6 +288,12 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public List<Attachment> forBug(Long bugId) {
         return ordered(repository.findByBugIdAndCommentIdIsNullOrderByUploadedAtAsc(bugId));
+    }
+
+    /** Every file on this bug its client may download, report and thread alike. */
+    @Transactional(readOnly = true)
+    public List<Attachment> sharedFor(Long bugId) {
+        return ordered(repository.findByBugIdAndSharedTrueOrderByUploadedAtAsc(bugId));
     }
 
     /**

@@ -84,21 +84,37 @@ in the migrations — and the older ones still carry H2-era SQL that is inert on
   must not rewrite it. Live facts (a project's team) are real relations.
 - **Status is a board column name**, not an enum: each project owns its `board_columns` rows
   and a bug's status is whichever column it sits in.
-- **`team_members` is the users table, and the only one.** A row with `password_hash` can
-  sign in; one without is only a name that appears on bugs. There is no configured account,
+- **`team_members` is the users table, and the only one** — clients included. A row with
+  `password_hash` can sign in; one without is only a name that appears on bugs. There is no configured account,
   no seeded person, no project and no example bug anywhere in the source — everything in this
   app was created in this app, so never add a seeder or a properties-file login to make
   something appear. The single exception is `BootstrapAdmin`, which writes the *first* admin
   from two `.env` values and does nothing once one active admin has a password; sign-in
   itself never reads it.
-- **A row carries a `role` — ADMIN or MEMBER, and the line is drawn around the setup, not
-  the work.** Raising, moving, commenting and assigning stay open to everyone; the roster,
-  passwords, roles and projects are an admin's. A new write route that administers something
-  needs a line in `SecurityConfig.filterChain`, and the control that posts to it needs
-  `sec:authorize` so nobody is shown a button that 403s.
-- **Security:** everything is behind login except `/login`, static files, `/error` and
-  `/api/**`. The API is deliberately open and CSRF-exempt; HTML forms need `th:action` to
-  get their CSRF token.
+- **A row carries a `role` — ADMIN, MEMBER or GUEST.** Between the first two the line is
+  drawn around the setup, not the work: raising, moving, commenting and assigning stay open
+  to everyone; the roster, passwords, roles and projects are an admin's. A new write route
+  that administers something needs a line in `SecurityConfig.filterChain`, and the control
+  that posts to it needs `sec:authorize` so nobody is shown a button that 403s.
+- **GUEST is a client, from outside, and is not on that line at all.** A guest is a
+  `team_members` row bound to one project by `guest_project_id`, and what it may reach is
+  an allowlist: `/portal/**` and `/account`. It is granted `ROLE_GUEST` and deliberately
+  **not** `ROLE_USER` — the chain ends `anyRequest().hasRole("USER")`, so every route this
+  app has and every route it grows is closed to a client until a line opens it. Never grant
+  a guest `ROLE_USER`, and never widen `/portal` to a route that is not scoped by
+  `GuestService`, which is the single place that answers "is this row theirs".
+- **Everything a client can see is decided in `GuestService`.** Reads start from the account
+  and narrow; an id in a URL is a filter, never a grant. Bugs carry `guest_id` (ownership,
+  a bare id like `blocked_by`) and `via_guest` (where it came from). Comments and
+  attachments carry `shared`, false by default — a client sees only what somebody ticked.
+  Guests are excluded from every people list by role in `TeamMemberService.all/active`, so
+  they cannot be assigned, mentioned or ticked onto a project.
+- **Security:** everything is behind login except `/login`, static files and `/error`.
+  `/api/**` is `hasRole("USER")` — it used to be `permitAll`, which meant an unauthenticated
+  `GET /api/bugs` returned every bug on every project; it is closed because a client now
+  holds a session on this origin. It is no longer CSRF-exempt either, so the two `fetch`
+  calls in `app.js` send the token from `layout.html`'s meta tag. HTML forms need
+  `th:action` to get theirs.
 - **Email mirrors the bell; it never decides anything.** `NotificationService` says who hears
   what and `EmailService` carries it out, after the transaction commits and on its own
   thread. If a change should email somebody it does not notify, add the *notification*.

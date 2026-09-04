@@ -13,6 +13,16 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     /** Oldest first: a comment thread reads like a conversation. */
     List<Comment> findByBugIdOrderByCreatedAtAsc(Long bugId);
 
+    /**
+     * The part of the thread a client may read: shared, oldest first.
+     *
+     * <p>Flat rather than threaded. A shared reply to an internal comment would
+     * be an answer to something the reader cannot see, so the portal draws the
+     * shared ones as one conversation and does not try to redraw the shape of a
+     * thread it is only seeing half of.
+     */
+    List<Comment> findByBugIdAndSharedTrueOrderByCreatedAtAsc(Long bugId);
+
     /** One comment's replies, for taking them with it when it goes. */
     List<Comment> findByParentIdOrderByCreatedAtAsc(Long parentId);
 

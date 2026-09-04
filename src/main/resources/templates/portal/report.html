@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{portal/layout :: page('BUG-' + ${bug.id}, ~{::section})}">
+<body>
+<section>
+
+    <header class="portal-head">
+        <div>
+            <p class="portal-crumb">
+                <a th:href="@{/portal}">Your reports</a>
+                <svg class="i" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+                <span class="mono" th:text="'BUG-' + ${bug.id}">BUG-12</span>
+            </p>
+            <h1 th:text="${bug.title}">Sign-in swallows the first click</h1>
+        </div>
+        <a class="btn btn-ghost" th:href="@{/portal}">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span>Back</span>
+        </a>
+    </header>
+
+    <!-- Where it has got to, first and on its own. It is the only question
+         somebody opening their own report a week later has. -->
+    <div class="panel portal-status">
+        <div class="panel-pad">
+            <span class="badge badge-lg" th:style="'--c:' + ${cols.token(bug)}"
+                  th:text="${cols.label(bug)}">In progress</span>
+            <span class="portal-status-meta">
+                <span class="meter" th:classappend="'sev-' + ${bug.severity}" aria-hidden="true">
+                    <i></i><i></i><i></i><i></i>
+                </span>
+                <span th:text="${bug.severity.label}">High</span>
+                <span class="dot" aria-hidden="true"></span>
+                <span th:text="${bug.environment?.label} ?: 'Not set'">Production</span>
+                <span class="dot" aria-hidden="true"></span>
+                <span>sent <span th:attr="data-time=${bug.createdAt}"
+                      th:text="${#temporals.format(bug.createdAt, 'd MMM yyyy')}">2 Sep 2026</span></span>
+            </span>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">
+            <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-file-text"/></svg>
+            <h2>What you sent</h2>
+        </div>
+        <div class="panel-pad">
+            <p class="pre" th:text="${#strings.isEmpty(bug.description)}
+                                    ? 'No details were given.' : ${bug.description}">Description</p>
+        </div>
+    </div>
+
+    <!-- Only the files that are theirs to see: what they attached, and what
+         somebody attached to a comment shared back. GuestService decides which,
+         so there is nothing to filter here. -->
+    <div class="panel" th:unless="${#lists.isEmpty(files)}">
+        <div class="panel-head">
+            <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-paperclip"/></svg>
+            <h2>Files</h2>
+            <span class="count-pill num" th:text="${#lists.size(files)}">2</span>
+        </div>
+        <div class="panel-pad">
+            <ul class="portal-files">
+                <li th:each="f : ${files}">
+                    <a th:href="@{/portal/reports/{id}/files/{fid}(id=${bug.id},fid=${f.id})}"
+                       th:text="${f.fileName}">screenshot.png</a>
+                    <span class="muted num"
+                          th:text="${#numbers.formatDecimal(f.sizeBytes / 1024.0, 1, 0)} + ' KB'">84 KB</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="panel" id="conversation">
+        <div class="panel-head">
+            <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-message"/></svg>
+            <h2>Conversation</h2>
+            <span class="count-pill num" th:if="${!#lists.isEmpty(conversation)}"
+                  th:text="${#lists.size(conversation)}">3</span>
+        </div>
+
+        <div class="panel-pad">
+            <ol class="portal-thread" th:unless="${#lists.isEmpty(conversation)}">
+                <li th:each="c,st : ${conversation}" th:style="'--i:' + ${st.index}"
+                    th:classappend="${c.createdBy == me.name} ? 'is-yours' : ''">
+                    <span class="avatar avatar-sm" th:attr="data-avatar=${c.createdBy}" aria-hidden="true"></span>
+                    <div>
+                        <p class="portal-thread-who">
+                            <b th:text="${c.createdBy == me.name} ? 'You' : ${c.createdBy}">Nishana R</b>
+                            <span class="muted" th:attr="data-time=${c.createdAt}"
+                                  th:text="${#temporals.format(c.createdAt, 'd MMM, HH:mm')}">2 Sep, 14:02</span>
+                        </p>
+                        <p class="pre" th:text="${c.text}">We can reproduce it, looking now.</p>
+                    </div>
+                </li>
+            </ol>
+
+            <!-- Empty is worth a sentence: silence here means nobody has written
+                 back yet, not that the report went nowhere. -->
+            <p class="pop-empty" th:if="${#lists.isEmpty(conversation)}">
+                Nothing yet. Anything the team wants to ask you about this will appear here.
+            </p>
+
+            <form class="portal-reply" method="post" enctype="multipart/form-data"
+                  th:action="@{/portal/reports/{id}/replies(id=${bug.id})}" id="reply-form">
+                <label>
+                    <span class="sr-only">Reply</span>
+                    <textarea name="text" id="reply-text" rows="3" required
+                              placeholder="Anything to add? Still happening, or fixed?"></textarea>
+                </label>
+                <div class="portal-reply-actions">
+                    <label class="btn btn-sm btn-ghost comment-clip" for="reply-files">
+                        <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                        <span>Attach</span>
+                        <input type="file" name="files" id="reply-files" multiple
+                               accept="image/*,video/*,application/pdf">
+                    </label>
+                    <span class="spacer"></span>
+                    <button type="submit" class="btn btn-primary btn-sm" id="send-reply">Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</section>
+</body>
+</html>

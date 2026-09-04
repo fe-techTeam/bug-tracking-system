@@ -214,9 +214,13 @@ Sign out with the ⏻ button in the top bar.
 
 - **CSRF is on** for the HTML forms. Thymeleaf adds the token to any form with `th:action`, so every
   form in the app already carries one. A hand-rolled form without `th:action` would be rejected.
-- **`/api/**` stays open and CSRF-exempt**, so scripts and test helpers keep working unchanged. That
-  is a deliberate, reversible choice for a localhost tool — one line in `SecurityConfig` closes it:
-  change `.requestMatchers("/api/**").permitAll()` to `.authenticated()`.
+- **`/api/**` needs a signed-in session.** It used to be `permitAll` and CSRF-exempt, which meant an
+  unauthenticated `GET /api/bugs` returned every bug on every project and `GET /api/projects/*/team`
+  returned the roster. That was survivable while everybody who could reach the app was already
+  inside; it stopped being survivable when [client access](#client-access) started handing people
+  outside the company a session on this origin. It is `hasRole("USER")` now — so the app's own two
+  `fetch` calls keep working on the session cookie, a client is refused, and a script has to sign in
+  first. CSRF applies to it too, so those two calls send the token from `layout.html`'s meta tag.
 - **Selenium tests need a sign-in step first.** New ids: `login-form`, `email`, `password`,
   `login-button`, `login-error`, `logout-button`. Every other id is unchanged.
 
@@ -849,11 +853,55 @@ holds a name that is no longer on the team — an old value like `dev-team`, or 
 hidden — the edit form keeps showing it, so opening an old bug never silently reassigns it.
 
 `GET /api/team` returns the active members; `?activeOnly=false` returns everyone. It never returns
-`password_hash` — the field is `@JsonIgnore`d, and `/api/**` is open, so that is load-bearing rather
-than tidiness.
+`password_hash` or `role` — both are `@JsonIgnore`d, which is load-bearing rather than tidiness: a
+hash and a list of who is an admin are the two things worth stealing off this endpoint. Neither
+list includes clients, who are the same table but never on the team — see
+[Client access](#client-access).
 
 The same table is the users table — see [Signing in](#signing-in) — and a project's own team is a
 separate, live relation on top of it, see [Projects](#projects).
+
+## Client access
+
+A client — somebody outside the company, on one project — can be given an account that reaches
+exactly one screen. An admin grants it on **Settings → Team → Client access**: a name, an email, the
+project, and a password to send them. They sign in at the same `/login` everybody else does and land
+on `/portal` instead of the board.
+
+What they get is the whole of it:
+
+- **Their own reports**, newest first, each with the board column it is sitting in — the client sees
+  your wording for the column ("Ready to test"), because that is what the column is called.
+- **A form to send another one in**: what is wrong, what happened, how bad, where they saw it, and up
+  to three screenshots, screen recordings or PDFs. Nothing else — not the project, not the column,
+  not an assignee. Those are decided on the server from the account that sent it.
+- **The conversation on their own report**, and a box to reply into it.
+
+What they do not get is everything else, and that is enforced rather than hidden. A client is granted
+`ROLE_GUEST` and *not* `ROLE_USER`, and the filter chain ends `anyRequest().hasRole("USER")` — so the
+board, the roster, another client's report, the JSON API and every route added to this app in future
+are already closed to them. Which *rows* they see is `GuestService`, the one place that answers it:
+every read starts from the account and narrows, so an id in a URL is a filter and never a grant.
+
+### What a client can read of a thread
+
+**Comments are internal until somebody shares them.** On a bug a client raised, the comment box grows
+a **Share with the client** tick and a banner above it saying who is watching. Only the ticked ones
+reach the portal, and they are marked *client can see this* in the thread so nobody has to remember
+which. Files inherit the visibility of the comment they arrive on — there is no second switch to get
+wrong — so sharing a file with a client means attaching it to a comment that is shared. Replying to a
+shared comment pre-ticks the box, because an answer they cannot read to something they can is the
+mistake this exists to prevent.
+
+### The mark, and the filter
+
+A bug that came in from outside carries a small ◇ beside its reporter — on the board card, in the
+list's *Raised by* column, and on the bug's own rail. The board's **Filters → Came from** narrows to
+*A client* or *The team*.
+
+Clients never appear in an assignee picker, a people filter or an `@` mention: `TeamMemberService`
+filters them out by role, so they cannot be given work. Revoking access is the **Revoke** button on
+the same panel — it switches the account off, and their reports stay on the board where they belong.
 
 ## The interface
 

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
+      th:fragment="page(title, content)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' · ' + ${project.name}">Reports</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400..600&display=swap">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+
+    <!-- Applied before first paint, so a dark theme never flashes white. -->
+    <script>
+        (function () {
+            var root = document.documentElement;
+            root.classList.add("js");
+            try {
+                var t = localStorage.getItem("bugtracking.theme");
+                if (t === "light" || t === "dark") root.setAttribute("data-theme", t);
+            } catch (e) { /* private mode: fall back to the system theme */ }
+        })();
+    </script>
+</head>
+<body class="portal-page">
+
+<!-- A shell of its own rather than layout.html's, and that is the point of the
+     file. The app shell is the project switcher, the bell, the bin and the
+     roster: chrome that says what else exists here. None of it is a client's,
+     so rather than draw it and hide the parts they may not have, this page is
+     built out of the handful of things they may. There is nothing here to
+     accidentally leave visible.
+
+     The icons it needs, since it is outside the sprite in layout.html. -->
+<svg width="0" height="0" class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/>
+    </symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24">
+        <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.18 5.18l-9.2 9.2a1.83 1.83 0 0 1-2.59-2.6l8.49-8.48"/>
+    </symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>
+        <path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/>
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24">
+        <path d="M3 3v18h18"/><path d="M7 15v3"/><path d="M12 9v9"/><path d="M17 5v13"/>
+    </symbol>
+    <symbol id="i-board" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
+        <rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
+    </symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+    </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/>
+        <path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/>
+        <path d="m19.1 4.9-1.4 1.4"/>
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+</svg>
+
+<div class="portal-shell">
+
+    <header class="portal-bar">
+        <a class="brand portal-brand" th:href="@{/portal}">
+            <span class="brand-mark" aria-hidden="true">B</span>
+            <span class="portal-brand-text">
+                <b th:text="${project.name}">Godrej</b>
+                <em>report a bug</em>
+            </span>
+        </a>
+
+        <div class="portal-bar-actions">
+            <!-- One icon, not two: app.js swaps this use[href] between
+                 #i-moon and #i-sun and rewrites the label with it, the same way
+                 it does in layout.html. Two stacked icons would draw both. -->
+            <button type="button" class="icon-btn" id="theme-toggle"
+                    title="Switch theme" aria-label="Switch theme">
+                <svg class="i" aria-hidden="true"><use href="#i-moon"/></svg>
+            </button>
+            <span class="portal-who">
+                <span class="avatar avatar-sm" th:attr="data-avatar=${me.name}" aria-hidden="true"></span>
+                <span th:text="${me.name}">Priya Nair</span>
+            </span>
+            <!-- A form, not a link: logging out is a state change, and a GET
+                 that ends a session is one a prefetcher can trip. -->
+            <form method="post" th:action="@{/logout}">
+                <button type="submit" class="btn btn-sm btn-ghost">Sign out</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="portal-main">
+        <!-- Every flash this portal raises lands here: a report sent, a reply
+             sent, a file refused, a link that was not theirs. One place, so
+             nothing is answered silently. -->
+        <p class="portal-flash" th:if="${message}" th:text="${message}" role="status">Done.</p>
+
+        <div th:replace="${content}">Page</div>
+    </main>
+
+    <footer class="portal-foot">
+        <span>Reports you send here reach the team working on
+            <b th:text="${project.name}">Godrej</b>.</span>
+    </footer>
+</div>
+
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>

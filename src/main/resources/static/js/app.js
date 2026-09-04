@@ -16,6 +16,22 @@
         try { return localStorage.getItem(key); } catch (e) { return null; }
     }
 
+    /* The CSRF token, for the two API calls below. /api/** is no longer exempt:
+       it authenticates on the session cookie now, and an endpoint that trusts a
+       cookie without a token is what CSRF means. Forms get theirs from
+       th:action; a fetch has to read layout.html's meta tag. */
+    function meta(name) {
+        var tag = document.querySelector('meta[name="' + name + '"]');
+        return tag ? tag.getAttribute("content") : null;
+    }
+    function csrfHeaders(extra) {
+        var headers = extra || {};
+        var token = meta("_csrf");
+        var header = meta("_csrf_header");
+        if (token && header) headers[header] = token;
+        return headers;
+    }
+
     /* ---------- theme: system by default, remembered once you choose ---------- */
     var THEME_KEY = "bugtracking.theme";
 
@@ -333,7 +349,8 @@
 
                 fetch("/api/bugs/" + id + "/status?status=" + encodeURIComponent(status), {
                     method: "POST",
-                    credentials: "same-origin"
+                    credentials: "same-origin",
+                    headers: csrfHeaders()
                 }).then(function (res) {
                     if (!res.ok) throw new Error(res.status + "");
                     card.classList.remove("is-saving");
@@ -547,7 +564,7 @@
             fetch("/api/columns/order", {
                 method: "POST",
                 credentials: "same-origin",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                headers: csrfHeaders({ "Content-Type": "application/x-www-form-urlencoded" }),
                 body: body
             }).then(function (res) {
                 if (!res.ok) throw new Error(res.status + "");

@@ -45,6 +45,7 @@
                     <span th:case="'closed'">🏁</span>
                     <span th:case="'unassigned'">✕</span>
                     <span th:case="'mention'">@</span>
+                    <span th:case="'guest'">◇</span>
                     <span th:case="*">•</span>
                 </span>
                 <span>
@@ -368,6 +369,21 @@
     <span th:unless="${cols.dueToday(bug)}"
           th:text="${card} ? ${#temporals.format(bug.dueDate, 'd MMM')}
                            : ${#temporals.format(bug.dueDate, 'd MMM yyyy')}">12 Sep</span>
+</span>
+
+<!-- Where a report came from, when it came from outside.
+
+     A mark rather than a word, because it sits in the middle of a row that is
+     already a name and a date, and "client" spelled out there reads as part of
+     the name. It carries its own title and its own screen-reader text, so what
+     it means is one hover or one tab-stop away and never guessed at.
+
+     Nothing is drawn for a bug the team raised: an absent mark is the normal
+     case, and marking both would make the pair meaningless. -->
+<span th:fragment="guestMark(bug)" class="guest-mark" th:if="${bug.viaGuest}"
+      title="Raised by a client, from outside">
+    <svg class="i" aria-hidden="true"><use href="#i-guest"/></svg>
+    <span class="sr-only">Raised by a client</span>
 </span>
 
 <!-- A sortable heading on the bug list.

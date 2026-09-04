@@ -380,6 +380,155 @@
                     </p>
                 </div>
             </div>
+
+            <!-- ---------- client access ---------- -->
+            <!-- Its own panel, below the roster and not inside it. A client is
+                 not a quiet kind of team member: they are never assigned, never
+                 mentioned, never on a project's team, and they see one screen
+                 nobody else sees. Two lists say that; one list with a column
+                 saying it does not. -->
+            <div class="panel" id="clients">
+                <div class="panel-head">
+                    <svg class="i" aria-hidden="true"><use href="#i-guest"/></svg>
+                    <h2>Client access</h2>
+                    <span class="count-pill num" th:if="${!#lists.isEmpty(guests)}"
+                          th:text="${#lists.size(guests)}">2</span>
+                    <span class="spacer"></span>
+
+                    <details class="pop-wrap" id="add-client-pop"
+                             th:if="${!#lists.isEmpty(activeProjects)}">
+                        <summary aria-label="Give a client access">
+                            <span class="btn btn-sm btn-primary">
+                                <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+                                <span>Add client</span>
+                            </span>
+                        </summary>
+                        <div class="pop">
+                            <div class="pop-head"><span>New client</span></div>
+                            <!-- id 0 means "a new one" — see TeamController.guest. -->
+                            <form class="pop-form" method="post" th:action="@{/team/0/guest}"
+                                  id="client-form">
+                                <input type="hidden" name="back" th:value="@{/settings(tab='team')}">
+                                <label>
+                                    <span>Name</span>
+                                    <input type="text" name="name" id="client-name" required
+                                           placeholder="Who is reporting" autocomplete="off"
+                                           autocapitalize="words" enterkeyhint="next"
+                                           autocorrect="off" spellcheck="false">
+                                </label>
+                                <label>
+                                    <span>Email</span>
+                                    <input type="email" name="email" id="client-email" required
+                                           placeholder="name@theircompany.com" autocomplete="off"
+                                           inputmode="email" enterkeyhint="next"
+                                           autocapitalize="none" autocorrect="off" spellcheck="false">
+                                </label>
+                                <label>
+                                    <span>Project</span>
+                                    <select name="projectId" id="client-project" required>
+                                        <option value="">— Which project —</option>
+                                        <option th:each="p : ${activeProjects}"
+                                                th:value="${p.id}" th:text="${p.name}">Godrej</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    <span>Password <span class="req">*</span></span>
+                                    <!-- Required, unlike a team member's. A member
+                                         with no password is a name on bugs, which
+                                         is a useful thing to be; a client with no
+                                         password is an account that cannot do the
+                                         one thing it exists for. -->
+                                    <input type="password" name="password" id="client-password"
+                                           required minlength="8" maxlength="72"
+                                           placeholder="Send it to them yourself"
+                                           autocomplete="new-password" enterkeyhint="done"
+                                           autocapitalize="none" autocorrect="off" spellcheck="false">
+                                </label>
+                                <p class="hint">
+                                    They sign in at the same address everyone else does and land
+                                    on a page with one project on it. Nothing else in this app is
+                                    reachable from there.
+                                </p>
+                                <button type="submit" class="btn btn-primary btn-block"
+                                        id="add-client">Give access</button>
+                            </form>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="table-wrap" th:if="${!#lists.isEmpty(guests)}">
+                    <table class="bug-table roster-table" id="client-table">
+                        <thead>
+                        <tr>
+                            <th class="grow">Client</th>
+                            <th>Reports on</th>
+                            <th class="row-act"><span class="sr-only">Actions</span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="g,rs : ${guests}" th:style="'--i:' + ${rs.index}"
+                            th:classappend="${g.active} ? '' : 'is-inactive'">
+                            <td data-label="Client">
+                                <span class="client-chip">
+                                    <span class="avatar avatar-sm" th:attr="data-avatar=${g.name}"
+                                          aria-hidden="true"></span>
+                                    <span class="client-name" th:text="${g.name}">Priya Nair</span>
+                                    <span class="muted" th:text="${g.email}">priya@theirs.com</span>
+                                </span>
+                            </td>
+                            <td data-label="Reports on">
+                                <!-- Changing the project is the only thing about a
+                                     client that is ever edited, so it is the row
+                                     rather than a page behind it. Self-submitting
+                                     with JS, with a button beside it without. -->
+                                <form method="post" th:action="@{/team/{id}/guest(id=${g.id})}"
+                                      class="inline-form">
+                                    <input type="hidden" name="back" th:value="@{/settings(tab='team')}">
+                                    <label class="sr-only" th:for="'client-project-' + ${g.id}">Project</label>
+                                    <select name="projectId" th:id="'client-project-' + ${g.id}"
+                                            data-autosubmit>
+                                        <option th:each="p : ${activeProjects}" th:value="${p.id}"
+                                                th:selected="${p.id == g.guestProjectId}"
+                                                th:text="${p.name}">Godrej</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-sm js-off">Move</button>
+                                </form>
+                            </td>
+                            <td class="row-act">
+                                <!-- Switching a client off is what revokes access:
+                                     the account stays, so the reports they sent
+                                     keep reading correctly, and their sign-in
+                                     stops working the moment this is unticked. -->
+                                <form method="post" th:action="@{/team/{id}/active(id=${g.id})}"
+                                      class="inline-form"
+                                      th:attr="onsubmit=${g.active}
+                                             ? |return confirm('Stop ${g.name} signing in?');| : null">
+                                    <input type="hidden" name="active" th:value="${g.active} ? 'false' : 'true'">
+                                    <input type="hidden" name="back" th:value="@{/settings(tab='team')}">
+                                    <button type="submit" class="btn btn-sm btn-ghost"
+                                            th:text="${g.active} ? 'Revoke' : 'Restore'">Revoke</button>
+                                </form>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${#lists.isEmpty(guests)}" id="no-clients">
+                    <div class="empty-art">
+                        <svg class="i" aria-hidden="true"><use href="#i-guest"/></svg>
+                    </div>
+                    <h3>No clients have access</h3>
+                    <p th:if="${!#lists.isEmpty(activeProjects)}">
+                        A client with access signs in and gets one screen: their own reports on
+                        one project, and a form to send in another. They cannot see the board,
+                        the team, or anybody else's bugs.
+                    </p>
+                    <p th:if="${#lists.isEmpty(activeProjects)}">
+                        Add a project first — client access is access to one of them.
+                    </p>
+                </div>
+            </div>
         </div>
 
         <!-- ---------- one person's account ---------- -->

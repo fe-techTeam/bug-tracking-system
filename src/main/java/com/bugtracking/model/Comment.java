@@ -53,6 +53,23 @@ public class Comment {
     @Column(name = "created_by", length = 80)
     private String createdBy;
 
+    /**
+     * Whether the client who raised this bug may read it.
+     *
+     * <p>False unless somebody ticked the box, and that direction is the only
+     * safe one: a thread is where a team is candid about what is actually
+     * broken, and a default of "shared" would have published every word already
+     * written on the strength of a schema change. Sharing has to be a decision
+     * somebody made about one comment.
+     *
+     * <p>The box only appears on a bug a client can see at all — see
+     * {@code bugs/detail.html} — so nothing changes on the bugs nobody outside
+     * is reading. A guest's own replies are stored shared, because a reply the
+     * writer cannot see back is not a conversation.
+     */
+    @Column(nullable = false)
+    private boolean shared = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -124,5 +141,13 @@ public class Comment {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public boolean isShared() {
+        return shared;
+    }
+
+    public void setShared(boolean shared) {
+        this.shared = shared;
     }
 }

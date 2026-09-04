@@ -64,7 +64,7 @@ public class GlobalModelAttributes {
      */
     @ModelAttribute("cols")
     public BoardColumns columns(HttpServletRequest request) {
-        return recovering(request) ? new BoardColumns(List.of()) : columns.snapshot();
+        return chromeless(request) ? new BoardColumns(List.of()) : columns.snapshot();
     }
 
     /**
@@ -78,7 +78,7 @@ public class GlobalModelAttributes {
      */
     @ModelAttribute("isAdmin")
     public boolean isAdmin(HttpServletRequest request) {
-        return !recovering(request)
+        return !chromeless(request)
                 && com.bugtracking.config.AccountPrincipal
                         .of(org.springframework.security.core.context.SecurityContextHolder
                                 .getContext().getAuthentication())
@@ -89,25 +89,25 @@ public class GlobalModelAttributes {
     /** Drives the count on the bell in the navbar. */
     @ModelAttribute("unreadNotifications")
     public long unreadNotifications(HttpServletRequest request) {
-        return recovering(request) ? 0 : notifications.unreadCount();
+        return chromeless(request) ? 0 : notifications.unreadCount();
     }
 
     /** What the bell popover lists without leaving the page. */
     @ModelAttribute("recentNotifications")
     public List<Notification> recentNotifications(HttpServletRequest request) {
-        return recovering(request) ? List.of() : notifications.latest(POPOVER_LIMIT);
+        return chromeless(request) ? List.of() : notifications.latest(POPOVER_LIMIT);
     }
 
     /** How much is in the bin, for the navbar's trash icon. */
     @ModelAttribute("trashCount")
     public long trashCount(HttpServletRequest request) {
-        return recovering(request) ? 0 : bugs.trashCount();
+        return chromeless(request) ? 0 : bugs.trashCount();
     }
 
     /** Every project the switcher offers, with its bug count. */
     @ModelAttribute("projectCounts")
     public Map<String, Long> projectCounts(HttpServletRequest request) {
-        return recovering(request) ? Map.of() : projects.sidebarCounts();
+        return chromeless(request) ? Map.of() : projects.sidebarCounts();
     }
 
     /**
@@ -159,7 +159,8 @@ public class GlobalModelAttributes {
     }
 
     /**
-     * Whether this request is something being rendered <em>after</em> a failure.
+     * Whether this request wants none of the chrome above: a page rendered
+     * after a failure, or a client's.
      *
      * <p>Tomcat re-dispatches to {@code /error} with {@link DispatcherType#ERROR},
      * and {@link ErrorPageController} draws a page with no navbar on it — so the
@@ -173,7 +174,25 @@ public class GlobalModelAttributes {
      * during the original request, where the dispatch is still a REQUEST and the
      * shell it renders does want its real counts.
      */
-    private static boolean recovering(HttpServletRequest request) {
-        return request.getDispatcherType() == DispatcherType.ERROR;
+    private static boolean chromeless(HttpServletRequest request) {
+        return request.getDispatcherType() == DispatcherType.ERROR || isGuest();
+    }
+
+    /**
+     * A client, who has no navbar to fill.
+     *
+     * <p>Every attribute above describes the app shell — the project switcher,
+     * the bell, the bin — and the portal draws none of it. Loading it for them
+     * would be a handful of wasted queries, which is the small half; the other
+     * half is that {@code projectCounts} is a list of every project in the
+     * company, and a model attribute that is never rendered today is one a
+     * template can start rendering tomorrow. Better that it is not there.
+     */
+    private static boolean isGuest() {
+        return com.bugtracking.config.AccountPrincipal
+                .of(org.springframework.security.core.context.SecurityContextHolder
+                        .getContext().getAuthentication())
+                .map(com.bugtracking.config.AccountPrincipal::isGuest)
+                .orElse(false);
     }
 }

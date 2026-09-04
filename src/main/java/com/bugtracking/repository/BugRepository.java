@@ -60,6 +60,7 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
                        SELECT a FROM Bug ab JOIN ab.assignees a
                        WHERE ab.id = b.id AND LOWER(a) = LOWER(CAST(:assignee AS string))))
               AND (:reporter IS NULL OR LOWER(b.reportedBy) = LOWER(CAST(:reporter AS string)))
+              AND (:viaGuest IS NULL OR b.viaGuest = :viaGuest)
               AND (:keyword IS NULL
                    OR LOWER(b.title) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
                    OR LOWER(b.description) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
@@ -78,8 +79,21 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
                      @Param("environment") Environment environment,
                      @Param("assignee") String assignee,
                      @Param("reporter") String reporter,
+                     @Param("viaGuest") Boolean viaGuest,
                      @Param("keyword") String keyword,
                      @Param("keywordId") Long keywordId);
+
+    /**
+     * One client's own reports, newest first — the whole of what their portal
+     * lists.
+     *
+     * <p>By id and not by name. {@code reported_by} holds the guest's display
+     * name like every other reporter's, but two people can share a name and any
+     * of them can be renamed, so it is not something to grant a read on. This is
+     * the only query the portal uses to find bugs, which is what makes "can this
+     * client see this bug" one answer rather than one per screen.
+     */
+    List<Bug> findByGuestIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long guestId);
 
     /** Every live bug on one project, newest first — the input to a dashboard. */
     List<Bug> findByProjectIgnoreCaseAndDeletedAtIsNullOrderByCreatedAtDesc(String project);
@@ -87,6 +101,11 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
     List<Bug> findByDeletedAtIsNullOrderByCreatedAtDesc();
 
     long countByProjectIgnoreCaseAndDeletedAtIsNull(String project);
+
+    /** For the count beside the board's source filter. */
+    long countByViaGuestTrueAndDeletedAtIsNull();
+
+    long countByProjectIgnoreCaseAndViaGuestTrueAndDeletedAtIsNull(String project);
 
     long countByStatusAndDeletedAtIsNull(String status);
 

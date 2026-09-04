@@ -135,14 +135,38 @@ public class TeamMemberService {
         repository.delete(member);
     }
 
+    /**
+     * The team. Not the clients — see {@link #guests()}.
+     *
+     * <p>Guests are rows in this table like everybody else, which is what makes
+     * them accounts at all, and that is exactly why this read has to say which
+     * it means. Everything downstream of here draws people who can be assigned
+     * work, mentioned in a comment or ticked onto a project, and a client is
+     * none of those. Filtering by role once, here, is the version that cannot be
+     * forgotten by the next screen somebody adds.
+     */
     @Transactional(readOnly = true)
     public List<TeamMember> all() {
-        return repository.findAllByOrderByNameAsc();
+        return repository.findAllByRoleNotOrderByNameAsc(MemberRole.GUEST);
     }
 
     @Transactional(readOnly = true)
     public List<TeamMember> active() {
-        return repository.findByActiveTrueOrderByNameAsc();
+        return repository.findByActiveTrueAndRoleNotOrderByNameAsc(MemberRole.GUEST);
+    }
+
+    /** The clients, for the one screen that administers them. */
+    @Transactional(readOnly = true)
+    public List<TeamMember> guests() {
+        return repository.findAllByRoleOrderByNameAsc(MemberRole.GUEST);
+    }
+
+    /** The clients with access to one project. */
+    @Transactional(readOnly = true)
+    public List<TeamMember> guestsOn(Long projectId) {
+        return projectId == null
+                ? List.of()
+                : repository.findByRoleAndGuestProjectIdOrderByNameAsc(MemberRole.GUEST, projectId);
     }
 
     @Transactional(readOnly = true)
@@ -246,6 +270,71 @@ public class TeamMemberService {
     }
 
     /**
+     * Grants somebody outside the company access to one project's portal.
+     *
+     * <p>Separate from {@link #add(String, String, String)} rather than a flag
+     * on it, because the two have opposite defaults: a team member usually has
+     * no password and is a name on bugs until somebody gives them one, while a
+     * client with no password is an account that cannot do the only thing it
+     * exists for. So a password is required here, and so is the project — a
+     * guest whose {@code guestProjectId} is null can see nothing at all, which
+     * would be a puzzling way to fail.
+     *
+     * <p>Re-granting to an address that already has access re-points and
+     * re-passwords it, the same way re-adding a member does. An address already
+     * on the <em>team</em> is refused outright: turning a colleague into a
+     * client would take the board away from them.
+     */
+    public TeamMember addGuest(String name, String email, String rawPassword, Long projectId) {
+        String cleanName = name == null ? "" : name.trim();
+        String cleanEmail = email == null ? "" : email.trim().toLowerCase();
+
+        if (cleanName.isBlank()) {
+            throw new IllegalArgumentException("A client needs a name.");
+        }
+        if (cleanEmail.isBlank() || !cleanEmail.contains("@")) {
+            throw new IllegalArgumentException("\"" + email + "\" is not a valid email address.");
+        }
+        if (projectId == null) {
+            throw new IllegalArgumentException("Choose the project this client may report on.");
+        }
+
+        // Hashed before anything is written, so a password that is too short
+        // does not leave a half-made account behind.
+        String hash = hash(rawPassword);
+
+        TeamMember guest = repository.findByEmailIgnoreCase(cleanEmail).orElse(null);
+        if (guest != null && !guest.isGuest()) {
+            throw new IllegalArgumentException(guest.getName()
+                    + " is already on the team, so that address cannot be a client as well.");
+        }
+        if (guest == null) {
+            guest = new TeamMember(cleanName, cleanEmail);
+        } else {
+            guest.setName(cleanName);
+        }
+        guest.setRole(MemberRole.GUEST);
+        guest.setGuestProjectId(projectId);
+        guest.setPasswordHash(hash);
+        guest.setActive(true);
+        return repository.save(guest);
+    }
+
+    /** Moves a client to a different project, or the same one after a rename. */
+    public TeamMember setGuestProject(Long id, Long projectId) {
+        TeamMember guest = repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No team member found with id " + id));
+        if (!guest.isGuest()) {
+            throw new IllegalArgumentException(guest.getName() + " is not a client.");
+        }
+        if (projectId == null) {
+            throw new IllegalArgumentException("Choose the project this client may report on.");
+        }
+        guest.setGuestProjectId(projectId);
+        return repository.save(guest);
+    }
+
+    /**
      * Gives somebody a sign-in password, or changes the one they have.
      *
      * <p>What is stored is the BCrypt hash and only ever the hash — the plain
@@ -317,6 +406,18 @@ public class TeamMemberService {
         if (wanted == MemberRole.ADMIN && !member.hasPassword()) {
             throw new IllegalArgumentException(member.getName()
                     + " cannot sign in yet, so an admin role would do nothing. Set a password first.");
+        }
+        // The Role button flips between Member and Admin, and the guest line is
+        // not on that switch in either direction: promoting a client would put
+        // somebody outside the company on the board, and demoting one would
+        // strand a portal account among the team with reports nobody can see.
+        // Removing the client and adding them again is the way across.
+        if (member.isGuest() != wanted.isGuest()) {
+            throw new IllegalArgumentException(wanted.isGuest()
+                    ? member.getName() + " is on the team. Client access is granted"
+                            + " to a new account, not by changing an existing one."
+                    : member.getName() + " is a client. Remove their access and add"
+                            + " them as a team member instead.");
         }
         if (wanted != MemberRole.ADMIN) {
             refuseIfLastAdmin(member, "make " + member.getName() + " a member");

@@ -13,6 +13,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 
 import java.util.Locale;
 
@@ -32,9 +34,14 @@ import java.util.Locale;
  * one.
  *
  * <p>Each row also carries a {@link MemberRole}, which becomes
- * {@code ROLE_ADMIN} on top of the {@code ROLE_USER} everybody gets. What that
- * buys is listed in {@link #filterChain} and is deliberately short:
- * administration, not work.
+ * {@code ROLE_ADMIN} on top of the {@code ROLE_USER} everybody on the team
+ * gets. What that buys is listed in {@link #filterChain} and is deliberately
+ * short: administration, not work.
+ *
+ * <p>{@link MemberRole#GUEST} is the one that does not work that way. A client
+ * gets {@code ROLE_GUEST} and <em>not</em> {@code ROLE_USER}, and the chain ends
+ * with {@code anyRequest().hasRole("USER")} — so the portal is an allowlist and
+ * everything else, written and unwritten, is already closed to them.
  */
 @Configuration
 public class SecurityConfig {
@@ -93,9 +100,18 @@ public class SecurityConfig {
                     // to an anonymous request, and answering it with a redirect
                     // to /login would say "sign in" about a missing file.
                     .requestMatchers("/error").permitAll()
-                    // The JSON API stays open so scripts and WebDriver helpers keep
-                    // working. Change this line to .authenticated() to close it.
-                    .requestMatchers("/api/**").permitAll()
+                    // The JSON API used to be permitAll, which meant an
+                    // unauthenticated GET /api/bugs returned every bug on every
+                    // project and /api/projects/*/team returned the roster. That
+                    // was survivable while everybody with the URL was already
+                    // inside; it stopped being survivable the moment a client
+                    // could hold a session on this origin, because the portal
+                    // below would be decorative next to it.
+                    //
+                    // ROLE_USER, so the app's own two fetch calls keep working
+                    // on the session cookie and a guest is refused. A script
+                    // that used to call this anonymously now has to sign in.
+                    .requestMatchers("/api/**").hasRole("USER")
 
                     // ---- administration ----
                     // The line is drawn around the *setup*, not around the
@@ -127,14 +143,36 @@ public class SecurityConfig {
                     // own team list with it, and both of those are daily work.
                     .requestMatchers(HttpMethod.POST,
                             "/projects", "/projects/*/active", "/projects/*/delete").hasRole("ADMIN")
+                    // Handing somebody outside the company a way in is setup of
+                    // the most consequential kind, so it sits with the roster.
+                    .requestMatchers(HttpMethod.POST,
+                            "/team/*/guest").hasRole("ADMIN")
 
-                    .anyRequest().authenticated())
+                    // ---- the client portal ----
+                    // Everything a guest may reach, and it is a list rather
+                    // than a subtraction. /account is on it because changing
+                    // your own password is not a privilege; the four /portal
+                    // routes are the whole of what a client can do here.
+                    .requestMatchers("/portal", "/portal/**").hasRole("GUEST")
+                    .requestMatchers("/account", "/account/**").hasAnyRole("USER", "GUEST")
+
+                    // hasRole("USER") and not authenticated(). A guest is
+                    // authenticated, so .authenticated() would hand them this
+                    // app - and would keep handing them every route added after
+                    // this line was written. ROLE_USER means "on the team", and
+                    // AccountPrincipal.authorities is where a guest is refused
+                    // it. Closed by default is the only version of this that
+                    // stays true as the app grows.
+                    .anyRequest().hasRole("USER"))
 
             .formLogin(form -> form
                     .loginPage("/login")
                     .usernameParameter("email")
                     .passwordParameter("password")
-                    .defaultSuccessUrl("/bugs", true)
+                    // A handler rather than defaultSuccessUrl("/bugs", true),
+                    // which sends everybody to a page a guest is refused: they
+                    // would sign in correctly and land on a 403.
+                    .successHandler(landing())
                     .failureUrl("/login?error")
                     .permitAll())
 
@@ -143,18 +181,38 @@ public class SecurityConfig {
                     .logoutSuccessUrl("/login?logout")
                     .invalidateHttpSession(true)
                     .deleteCookies("JSESSIONID")
-                    .permitAll())
+                    .permitAll());
 
-            // CSRF protects the HTML forms (Thymeleaf adds the token to any form
-            // with th:action). The API has no browser session to ride on, so it
-            // is exempt — otherwise every script POST would need a token.
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"));
+        // CSRF is left at its default, which is on for every state-changing
+        // request including /api/**. That used to carry .ignoringRequestMatchers
+        // ("/api/**"), on the grounds that the API had no browser session to
+        // ride on; closing it to ROLE_USER above gave it one, and an exempt
+        // endpoint that trusts a session cookie is the definition of CSRF. Both
+        // fetch calls in app.js send the token from layout.html's meta tag.
 
         // No HTTP Basic on purpose: with it configured alongside form login,
         // Spring answers an unauthenticated request with 401 + WWW-Authenticate
-        // instead of redirecting to /login. The API needs no credentials, so
-        // the form is the only way in.
+        // instead of redirecting to /login. The form is the only way in.
 
         return http.build();
+    }
+
+    /**
+     * Where signing in puts you: the board, or the portal if you are a client.
+     *
+     * <p>Fixed rather than "wherever you were heading" on purpose. Spring's
+     * saved-request handler would send somebody who followed a deep link back to
+     * it after signing in, which for a guest is a link into the app they cannot
+     * open — a 403 as the first thing a client ever sees. One destination per
+     * role is the whole rule.
+     */
+    private static AuthenticationSuccessHandler landing() {
+        return (request, response, authentication) -> {
+            boolean guest = AccountPrincipal.of(authentication)
+                    .map(AccountPrincipal::isGuest)
+                    .orElse(false);
+            new SimpleUrlAuthenticationSuccessHandler(guest ? "/portal" : "/bugs")
+                    .onAuthenticationSuccess(request, response, authentication);
+        };
     }
 }

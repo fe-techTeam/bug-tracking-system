@@ -92,7 +92,7 @@ public class ProjectDocController {
      * actually lives, so the drawer is a shortcut and never the only route.
      *
      * <p>A page route rather than another {@code /api} one, deliberately:
-     * {@code /api/**} is left open for scripts, and a document's name is not
+     * {@code /api/**} answers JSON to scripts, and a document's name is not
      * something to hand out unauthenticated.
      */
     @GetMapping("/documents/panel")

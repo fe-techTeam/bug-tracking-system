@@ -13,6 +13,12 @@
           href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400..600&display=swap">
     <link rel="stylesheet" th:href="@{/css/style.css}">
 
+    <!-- The API is no longer CSRF-exempt, so the two fetch calls in app.js have
+         to carry a token. A form gets its own from th:action; a fetch has to be
+         handed one, and this is where it is put. -->
+    <meta name="_csrf" th:content="${_csrf?.token}">
+    <meta name="_csrf_header" th:content="${_csrf?.headerName}">
+
     <!-- Applied before first paint, so a dark theme never flashes white. -->
     <script>
         (function () {
@@ -90,6 +96,10 @@
     <symbol id="i-chart" viewBox="0 0 24 24">
         <path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-4"/>
     </symbol>
+    <!-- The client mark. A shape and not a face: it sits beside a reporter's
+         avatar, and a second person-glyph there would read as a second person.
+         The same diamond marks a client's notification in the bell. -->
+    <symbol id="i-guest" viewBox="0 0 24 24"><path d="M12 3.6 20.4 12 12 20.4 3.6 12Z"/></symbol>
     <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/>

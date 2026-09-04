@@ -163,6 +163,35 @@ public class Bug {
     private LocalDate dueDate;
 
     /**
+     * The guest account that raised this, or null — which is nearly every bug.
+     *
+     * <p>{@link #getReportedBy()} still holds their name as text, like every
+     * other reporter, because that is history. This is not history: it is the
+     * only thing the portal's "is this yours" check may be built on. Two people
+     * can share a display name and anybody can be renamed, so a name is not
+     * something to grant a read on.
+     *
+     * <p>A bare id, deliberately, in the same way {@link #blockedBy} is: delete
+     * the guest and their reports become unreadable in the portal rather than
+     * being deleted along with them. The bug stays on the board, where it
+     * belongs.
+     */
+    @Column(name = "guest_id")
+    private Long guestId;
+
+    /**
+     * Whether this came in from outside the company.
+     *
+     * <p>Kept alongside {@link #guestId} rather than derived from it: the board,
+     * the list and every card ask this to draw the badge, the filter asks it of
+     * the whole table, and it has to keep answering "yes" after the guest
+     * account behind it is gone. Where a report came from is a fact about the
+     * report.
+     */
+    @Column(name = "via_guest", nullable = false)
+    private boolean viaGuest = false;
+
+    /**
      * When this bug was moved to the trash, or null while it is live.
      *
      * <p>Deleting is reversible: the row, its comments, its files and its
@@ -397,5 +426,21 @@ public class Bug {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Long getGuestId() {
+        return guestId;
+    }
+
+    public void setGuestId(Long guestId) {
+        this.guestId = guestId;
+    }
+
+    public boolean isViaGuest() {
+        return viaGuest;
+    }
+
+    public void setViaGuest(boolean viaGuest) {
+        this.viaGuest = viaGuest;
     }
 }

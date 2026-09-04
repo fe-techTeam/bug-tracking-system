@@ -5948,3 +5948,313 @@ a.tm-name:hover { color: var(--accent); }
     .error-card { padding: 24px 20px 20px; }
     .error-facts > div { grid-template-columns: minmax(0, 1fr); gap: 1px; }
 }
+
+/* ==========================================================================
+   CLIENTS
+   Two things: the mark that says a bug came from outside, and the portal a
+   client reads it in.
+
+   No new colour enters the palette here, and that is deliberate. Rules 1 to 3
+   at the top of this file give every hue on a board a job — status is the
+   journey, severity is the heat — so a fourth meaning painted in a fourth
+   colour would be a fourth thing to learn and a near-miss against whichever
+   existing token it landed nearest. Where a report came from is not a degree of
+   anything, so it is drawn as a shape in --muted, and gets --accent only where
+   it is a control you are choosing rather than a fact you are reading.
+   ========================================================================== */
+
+/* ---------- the mark ---------- */
+
+/* A diamond beside a name. It sits inside .client-chip, a board card's row of
+   marks, a filter row and the rail, so it carries no margin of its own — every
+   one of those is already a flex row with its own gap. */
+.guest-mark {
+    display: inline-flex;
+    align-items: center;
+    color: var(--muted);
+}
+.guest-mark svg.i { width: 11px; height: 11px; }
+
+/* Filled rather than outlined once it is the thing you picked, so an active
+   filter reads at a glance rather than by comparing two 11px outlines. */
+.fmenu-opt.is-active .guest-mark,
+.chip .guest-mark { color: var(--accent); }
+.fmenu-opt.is-active .guest-mark svg.i,
+.chip .guest-mark svg.i { fill: currentColor; }
+
+/* The board's filter menu columns are sized to their longest name; this one
+   holds three short ones and would otherwise take a person's width. */
+.fmenu-col-sm { min-width: 148px; }
+
+/* The project a client reports on, in the roster's client table. Selects are
+   width:100% by default and the cell is sized to its heading, which clipped
+   "Godrej" to "Godre" — and a project name half-drawn is the one thing in this
+   row that has to be read exactly. */
+#client-table select { min-width: 160px; }
+#client-table .inline-form { display: flex; align-items: center; gap: 8px; }
+
+/* ---------- what a client can see ---------- */
+
+/* Said once, above the comment box, on a bug a client is watching. A notice and
+   not a warning: nothing has gone wrong, there is simply a reader here who is
+   not on the team, and knowing that before you type is the whole point. */
+.notice {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 12.5px;
+    line-height: 1.55;
+}
+.notice svg.i { flex: none; margin-top: 2px; color: var(--accent); }
+.notice-client { border-color: color-mix(in oklab, var(--accent) 28%, var(--line)); }
+
+/* The tag on a comment that has been shared. Only the shared ones are marked —
+   see the template — so this is rare on the page and can afford the accent. */
+.tag-shared {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-color: color-mix(in oklab, var(--accent) 32%, transparent);
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.tag-shared svg.i { width: 10px; height: 10px; fill: currentColor; }
+
+/* The checkbox that does it. In the row of buttons under a comment box, so it
+   is sized like one and lights up when it is on — a tick alone, at 12px, is
+   not enough of a difference for something with this consequence. */
+.share-toggle {
+    /* flex-direction is not decoration here: the base `label` rule stacks its
+       children in a column, which is right for a field and wrong for a control
+       that sits in a row of buttons. Without it the box, the mark and the words
+       pile up three high and shoulder the Comment button off the row. */
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    flex: none;
+    gap: 6px;
+    font-weight: 400;
+    padding: 4px 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-full);
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease),
+                background var(--fast) var(--ease);
+}
+.share-toggle input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); }
+.share-toggle svg.i { width: 11px; height: 11px; }
+.share-toggle:hover { color: var(--text-2); border-color: var(--line-strong); }
+.share-toggle:has(input:checked) {
+    border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.share-toggle:has(input:checked) svg.i { fill: currentColor; }
+.share-toggle:has(input:focus-visible) { box-shadow: var(--ring); }
+
+/* ==========================================================================
+   THE CLIENT PORTAL
+   Its own page, outside layout.html: no sidebar, no switcher, no bell. A
+   narrow single column, because there is one thing to read and one thing to
+   write and no board to put beside them.
+   ========================================================================== */
+
+.portal-page { min-height: 100vh; }
+
+.portal-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.portal-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+}
+.portal-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.portal-brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+.portal-brand-text b { font-size: 14px; color: var(--text); }
+.portal-brand-text em {
+    font-style: normal;
+    font-size: 11.5px;
+    color: var(--muted);
+}
+.portal-bar-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.portal-who {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--text-2);
+}
+
+.portal-main { flex: 1; padding: 24px 0 40px; }
+.portal-main > section { display: flex; flex-direction: column; gap: 16px; }
+
+/* Every answer this portal gives lands here — sent, refused, not yours — so
+   there is one place to look and nothing is answered silently. */
+.portal-flash {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    border: 1px solid color-mix(in oklab, var(--accent) 28%, var(--line));
+    border-radius: var(--r-md);
+    background: var(--accent-soft);
+    color: var(--text);
+    font-size: 13px;
+}
+
+.portal-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.portal-head > div { flex: 1; min-width: 0; }
+.portal-head h1 { margin: 0; font-size: 21px; letter-spacing: -.01em; }
+.portal-head .sub { margin: 5px 0 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+.portal-crumb {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--muted);
+}
+.portal-crumb a { color: var(--muted); text-decoration: none; }
+.portal-crumb a:hover { color: var(--accent); }
+.portal-crumb svg.i { width: 12px; height: 12px; }
+
+/* ---------- the list of your own reports ---------- */
+
+.portal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.portal-card {
+    display: grid;
+    gap: 7px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.portal-card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+.portal-card:focus-visible { box-shadow: var(--ring); outline: none; }
+
+.portal-card-top { display: flex; align-items: center; gap: 10px; font-size: 11.5px; }
+.portal-card-top .badge { margin-left: auto; }
+.portal-card-title { font-size: 14.5px; font-weight: 560; line-height: 1.4; color: var(--text); }
+.portal-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.portal-empty {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    padding: 40px 24px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--r-lg);
+    text-align: center;
+}
+.portal-empty h1 { margin: 0; font-size: 18px; }
+.portal-empty p { margin: 0; max-width: 44ch; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.portal-empty > svg.i { width: 26px; height: 26px; color: var(--muted); }
+
+/* ---------- one report ---------- */
+
+.portal-status .panel-pad { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.portal-status-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: var(--muted);
+}
+
+.portal-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.portal-files li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.portal-files .num { margin-left: auto; font-size: 11.5px; }
+
+.portal-thread { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 14px; }
+.portal-thread li { display: flex; gap: 10px; }
+.portal-thread li > div { flex: 1; min-width: 0; }
+.portal-thread-who {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 3px;
+    font-size: 12.5px;
+}
+.portal-thread-who .muted { font-size: 11.5px; }
+.portal-thread .pre { margin: 0; font-size: 13px; line-height: 1.6; }
+/* Your own words, set apart from the team's without moving them to the other
+   side: a chat layout in a page this narrow costs more than it says. */
+.portal-thread li.is-yours > div {
+    padding: 9px 12px;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+}
+
+.portal-reply { border-top: 1px solid var(--line); padding-top: 14px; }
+.portal-reply textarea { min-height: 72px; }
+.portal-reply-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+
+/* ---------- the form ---------- */
+
+/* Severity and environment, side by side and stacking on a phone. */
+.portal-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: 14px;
+    align-items: start;
+}
+.portal-pair > * { min-width: 0; }
+/* The action row every panel-shaped form ends with. */
+.panel-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--line);
+    background: var(--surface-2);
+}
+
+.portal-foot {
+    padding: 18px 0 24px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+}
+
+@media (max-width: 620px) {
+    .portal-shell { padding: 0 14px; }
+    .portal-head { gap: 10px; }
+    .portal-head h1 { font-size: 19px; }
+    /* The name is what identifies you; on a narrow bar the avatar says it. */
+    .portal-who span:last-child { display: none; }
+    .panel-foot { flex-direction: column-reverse; }
+    .panel-foot .btn { width: 100%; }
+}

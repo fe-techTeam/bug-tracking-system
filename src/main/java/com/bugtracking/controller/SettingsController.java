@@ -86,6 +86,12 @@ public class SettingsController {
         // Only what the Remove control depends on: a member named on a bug is
         // deactivated rather than removed, so their history keeps making sense.
         model.addAttribute("workload", team.workloadByMemberId());
+
+        // The clients, listed apart from the roster because they are not on it:
+        // team.all() excludes them by role, and mixing the two lists back
+        // together here would undo that in the one place people read it.
+        model.addAttribute("guests", team.guests());
+        model.addAttribute("activeProjects", projects.active());
         return "settings";
     }
 }

@@ -40,11 +40,21 @@ public class AccountPrincipal extends User {
     }
 
     /**
-     * ROLE_USER is granted to everybody alongside the real role, so anything
-     * that only asks "is somebody signed in" keeps working — including the
-     * accounts this app had before roles existed.
+     * ROLE_USER is granted to everybody <em>on the team</em> alongside the real
+     * role, so anything that only asks "is somebody signed in" keeps working —
+     * including the accounts this app had before roles existed.
+     *
+     * <p>A guest is the exception, and it is the load-bearing line in this
+     * class. {@code SecurityConfig} ends with {@code anyRequest().hasRole("USER")},
+     * so ROLE_USER is not "signed in" — it is "one of us". Withholding it means
+     * every route this app has, and every route anybody adds later, is closed to
+     * a client until a line in that filter chain opens it. Grant it here and the
+     * portal becomes a suggestion.
      */
     private static List<GrantedAuthority> authorities(MemberRole role) {
+        if (role == MemberRole.GUEST) {
+            return List.of(new SimpleGrantedAuthority("ROLE_GUEST"));
+        }
         if (role == MemberRole.ADMIN) {
             return List.of(new SimpleGrantedAuthority("ROLE_ADMIN"),
                            new SimpleGrantedAuthority("ROLE_USER"));
@@ -67,6 +77,11 @@ public class AccountPrincipal extends User {
 
     public boolean isAdmin() {
         return role == MemberRole.ADMIN;
+    }
+
+    /** Somebody from outside: a client with a portal and nothing else. */
+    public boolean isGuest() {
+        return role == MemberRole.GUEST;
     }
 
     /**

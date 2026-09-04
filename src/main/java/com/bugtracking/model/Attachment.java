@@ -58,6 +58,18 @@ public class Attachment {
     @Column(name = "uploaded_by", length = 80)
     private String uploadedBy;
 
+    /**
+     * Whether the client who raised this bug may download it.
+     *
+     * <p>Taken from the comment the file arrives with rather than chosen
+     * separately, and true for the files a guest uploads with their own report.
+     * There is no control of its own on purpose: a second switch beside the
+     * first is a second thing to get wrong, so sharing a file with a client
+     * means attaching it to a comment that is shared.
+     */
+    @Column(nullable = false)
+    private boolean shared = false;
+
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
 
@@ -176,5 +188,13 @@ public class Attachment {
 
     public void setUploadedAt(LocalDateTime uploadedAt) {
         this.uploadedAt = uploadedAt;
+    }
+
+    public boolean isShared() {
+        return shared;
+    }
+
+    public void setShared(boolean shared) {
+        this.shared = shared;
     }
 }

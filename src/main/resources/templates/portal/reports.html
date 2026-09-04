@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{portal/layout :: page('Your reports', ~{::section})}">
+<body>
+<section>
+
+    <header class="portal-head">
+        <div>
+            <h1>Your reports</h1>
+            <p class="sub" th:if="${!#lists.isEmpty(reports)}">
+                Everything you have sent in, newest first. Open one to see where it has got to.
+            </p>
+            <p class="sub" th:if="${#lists.isEmpty(reports)}">
+                Nothing sent yet. When something is broken, this is where it goes.
+            </p>
+        </div>
+        <a class="btn btn-primary" th:href="@{/portal/new}" id="new-report">
+            <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+            <span>Report a bug</span>
+        </a>
+    </header>
+
+    <!-- Cards rather than a table. A client reads three or ten of these, not a
+         hundred, and what they want off each one is the same thing every time:
+         what did I call it, and has anybody moved it. A table would put that
+         behind a header row and a horizontal scroll on a phone. -->
+    <ol class="portal-list" th:unless="${#lists.isEmpty(reports)}">
+        <li th:each="bug,st : ${reports}" th:style="'--i:' + ${st.index}">
+            <a class="portal-card" th:href="@{/portal/reports/{id}(id=${bug.id})}">
+                <span class="portal-card-top">
+                    <span class="mono muted" th:text="'BUG-' + ${bug.id}">BUG-12</span>
+                    <span class="badge" th:style="'--c:' + ${cols.token(bug)}"
+                          th:text="${cols.label(bug)}">Open</span>
+                </span>
+                <span class="portal-card-title" th:text="${bug.title}">Sign-in swallows the first click</span>
+                <span class="portal-card-meta">
+                    <span class="meter" th:classappend="'sev-' + ${bug.severity}" aria-hidden="true">
+                        <i></i><i></i><i></i><i></i>
+                    </span>
+                    <span th:text="${bug.severity.label}">High</span>
+                    <span class="dot" aria-hidden="true"></span>
+                    <span th:text="${bug.environment?.label} ?: 'Not set'">Production</span>
+                    <span class="dot" aria-hidden="true"></span>
+                    <span th:attr="data-time=${bug.createdAt}"
+                          th:text="${#temporals.format(bug.createdAt, 'd MMM yyyy')}">2 Sep 2026</span>
+                </span>
+            </a>
+        </li>
+    </ol>
+
+    <div class="portal-empty" th:if="${#lists.isEmpty(reports)}">
+        <svg class="i" aria-hidden="true"><use href="#i-file-text"/></svg>
+        <p>A good report says what happened, where you were, and what you expected instead.
+            A screenshot usually says it faster than any of that.</p>
+        <a class="btn btn-primary" th:href="@{/portal/new}">Report a bug</a>
+    </div>
+
+</section>
+</body>
+</html>

@@ -21,6 +21,9 @@ public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
     /** Every comment's files on this bug, for grouping in one query. */
     List<Attachment> findByBugIdAndCommentIdIsNotNullOrderByUploadedAtAsc(Long bugId);
 
+    /** The files a client may download: the ones they sent, and the ones shared back. */
+    List<Attachment> findByBugIdAndSharedTrueOrderByUploadedAtAsc(Long bugId);
+
     long countByBugId(Long bugId);
 
     /** The same count for a whole board's worth of bugs, in one query. */

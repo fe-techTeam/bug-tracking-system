@@ -60,8 +60,9 @@ public class TeamMember {
      * compared against.
      *
      * <p>{@code @JsonIgnore} is load-bearing, not tidiness: {@code /api/team}
-     * serialises this entity and {@code /api/**} is permitAll, so without it
-     * every hash on the team would be readable by an unauthenticated GET.
+     * serialises this entity, so without it every hash on the team travels in
+     * the response. The API is signed-in-only now, which makes that a smaller
+     * blast radius than when it was permitAll and not a reason to relax it.
      * {@link #hasPassword()} is what the API is allowed to say instead.
      */
     @JsonIgnore
@@ -98,6 +99,23 @@ public class TeamMember {
     /** Someone who has left stays in the table so old bugs still read correctly. */
     @Column(nullable = false)
     private boolean active = true;
+
+    /**
+     * The one project a guest may see, and null for everybody who is not one.
+     *
+     * <p>A bare id rather than a relation: it is read once per request to scope
+     * a guest's own reports, never navigated, and a project deleted out from
+     * under a client should leave them with an empty portal rather than take
+     * the account down with it — the same reasoning {@code Bug.blockedBy}
+     * carries.
+     *
+     * <p>Deliberately not {@code project_members}. Being on a project means
+     * being on its team: it feeds the assignee picker, the people filter and
+     * the workload bars, and a client appearing in any of those is a bug
+     * waiting to be filed. Two different facts, so two different columns.
+     */
+    @Column(name = "guest_project_id")
+    private Long guestProjectId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -155,10 +173,9 @@ public class TeamMember {
 
     /**
      * {@code @JsonIgnore} for the same reason the hash carries one, if less
-     * sharply: {@code /api/team} serialises this entity and {@code /api/**} is
-     * permitAll, so without it an unauthenticated GET answers "which of these
-     * accounts is worth attacking". The roster page reads this server-side and
-     * is behind sign-in; the open API has no business publishing it.
+     * sharply: {@code /api/team} serialises this entity, and who is an admin is
+     * the answer to "which of these accounts is worth attacking". The roster
+     * page reads this server-side; the JSON has no business publishing it.
      */
     @JsonIgnore
     public MemberRole getRole() {
@@ -225,5 +242,18 @@ public class TeamMember {
     @Override
     public int hashCode() {
         return TeamMember.class.hashCode();
+    }
+
+    public Long getGuestProjectId() {
+        return guestProjectId;
+    }
+
+    public void setGuestProjectId(Long guestProjectId) {
+        this.guestProjectId = guestProjectId;
+    }
+
+    /** Somebody from outside: a client, not a member of the team. */
+    public boolean isGuest() {
+        return role == MemberRole.GUEST;
     }
 }

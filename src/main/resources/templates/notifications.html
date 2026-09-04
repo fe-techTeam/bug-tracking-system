@@ -9,7 +9,7 @@
             <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
             </a>
         <h1 class="topbar-title">Notifications</h1>
-        <span class="topbar-sub">Raised when a bug is assigned, unassigned, fixed, reopened or closed.</span>
+        <span class="topbar-sub">Raised when a bug is assigned, unassigned, fixed, reopened or closed — or when a client sends something in.</span>
         <div class="topbar-actions">
             <form method="post" th:action="@{/notifications/read-all}">
                 <button type="submit" class="btn btn-sm" id="mark-all-read"
@@ -42,6 +42,7 @@
                     <span th:case="'closed'">🏁</span>
                     <span th:case="'unassigned'">✕</span>
                     <span th:case="'mention'">@</span>
+                    <span th:case="'guest'">◇</span>
                     <span th:case="*">•</span>
                 </span>
 

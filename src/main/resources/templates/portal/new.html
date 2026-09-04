@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{portal/layout :: page('Report a bug', ~{::section})}">
+<body>
+<section>
+
+    <header class="portal-head">
+        <div>
+            <h1>Report a bug</h1>
+            <p class="sub">
+                Tell us what happened on <b th:text="${project.name}">Godrej</b>.
+                Somebody on the team picks it up from here.
+            </p>
+        </div>
+        <a class="btn btn-ghost" th:href="@{/portal}">
+            <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+            <span>Back</span>
+        </a>
+    </header>
+
+    <!-- One column, not the two the internal form uses. There is nothing to
+         put in a rail: no assignee, no due date, no board column, no project to
+         choose between. What is left is the report, and a form that is only a
+         report reads better as one thing than as a thing with a sidebar. -->
+    <form class="panel portal-form" method="post" th:action="@{/portal}"
+          th:object="${report}" enctype="multipart/form-data" id="report-form">
+        <div class="panel-pad">
+
+            <label>
+                <span>
+                    <svg class="i" aria-hidden="true"><use href="#i-pen"/></svg>
+                    What is wrong <span class="req">*</span>
+                    <span class="hint">— one line, as you would say it out loud</span>
+                </span>
+                <input type="text" th:field="*{title}" id="title" class="input-lg"
+                       placeholder="Sign-in swallows the first click" autocomplete="off"
+                       enterkeyhint="next" autocapitalize="sentences" maxlength="150">
+                <span class="field-error" th:if="${#fields.hasErrors('title')}"
+                      th:errors="*{title}">Title error</span>
+            </label>
+
+            <label style="margin-top:16px">
+                <span>
+                    <svg class="i" aria-hidden="true"><use href="#i-file-text"/></svg>
+                    What happened <span class="req">*</span>
+                    <span class="hint">— where you were, what you did, what you expected instead</span>
+                </span>
+                <textarea rows="12" th:field="*{description}" id="description" class="detail-box"
+                          placeholder="What happens, and where.&#10;&#10;How to see it:&#10;1. Open ...&#10;2. Click ...&#10;3. Observe ...&#10;&#10;Expected: ...&#10;Actual: ..."
+                          autocapitalize="sentences"></textarea>
+                <span class="field-error" th:if="${#fields.hasErrors('description')}"
+                      th:errors="*{description}">Description error</span>
+            </label>
+
+            <!-- Not .two-col: its 360px minimum is written for the app's wide
+                 panels and collapses to one column inside the portal's 700px
+                 measure, which is exactly where two short pickers should sit
+                 side by side. -->
+            <div class="portal-pair" style="margin-top:16px">
+                <label>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-chart"/></svg>
+                        How bad is it <span class="req">*</span>
+                    </span>
+                    <select th:field="*{severity}" id="severity">
+                        <option th:each="s : ${severities}" th:value="${s}" th:text="${s.label}">High</option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-board"/></svg>
+                        Where did you see it <span class="req">*</span>
+                    </span>
+                    <select th:field="*{environment}" id="environment">
+                        <option th:each="e : ${environments}" th:value="${e}" th:text="${e.label}">Production</option>
+                    </select>
+                </label>
+            </div>
+
+            <!-- On the same screen as the report, not a second one. A screenshot
+                 is usually the clearest part of what a client is telling us, and
+                 asking for it afterwards is how it never arrives. -->
+            <div style="margin-top:20px">
+                <label class="file-drop" for="files">
+                    <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                    <span class="file-drop-text" id="file-name">
+                        Add a screenshot, a screen recording or a PDF
+                    </span>
+                    <input type="file" name="files" id="files" multiple
+                           accept="image/*,video/*,application/pdf">
+                </label>
+                <p class="hint" style="margin-top:8px"
+                   th:text="'Up to ' + ${maxFiles} + ' files. A picture of the screen usually saves a round trip.'">
+                    Up to 3 files.</p>
+                <!-- A browser will not hand the same file over twice, so a
+                     rejected save empties this control. Say so rather than let
+                     it look full. -->
+                <p class="field-error" th:if="${#fields.hasAnyErrors()}" style="margin-top:8px">
+                    Your file choice was cleared when the form came back — pick it again before you send.
+                </p>
+            </div>
+        </div>
+
+        <div class="panel-foot">
+            <a class="btn btn-ghost" th:href="@{/portal}">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="send-report">Send it</button>
+        </div>
+    </form>
+
+</section>
+</body>
+</html>

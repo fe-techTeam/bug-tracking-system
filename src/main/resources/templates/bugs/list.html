@@ -29,7 +29,8 @@
                                     + (reporter != null and !reporter.isBlank() ? 1 : 0)
                                     + (selectedSeverity != null ? 1 : 0)
                                     + (selectedEnvironment != null ? 1 : 0)
-                                    + (selectedStatus != null ? 1 : 0)}">
+                                    + (selectedStatus != null ? 1 : 0)
+                                    + (source != null ? 1 : 0)}">
             <form class="search-wrap" method="get" th:action="@{/bugs}" id="filter-form">
                 <input type="hidden" name="project" th:if="${selectedProject != null}" th:value="${selectedProject}">
                 <input type="hidden" name="view" th:if="${view != 'board'}" th:value="${view}">
@@ -38,6 +39,7 @@
                 <input type="hidden" name="environment" th:if="${selectedEnvironment != null}" th:value="${selectedEnvironment}">
                 <input type="hidden" name="assignee" th:if="${assignee != null}" th:value="${assignee}">
                 <input type="hidden" name="reporter" th:if="${reporter != null}" th:value="${reporter}">
+                <input type="hidden" name="source" th:if="${source != null}" th:value="${source}">
                 <input type="hidden" name="sort" th:if="${sort != null}" th:value="${sort}">
                 <label class="sr-only" for="filter-keyword">Search</label>
                 <!-- The magnifier was decoration; now it is the submit button. Typing
@@ -113,6 +115,33 @@
                                 <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
                                 <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
                                 <span class="opt-count"></span>
+                            </a>
+                        </div>
+
+                        <!-- Where it came from. Its own column rather than two
+                             more rows under "Raised by": that list is people,
+                             and "everybody outside the company" is not a person
+                             to put at the bottom of it. -->
+                        <div class="fmenu-col fmenu-col-sm">
+                            <p class="fmenu-head">Came from</p>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.without('source')}}"
+                               th:classappend="${source == null} ? 'is-active' : ''">
+                                <svg class="i tick" aria-hidden="true"><use href="#i-check"/></svg>
+                                <span>Anywhere</span><span class="opt-count"></span>
+                            </a>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('source', 'guest')}}"
+                               th:classappend="${source == 'guest'} ? 'is-active' : ''">
+                                <span class="guest-mark" aria-hidden="true">
+                                    <svg class="i"><use href="#i-guest"/></svg>
+                                </span>
+                                <span>A client</span>
+                                <span class="opt-count num" th:if="${guestRaised > 0}"
+                                      th:text="${guestRaised}">4</span>
+                            </a>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('source', 'team')}}"
+                               th:classappend="${source == 'team'} ? 'is-active' : ''">
+                                <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
+                                <span>The team</span><span class="opt-count"></span>
                             </a>
                         </div>
 
@@ -285,6 +314,15 @@
            th:href="@{${'/bugs' + q.without('reporter')}}">
             <span class="avatar avatar-sm" th:attr="data-avatar=${reporter}" aria-hidden="true"></span>
             <span>raised by <b th:text="${reporter == me} ? 'me' : ${reporter}">me</b></span>
+            <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
+        </a>
+
+        <a class="chip" th:if="${source != null}"
+           th:href="@{${'/bugs' + q.without('source')}}">
+            <span class="guest-mark" aria-hidden="true" th:if="${source == 'guest'}">
+                <svg class="i"><use href="#i-guest"/></svg>
+            </span>
+            <span>from <b th:text="${source == 'guest'} ? 'a client' : 'the team'">a client</b></span>
             <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
         </a>
 
@@ -595,7 +633,8 @@
                        th:attr="aria-label='BUG-' + ${bug.id} + ': ' + ${bug.title}">Sign-in swallows the first click</a>
 
                     <p class="kcard-note"
-                       th:if="${files != null or said != null or blocker != null or bug.dueDate != null}">
+                       th:if="${files != null or said != null or blocker != null
+                               or bug.dueDate != null or bug.viaGuest}">
                         <!-- A count, drawn the way the comment count beside it
                              already is: the glyph says what it counts, so the
                              row reads as marks on a card rather than as a
@@ -615,6 +654,8 @@
                         <!-- Last in the row: the counts describe what is on the
                              card, the date is about the work itself. -->
                         <span th:replace="~{fragments :: due(${bug}, ${cols}, true)}"></span>
+
+                        <span th:replace="~{fragments :: guestMark(${bug})}"></span>
 
                         <!-- Only while the blocker is still open: a bug waiting
                              on something already fixed is not blocked. -->
@@ -904,6 +945,7 @@
                         <span class="client-chip" th:if="${bug.reportedBy}">
                             <span class="avatar avatar-sm" th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
                             <span class="client-name" th:text="${bug.reportedBy}">qa-team</span>
+                            <span th:replace="~{fragments :: guestMark(${bug})}"></span>
                         </span>
                         <span class="muted" th:unless="${bug.reportedBy}">—</span>
                     </td>

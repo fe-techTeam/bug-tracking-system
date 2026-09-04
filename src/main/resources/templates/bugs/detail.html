@@ -247,6 +247,22 @@
                           th:text="${commentTotal}">0</span>
                 </div>
 
+                <!-- The one thing somebody about to type here needs to know
+                     first. A bug raised by a client is one they are watching
+                     from a portal of their own, and this thread is where the
+                     answer they can see comes from — so the fact is stated
+                     before the box rather than left to be inferred from a
+                     checkbox under it. Nothing is shared by default; that is
+                     what the second sentence is for. -->
+                <p class="notice notice-client" th:if="${bug.viaGuest}">
+                    <svg class="i" aria-hidden="true"><use href="#i-guest"/></svg>
+                    <span>
+                        <b th:text="${bug.reportedBy}">Priya Nair</b> raised this from outside and
+                        can follow it. Comments here are internal unless you tick
+                        <b>Share with the client</b> — they see the ones you tick, and nothing else.
+                    </span>
+                </p>
+
                 <!-- data-people drives the @ autocomplete; the server matches
                      mentions against the roster again on save, so a typed name
                      still notifies even with JS off.
@@ -292,6 +308,17 @@
                         </button>
                         <span class="file-note" id="comment-file-note" aria-live="polite"></span>
                         <span class="spacer"></span>
+                        <!-- Only on a bug a client is actually reading. On every
+                             other bug there is nobody to share with, and a
+                             permanently inert checkbox is a control people learn
+                             to tick without reading. The server checks the same
+                             thing again, so this is a courtesy and not the
+                             rule. -->
+                        <label class="share-toggle" th:if="${bug.viaGuest}">
+                            <input type="checkbox" name="shared" value="true">
+                            <svg class="i" aria-hidden="true"><use href="#i-guest"/></svg>
+                            <span>Share with the client</span>
+                        </label>
                         <button type="submit" class="btn btn-primary btn-sm" id="add-comment">Comment</button>
                     </div>
                 </form>
@@ -664,6 +691,7 @@
                                 <span class="avatar avatar-sm" th:if="${bug.reportedBy}"
                                       th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
                                 <span th:text="${bug.reportedBy} ?: '—'">Reporter</span>
+                                <span th:replace="~{fragments :: guestMark(${bug})}"></span>
                             </dd>
                         </div>
                         <div class="rail-fact">
@@ -784,6 +812,15 @@
                   th:text="${#temporals.format(c.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan</span>
             <span class="tag" th:if="${c.edited}"
                   th:title="'Edited ' + ${#temporals.format(c.editedAt, 'dd MMM yyyy, HH:mm')}">edited</span>
+            <!-- Only ever drawn on the ones that are shared. Marking the
+                 internal ones instead would put a badge on almost every comment
+                 in the app to say the ordinary thing, and leave the one that
+                 actually matters as the plain one. -->
+            <span class="tag tag-shared" th:if="${c.shared}"
+                  title="The client who raised this can read it">
+                <svg class="i" aria-hidden="true"><use href="#i-guest"/></svg>
+                <span>client can see this</span>
+            </span>
         </div>
 
         <p class="pre comment-text" th:unless="${#strings.isEmpty(c.text)}"
@@ -851,6 +888,18 @@
                                   placeholder="Reply… type @ to tag someone else"></textarea>
                     </label>
                     <div class="comment-inline-foot">
+                        <!-- Pre-ticked when the comment being answered is one
+                             the client can see: an answer to something they read
+                             that they cannot read is the shape of mistake this
+                             box exists to prevent. Still a box, so it can be
+                             unticked to say something internal about a shared
+                             comment. -->
+                        <label class="share-toggle" th:if="${bug.viaGuest}">
+                            <input type="checkbox" name="shared" value="true" th:checked="${c.shared}">
+                            <svg class="i" aria-hidden="true"><use href="#i-guest"/></svg>
+                            <span>Share with the client</span>
+                        </label>
+                        <span class="spacer"></span>
                         <button type="submit" class="btn btn-sm btn-primary">Reply</button>
                     </div>
                 </form>

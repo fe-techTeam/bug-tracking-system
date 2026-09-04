@@ -57,17 +57,41 @@ public class BugService {
     /** The original three-filter search, kept so existing callers are unaffected. */
     @Transactional(readOnly = true)
     public List<Bug> findAll(String status, Severity severity, String keyword) {
-        return findAll(null, status, severity, null, null, null, keyword, null);
+        return findAll(null, status, severity, null, null, null, null, keyword, null);
     }
 
+    /** The board's search without the source filter, for callers that never set one. */
     @Transactional(readOnly = true)
     public List<Bug> findAll(String project, String status, Severity severity,
                              Environment environment, String assignee, String reporter,
                              String keyword, String sort) {
+        return findAll(project, status, severity, environment, assignee, reporter,
+                null, keyword, sort);
+    }
+
+    /**
+     * The board's search. {@code viaGuest} is three-valued on purpose: null is
+     * "everything", which is not the same question as "everything the team
+     * raised".
+     */
+    @Transactional(readOnly = true)
+    public List<Bug> findAll(String project, String status, Severity severity,
+                             Environment environment, String assignee, String reporter,
+                             Boolean viaGuest, String keyword, String sort) {
         String trimmed = blankToNull(keyword);
         List<Bug> found = repository.search(blankToNull(project), status, severity,
-                environment, blankToNull(assignee), blankToNull(reporter), trimmed, idIn(trimmed));
+                environment, blankToNull(assignee), blankToNull(reporter), viaGuest,
+                trimmed, idIn(trimmed));
         return sorted(found, sort);
+    }
+
+    /** How many of a project's live bugs came in from a client. */
+    @Transactional(readOnly = true)
+    public long guestRaisedIn(String project) {
+        String scope = blankToNull(project);
+        return scope == null
+                ? repository.countByViaGuestTrueAndDeletedAtIsNull()
+                : repository.countByProjectIgnoreCaseAndViaGuestTrueAndDeletedAtIsNull(scope);
     }
 
     /** Who currently carries work, busiest first — the board's people filter. */

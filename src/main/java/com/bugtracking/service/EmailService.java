@@ -242,6 +242,7 @@ public class EmailService {
             case "assigned" -> "Assigned to you";
             case "unassigned" -> "No longer yours";
             case "mention" -> "You were mentioned";
+            case "guest" -> "From a client";
             case "fixed" -> "Marked fixed";
             case "reopened" -> "Reopened";
             case "closed" -> "Closed";

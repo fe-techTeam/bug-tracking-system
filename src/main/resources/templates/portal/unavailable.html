@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Not ready yet · Bug Tracking</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<!-- Outside portal/layout on purpose: that shell is built around the project,
+     and the one thing that has gone wrong here is that there is no project.
+     Bare, so it cannot fail the same way twice. -->
+<body class="portal-page">
+<div class="portal-shell">
+    <main class="portal-main">
+        <div class="portal-empty">
+            <h1>Not ready yet</h1>
+            <p th:text="${message}">This account is not attached to a project yet.</p>
+            <form method="post" th:action="@{/logout}">
+                <button type="submit" class="btn btn-ghost">Sign out</button>
+            </form>
+        </div>
+    </main>
+</div>
+</body>
+</html>

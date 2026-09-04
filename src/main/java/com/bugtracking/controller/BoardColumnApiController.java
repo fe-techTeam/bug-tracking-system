@@ -15,9 +15,11 @@ import java.util.List;
  * column head to a new place on the board.
  *
  * <p>It lives here rather than beside the forms in {@link BoardColumnController}
- * for two reasons. CSRF is waived for {@code /api/**}, which is what lets the
- * drag handler post without threading a token through; and a drag wants a 204
- * back, not a redirect to a page it has already updated by hand.
+ * because a drag wants a 204 back, not a redirect to a page it has already
+ * updated by hand. CSRF is <em>not</em> waived here any more — the API used to
+ * be exempt on the grounds that it had no session to ride on, and closing it to
+ * ROLE_USER gave it one — so the drag handler sends the token from
+ * {@code layout.html}'s meta tag like every other fetch in app.js.
  *
  * <p>Everything reordering does is also reachable without it — the two arrows
  * in a column's menu post to the form routes and reload the board.

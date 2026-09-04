@@ -52,16 +52,34 @@ public class CommentService {
      * to whom meant reading the words for it.
      */
     public Comment add(Long bugId, Long parentId, String text, String author) {
+        return add(bugId, parentId, text, author, false);
+    }
+
+    /**
+     * The same, saying whether the client who raised the bug may read it.
+     *
+     * <p>Internal unless the writer said otherwise, which is the only default
+     * that can be safely applied to a thread nobody wrote with an outside
+     * reader in mind.
+     */
+    public Comment add(Long bugId, Long parentId, String text, String author, boolean shared) {
         Comment comment = new Comment();
         comment.setBugId(bugId);
         comment.setParentId(parentFor(bugId, parentId));
         comment.setText(text.trim());
+        comment.setShared(shared);
         comment.setCreatedBy(BugHistoryService.actor(author));
         Comment saved = repository.save(comment);
         history.record(bugId, "comment", null, null, comment.getCreatedBy());
 
         tell(saved);
         return saved;
+    }
+
+    /** The part of a bug's thread its client may read, oldest first. */
+    @Transactional(readOnly = true)
+    public List<Comment> sharedFor(Long bugId) {
+        return repository.findByBugIdAndSharedTrueOrderByCreatedAtAsc(bugId);
     }
 
     /** Everybody tagged with an "@" hears about it. */

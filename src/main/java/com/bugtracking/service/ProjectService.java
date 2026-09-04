@@ -101,6 +101,11 @@ public class ProjectService {
 
     /** One project by name, for the routes that are handed a name rather than an id. */
     @Transactional(readOnly = true)
+    public java.util.Optional<Project> findById(Long id) {
+        return id == null ? java.util.Optional.empty() : repository.findById(id);
+    }
+
+    @Transactional(readOnly = true)
     public java.util.Optional<Project> findByName(String name) {
         return name == null || name.isBlank()
                 ? java.util.Optional.empty()

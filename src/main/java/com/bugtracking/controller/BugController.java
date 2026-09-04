@@ -99,6 +99,10 @@ public class BugController {
                        @RequestParam(required = false) Environment environment,
                        @RequestParam(required = false) String assignee,
                        @RequestParam(required = false) String reporter,
+                       // "guest" or "team", or absent for both. A String rather
+                       // than a Boolean because a bare ?source= in a bookmark
+                       // should mean "no filter", and Spring binds that to false.
+                       @RequestParam(required = false) String source,
                        @RequestParam(required = false) String keyword,
                        @RequestParam(required = false) String sort,
                        @RequestParam(required = false) String view,
@@ -111,7 +115,7 @@ public class BugController {
         // /bugs?assignee=X still means what it says.
         boolean noFilters = isBlank(status) && severity == null
                 && environment == null && isBlank(assignee) && isBlank(reporter)
-                && isBlank(keyword) && isBlank(sort);
+                && isBlank(source) && isBlank(keyword) && isBlank(sort);
         if (isBlank(project) && noFilters) {
             String landing = landingProject(session);
             if (landing != null) {
@@ -142,8 +146,9 @@ public class BugController {
 
         // The dashboard describes the project; the board answers the filters.
         Dashboard dashboard = service.dashboard(project);
+        Boolean fromClient = sourceFilter(source);
         List<Bug> bugs = service.findAll(project, status, severity,
-                environment, assignee, reporter, keyword, sort);
+                environment, assignee, reporter, fromClient, keyword, sort);
 
         // The board this project actually runs, in the order it runs it.
         List<BoardColumn> boardColumns = board.forProject(project);
@@ -163,7 +168,6 @@ public class BugController {
         model.addAttribute("commentCounts", comments.countsFor(onScreen));
         model.addAttribute("fileCounts", attachments.countsFor(onScreen));
         model.addAttribute("dashboard", dashboard);
-        model.addAttribute("boardTotal", service.dashboard(null).total());
         model.addAttribute("selectedProject", project);
         model.addAttribute("severities", Severity.values());
         model.addAttribute("environments", Environment.values());
@@ -190,6 +194,11 @@ public class BugController {
         model.addAttribute("selectedEnvironment", environment);
         model.addAttribute("assignee", assignee);
         model.addAttribute("reporter", reporter);
+        model.addAttribute("source", isBlank(source) ? null : source.trim());
+        // How many of this project's bugs came from outside, for the count
+        // beside the filter — off the dashboard's scope, so it does not move
+        // when another filter does.
+        model.addAttribute("guestRaised", service.guestRaisedIn(project));
         model.addAttribute("keyword", keyword);
         model.addAttribute("sort", sort);
         model.addAttribute("view", mode);
@@ -199,6 +208,7 @@ public class BugController {
                 .put("status", status)
                 .put("severity", severity)
                 .put("environment", environment)
+                .put("source", source)
                 .put("assignee", assignee)
                 .put("reporter", reporter)
                 .put("keyword", keyword)
@@ -304,7 +314,7 @@ public class BugController {
      * without leaving the page you are on.
      *
      * <p>It is a page route rather than another {@code /api/bugs} one on
-     * purpose. {@code /api/**} is deliberately open for scripts; bug titles
+     * purpose. {@code /api/**} answers JSON to scripts; bug titles
      * typed into a search box should not be, so this rides the session like
      * every other thing behind the login.
      *
@@ -432,6 +442,21 @@ public class BugController {
                 ? "Bug #" + saved.getId() + " raised successfully."
                 : "Bug #" + saved.getId() + " raised, but " + rejected);
         return "redirect:/bugs/" + saved.getId();
+    }
+
+    /**
+     * Turns {@code ?source=} into the three-valued answer the query wants.
+     *
+     * <p>Anything that is not one of the two words is no filter at all, so a
+     * mistyped bookmark shows the whole board rather than an empty one.
+     */
+    private static Boolean sourceFilter(String source) {
+        String asked = source == null ? "" : source.trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (asked) {
+            case "guest" -> Boolean.TRUE;
+            case "team" -> Boolean.FALSE;
+            default -> null;
+        };
     }
 
     /**
@@ -647,6 +672,7 @@ public class BugController {
                              @RequestParam(required = false) Long parentId,
                              @RequestParam(required = false) String actor,
                              @RequestParam(value = "files", required = false) MultipartFile[] files,
+                             @RequestParam(defaultValue = "false") boolean shared,
                              RedirectAttributes flash) {
         boolean hasFiles = files != null && Arrays.stream(files).anyMatch(f -> f != null && !f.isEmpty());
         // A file with no words is still a comment. Empty and file-less is not.
@@ -655,11 +681,20 @@ public class BugController {
             return "redirect:/bugs/" + id + "#comments";
         }
 
-        Comment saved = comments.add(id, parentId, text == null ? "" : text, actor);
-        String rejected = hasFiles ? attachTo(id, saved.getId(), files, actor) : null;
+        // Only a bug a client raised can be shared with one, and the checkbox
+        // only exists on those - but the parameter arrives from a request, so
+        // the bug is what decides, not the box. A tick on a bug nobody outside
+        // is reading would otherwise mark a comment shared with nobody, and the
+        // marker beside it would say so.
+        Bug bug = service.findById(id);
+        boolean toClient = shared && bug.isViaGuest();
+
+        Comment saved = comments.add(id, parentId, text == null ? "" : text, actor, toClient);
+        String rejected = hasFiles ? attachTo(id, saved.getId(), files, actor, toClient) : null;
 
         flash.addFlashAttribute("message", rejected == null
-                ? "Comment added to bug #" + id + "."
+                ? (toClient ? "Comment added and shared with the client."
+                            : "Comment added to bug #" + id + ".")
                 : "Comment added, but " + rejected);
         // At the comment rather than at the section: a reply three levels down
         // a long thread is otherwise somewhere you have to go and find.
@@ -701,14 +736,18 @@ public class BugController {
      * Files onto one comment. Each is reported separately so a batch of five
      * that holds one .exe still attaches the other four.
      */
-    private String attachTo(Long bugId, Long commentId, MultipartFile[] files, String actor) {
+    private String attachTo(Long bugId, Long commentId, MultipartFile[] files, String actor,
+                            boolean shared) {
         List<String> refused = new ArrayList<>();
         for (MultipartFile file : files) {
             if (file == null || file.isEmpty()) {
                 continue;
             }
             try {
-                attachments.store(bugId, commentId, file, actor);
+                // A file inherits the comment's visibility rather than having a
+                // switch of its own: two controls a foot apart is how a
+                // screenshot ends up shared under a comment that is not.
+                attachments.store(bugId, commentId, file, actor, shared);
             } catch (AttachmentService.RejectedFileException e) {
                 refused.add(e.getMessage());
             }

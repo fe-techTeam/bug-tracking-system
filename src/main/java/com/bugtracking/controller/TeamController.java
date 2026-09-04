@@ -57,7 +57,7 @@ public class TeamController {
      * because ticking <em>is</em> the edit.
      *
      * <p>A page route rather than an {@code /api} one, deliberately:
-     * {@code /api/**} is left open for scripts, and this carries email
+     * {@code /api/**} answers JSON to scripts, and this carries email
      * addresses and a CSRF token for the form it draws.
      *
      * <p>{@code /panel} ahead of {@code /{id}} is not an ordering accident —
@@ -150,6 +150,42 @@ public class TeamController {
      * <p>The flash never repeats the password back — it would end up in the
      * session, and from there into the next page's HTML.
      */
+    /**
+     * Grants somebody outside the company access to one project's portal.
+     *
+     * <p>Its own route rather than {@code /team} with a role parameter, so the
+     * admin-only line in {@code SecurityConfig} can name it: letting a client in
+     * is the most consequential piece of setup this app has, and it should not
+     * ride on a matcher written for adding a colleague.
+     */
+    @PostMapping("/{id}/guest")
+    public String guest(@PathVariable Long id,
+                        @RequestParam(required = false) String name,
+                        @RequestParam(required = false) String email,
+                        @RequestParam(required = false) String password,
+                        @RequestParam(required = false) Long projectId,
+                        @RequestParam(required = false) String back,
+                        RedirectAttributes flash) {
+        try {
+            // id 0 is "a new one". A path variable rather than two routes,
+            // because everything either does is the same work on the same row.
+            if (id != null && id > 0) {
+                var moved = service.setGuestProject(id, projectId);
+                flash.addFlashAttribute("message", moved.getName() + " now reports on "
+                        + projects.findById(projectId).map(Project::getName).orElse("that project") + ".");
+            } else {
+                var added = service.addGuest(name, email, password, projectId);
+                flash.addFlashAttribute("message", added.getName()
+                        + " can now sign in and send in reports. Send them the sign-in"
+                        + " address and the password you just set — the password is not"
+                        + " stored anywhere it can be read back.");
+            }
+        } catch (IllegalArgumentException e) {
+            flash.addFlashAttribute("message", e.getMessage());
+        }
+        return SafeRedirect.to(back, "redirect:/settings?tab=team");
+    }
+
     @PostMapping("/{id}/password")
     public String setPassword(@PathVariable Long id,
                               @RequestParam(required = false) String password,

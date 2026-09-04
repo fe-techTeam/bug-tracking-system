@@ -38,13 +38,25 @@ public class AttachmentService {
     private static final Logger log = LoggerFactory.getLogger(AttachmentService.class);
 
     /** Fills the gaps Spring's own mime.types leaves among the extensions we allow. */
-    private static final Map<String, MediaType> EXTRA_TYPES = Map.of(
-            "log", MediaType.TEXT_PLAIN,
-            "webp", MediaType.valueOf("image/webp"),
-            "bmp", MediaType.valueOf("image/bmp"),
-            "heic", MediaType.valueOf("image/heic"),
-            "heif", MediaType.valueOf("image/heif"),
-            "csv", MediaType.valueOf("text/csv"));
+    private static final Map<String, MediaType> EXTRA_TYPES = Map.ofEntries(
+            Map.entry("log", MediaType.TEXT_PLAIN),
+            Map.entry("webp", MediaType.valueOf("image/webp")),
+            Map.entry("bmp", MediaType.valueOf("image/bmp")),
+            Map.entry("heic", MediaType.valueOf("image/heic")),
+            Map.entry("heif", MediaType.valueOf("image/heif")),
+            Map.entry("csv", MediaType.valueOf("text/csv")),
+            // Video. Guessed from the name like everything else here — the part
+            // header a browser sends for a screen recording is as unreliable as
+            // the one it sends for a .webp, and worse: Windows reports .mov as
+            // application/octet-stream, which would file a screen recording
+            // among the zips.
+            Map.entry("mp4", MediaType.valueOf("video/mp4")),
+            Map.entry("m4v", MediaType.valueOf("video/mp4")),
+            Map.entry("webm", MediaType.valueOf("video/webm")),
+            Map.entry("ogv", MediaType.valueOf("video/ogg")),
+            Map.entry("mov", MediaType.valueOf("video/quicktime")),
+            Map.entry("mkv", MediaType.valueOf("video/x-matroska")),
+            Map.entry("avi", MediaType.valueOf("video/x-msvideo")));
 
     /**
      * What a browser will both draw in place and never be talked into running
@@ -53,7 +65,14 @@ public class AttachmentService {
      * HEIC is left out for the duller reason that only Safari draws it.
      */
     private static final Set<String> INLINE_TYPES = Set.of(
-            "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "application/pdf");
+            "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "application/pdf",
+            // The video formats a browser will play in a <video> element
+            // without a plugin or a transcode. quicktime is on the list because
+            // a .mov out of a Mac is almost always H.264 in a MOV wrapper,
+            // which Safari and Chrome both play; mkv and avi are deliberately
+            // absent, so they arrive as a download rather than as a black box
+            // with a broken play button on it.
+            "video/mp4", "video/webm", "video/ogg", "video/quicktime");
 
     /** As much of a name as the file_name column holds. */
     private static final int MAX_FILE_NAME = 255;
@@ -98,6 +117,21 @@ public class AttachmentService {
         return type != null && INLINE_TYPES.contains(type.getType() + "/" + type.getSubtype());
     }
 
+    /** Whether this is video at all — playable or not. */
+    public static boolean isVideo(MediaType type) {
+        return type != null && "video".equals(type.getType());
+    }
+
+    /**
+     * Whether a {@code <video>} element will actually play this, which is the
+     * narrower question: every video is video, only some of it is playable
+     * here. The page asks this before drawing a player, so a .mkv is listed as
+     * a file instead of being offered as one that will not start.
+     */
+    public static boolean isPlayableVideo(MediaType type) {
+        return isVideo(type) && isInlineSafe(type);
+    }
+
     public Attachment store(Long bugId, MultipartFile file, String uploadedBy) {
         return store(bugId, null, file, uploadedBy);
     }
@@ -122,10 +156,16 @@ public class AttachmentService {
             throw new RejectedFileException("\"" + original + "\" is not an allowed file type. Allowed: "
                     + String.join(", ", properties.getAllowedExtensions()) + ".");
         }
-        if (file.getSize() > properties.getMaxSizeBytes()) {
+        // Video is measured against its own, much larger ceiling: see
+        // AttachmentProperties.maxVideoSizeBytes for why the general one is not
+        // simply raised to meet it.
+        long ceiling = isVideo(mediaTypeFor(original))
+                ? properties.getMaxVideoSizeBytes()
+                : properties.getMaxSizeBytes();
+        if (file.getSize() > ceiling) {
             throw new RejectedFileException("\"" + original + "\" is "
                     + Math.round(file.getSize() / (1024.0 * 1024.0) * 10) / 10.0 + " MB - the limit is "
-                    + Math.round(properties.getMaxSizeBytes() / (1024.0 * 1024.0)) + " MB.");
+                    + Math.round(ceiling / (1024.0 * 1024.0)) + " MB.");
         }
 
         // Trimmed before anything is written: the column stops at 255, and an

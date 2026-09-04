@@ -51,10 +51,8 @@
         </a>
 
         <div class="login-body">
-            <!-- app.js turns this into a button; without it, a plain heading. -->
-            <h1 id="welcome-heading" th:attr="data-accounts=${quickFillAccounts}">Welcome back</h1>
+            <h1>Welcome back</h1>
             <p class="sub">Sign in to pick up your board, your queue and everything raised since you left.</p>
-            <p class="login-switch-note" id="login-switch-note" role="status" hidden></p>
 
             <p class="login-alert is-error" th:if="${loginError}" th:text="${loginError}" id="login-error">
                 That email and password do not match.</p>
@@ -81,6 +79,7 @@
                                enterkeyhint="go">
                         <!-- Added by app.js; without JS the field simply stays masked. -->
                         <button type="button" class="reveal" id="toggle-password"
+                                data-reveal="password" aria-pressed="false"
                                 title="Show password" aria-label="Show password" hidden>
                             <svg class="i" aria-hidden="true"><use href="#i-eye"/></svg>
                         </button>

@@ -31,10 +31,15 @@ public class Comment {
     /**
      * The comment this one answers, or null when it opens a thread.
      *
-     * <p>One level and no more. A reply to a reply is a conversation that has
-     * outgrown a bug, and an unbounded tree in a 380px column is unreadable —
-     * so a reply to a reply is filed against the same parent, which keeps every
-     * exchange as one flat run under the thing it is about.
+     * <p>The one it actually answers, at any depth: a reply can be replied to,
+     * and that reply can be replied to again. It used to be flattened to the
+     * top of its thread, which made every answer look like an answer to the
+     * first comment and left a long exchange impossible to follow.
+     *
+     * <p>Depth is unbounded here and capped only where it is <em>drawn</em> —
+     * see the {@code branch} fragment in {@code bugs/detail.html}. A staircase
+     * that keeps going walks off the right-hand edge of the column, but that is
+     * a question about a column, not about what answers what.
      */
     @Column(name = "parent_id")
     private Long parentId;

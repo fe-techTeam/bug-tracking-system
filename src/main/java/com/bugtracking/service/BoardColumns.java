@@ -120,6 +120,28 @@ public final class BoardColumns {
         return bug == null || openWork(bug.getProject(), bug.getStatus());
     }
 
+    /**
+     * Whether a bug has missed its due date and still needs doing.
+     *
+     * <p>Both halves matter, which is why this lives here rather than on
+     * {@link Bug}: the date knows it has been and gone, but only the board
+     * knows whether the column the bug is sitting in counts as finished. A bug
+     * closed last month that was due last week is done — painting it red says
+     * somebody should act, and nobody should.
+     *
+     * <p>Every screen that colours a due date asks this one method, so there is
+     * no way for the board, the list and the bug page to disagree about what
+     * late means.
+     */
+    public boolean late(Bug bug) {
+        return bug != null && bug.isPastDue() && openWork(bug);
+    }
+
+    /** Due today and not finished — the day it stops being "soon". */
+    public boolean dueToday(Bug bug) {
+        return bug != null && bug.isDueToday() && openWork(bug);
+    }
+
     /** Where the column sits on its board, counting from 1, for the status picker. */
     public int step(String project, String statusKey) {
         List<BoardColumn> columns = of(project);

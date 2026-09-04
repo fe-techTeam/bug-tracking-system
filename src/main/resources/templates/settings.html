@@ -8,11 +8,23 @@
         <a class="back-link" th:href="@{/bugs}" title="Go back" aria-label="Go back">
             <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
             </a>
-        <h1 class="topbar-title">Settings</h1>
+        <!-- Not in the bar: the trail beside it already says "Settings", and on
+             the projects tab that made it read "Settings Settings". Kept as
+             .sr-only rather than deleted — the page has no other h1, and one
+             whose outline starts at h2 is a page a screen reader cannot
+             summarise. It names the tab, which the trail shows visually. -->
+        <h1 class="sr-only"
+            th:text="${(tab == 'team' ? (editingMember != null ? editingMember.name : 'Team')
+                     : 'Projects') + ' — Settings'}">Settings</h1>
+        <!-- Three steps at most: Settings, the tab, and — on one person's
+             account — their name. The tab becomes a link exactly when there is
+             a step after it, which is the only way back off that screen that
+             does not go through the browser's own arrow. -->
         <div th:replace="~{fragments :: crumbs(${ {
-                 {'Board', '/bugs'},
                  {'Settings', tab == 'projects' ? null : '/settings'},
-                 {tab == 'team' ? 'Team' : (tab == 'board' ? 'Board columns' : null), null} } })}"></div>
+                 {tab == 'team' ? 'Team' : null,
+                  tab == 'team' and editingMember != null ? '/settings?tab=team' : null},
+                 {tab == 'team' and editingMember != null ? editingMember.name : null, null} } })}"></div>
 
         <div class="topbar-actions">
             <!-- Links, not script: the tabs work with JS switched off. -->
@@ -27,11 +39,6 @@
                     <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
                     <span>Team</span>
                 </a>
-                <a th:href="@{/settings(tab='board', project=${boardProject})}"
-                   th:classappend="${tab == 'board'} ? 'is-active' : ''" id="tab-board">
-                    <svg class="i" aria-hidden="true"><use href="#i-columns"/></svg>
-                    <span>Board</span>
-                </a>
             </div>
         </div>
     </header>
@@ -41,64 +48,6 @@
 
         <!-- ================= projects ================= -->
         <div th:if="${tab == 'projects'}" class="stack">
-
-            <div class="panel">
-                <div class="panel-head">
-                    <h2>Add a project</h2>
-                    <span class="count-pill" th:text="${#lists.size(projects)}">4</span>
-                </div>
-                <div class="panel-pad">
-                    <form class="row row-inline" method="post" th:action="@{/projects}" id="project-form">
-                        <label style="flex: 3 1 240px">
-                            <span>Project name</span>
-                            <input type="text" name="name" id="project-name" required
-                                   placeholder="e.g. Mahindra Mutual Fund" autocomplete="off"
-                                   autocapitalize="words" enterkeyhint="done" autocorrect="off"
-                                   spellcheck="false">
-                        </label>
-
-                        <!-- Who is on it, chosen while the project is being made
-                             rather than as a second trip through the table. The
-                             same checkbox list the raise form assigns people
-                             with, so ticking somebody reads the same everywhere. -->
-                        <div class="field" style="flex: 2 1 220px">
-                            <span class="field-label" id="new-team-label">Team</span>
-                            <details class="pop-wrap picker" id="new-team-picker" data-tally="Nobody yet">
-                                <summary aria-labelledby="new-team-label new-team-summary">
-                                    <span class="picker-btn" id="new-team-summary">
-                                        <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
-                                        <span class="picker-tally muted">Nobody yet</span>
-                                        <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
-                                    </span>
-                                </summary>
-                                <div class="pop pop-block">
-                                    <div class="pop-head"><span>Who works on it</span></div>
-                                    <div class="pop-list">
-                                        <label class="pick-opt" th:each="m : ${members}" th:if="${m.active}">
-                                            <input type="checkbox" name="members" th:value="${m.id}">
-                                            <span class="avatar avatar-sm" th:attr="data-avatar=${m.name}"
-                                                  aria-hidden="true"></span>
-                                            <span th:text="${m.name == me} ? ${m.name} + ' (me)' : ${m.name}">Nishana R</span>
-                                        </label>
-                                    </div>
-                                    <p class="pop-empty" th:if="${#lists.isEmpty(members)}">
-                                        Nobody on the team yet.
-                                    </p>
-                                </div>
-                            </details>
-                        </div>
-
-                        <div class="filter-actions">
-                            <button type="submit" class="btn btn-primary" id="add-project">Add project</button>
-                        </div>
-                    </form>
-                    <p class="hint" style="margin-top:10px">
-                        The team can be changed at any time from the Team column below — nothing on a
-                        bug depends on it, so adding somebody late costs nothing.
-                    </p>
-                </div>
-            </div>
-
             <!-- One project's team, opened from its row. It is a panel rather than
                  a popover in the table because .table-wrap scrolls sideways, and
                  anything opening out of a cell is clipped by that scrollport. -->
@@ -136,88 +85,155 @@
                 </div>
             </div>
 
-            <div class="panel table-wrap">
+            <!-- The table is the page. Adding a project is a popover off its
+                 head, not a form sitting open above it for ever — you add one
+                 every few months and read the list every time you come here. -->
+            <div class="panel">
+                <div class="panel-head">
+                    <svg class="i" aria-hidden="true"><use href="#i-folder"/></svg>
+                    <h2>Projects</h2>
+                    <span class="count-pill num" th:text="${#lists.size(projects)}">4</span>
+                    <span class="spacer"></span>
+
+                    <details class="pop-wrap" id="add-project-pop">
+                        <summary aria-label="Add a project">
+                            <span class="btn btn-sm btn-primary">
+                                <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+                                <span>Add project</span>
+                            </span>
+                        </summary>
+                        <div class="pop">
+                            <div class="pop-head"><span>New project</span></div>
+                            <form class="pop-form" method="post" th:action="@{/projects}" id="project-form">
+                                <label>
+                                    <span>Project name</span>
+                                    <input type="text" name="name" id="project-name" required
+                                           placeholder="e.g. Mahindra Mutual Fund" autocomplete="off"
+                                           autocapitalize="words" enterkeyhint="done" autocorrect="off"
+                                           spellcheck="false">
+                                </label>
+
+                                <!-- Who is on it, chosen while the project is being
+                                     made rather than as a second trip through the
+                                     table. The same checkbox row the raise form
+                                     assigns people with, so ticking somebody reads
+                                     the same everywhere — and the same search above
+                                     it, because a roster is twenty rows and reading
+                                     twenty is slower than typing three letters. -->
+                                <div class="pick-block">
+                                    <span class="field-label">Who works on it</span>
+                                    <div class="pick-search">
+                                        <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+                                        <input type="text" id="new-team-filter" placeholder="Find someone…"
+                                               autocomplete="off" aria-label="Find someone">
+                                    </div>
+                                    <div class="pick-list pick-scroll" id="new-team-list">
+                                        <label class="pick-opt" th:each="m : ${members}" th:if="${m.active}"
+                                               th:attr="data-name=${m.name}">
+                                            <input type="checkbox" name="members" th:value="${m.id}">
+                                            <span class="avatar avatar-sm" th:attr="data-avatar=${m.name}"
+                                                  aria-hidden="true"></span>
+                                            <span th:text="${m.name == me} ? ${m.name} + ' (me)' : ${m.name}">Nishana R</span>
+                                        </label>
+                                        <p class="pop-empty pick-none" id="new-team-none" hidden>
+                                            Nobody by that name.
+                                        </p>
+                                    </div>
+                                    <p class="pop-empty" th:if="${#lists.isEmpty(members)}">
+                                        Nobody on the team yet.
+                                    </p>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-block"
+                                        id="add-project">Add project</button>
+                            </form>
+                        </div>
+                    </details>
+                </div>
+
                 <!-- data-label is the mobile contract: under 780px the row becomes a
                      card and the CSS prints each label from it, so the value must be
                      the column's own heading, word for word. -->
-                <table class="bug-table" id="project-table">
-                    <thead>
-                    <tr>
-                        <th>Project</th>
-                        <th>Bugs</th>
-                        <th>Team</th>
-                        <th>Documents</th>
-                        <th>In the switcher</th>
-                        <th><span class="sr-only">Actions</span></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="p,rs : ${projects}" th:style="'--i:' + ${rs.index}"
-                        th:classappend="${p.active} ? '' : 'is-inactive'">
-                        <td data-label="Project">
-                            <span class="client-chip">
-                                <span class="avatar" th:attr="data-avatar=${p.name}" aria-hidden="true"></span>
-                                <a class="client-name" th:href="@{/bugs(project=${p.name})}"
-                                   th:text="${p.name}">Godrej</a>
-                            </span>
-                        </td>
-                        <td data-label="Bugs" th:with="used=${usage.get(p.id)}">
-                            <a class="tag" th:if="${used != null and used > 0}" th:href="@{/bugs(project=${p.name})}"
-                               th:text="${used}">3</a>
-                            <span class="muted" th:unless="${used != null and used > 0}">none</span>
-                        </td>
-                        <!-- Faces, and the link that opens the editor above. Read
-                             only in the cell itself: it is the one place on this
-                             page where a face is a fact rather than a control. -->
-                        <td data-label="Team" th:with="onIt=${projectTeam.get(p.id)}">
-                            <a class="team-cell" th:href="@{/settings(project=${p.name})}"
-                               th:attr="aria-label='Edit who is on ' + ${p.name}">
-                                <span class="face-stack" th:if="${onIt != null and !onIt.isEmpty()}">
-                                    <span class="avatar avatar-sm" th:each="m,ms : ${onIt}"
-                                          th:if="${ms.index < 4}"
-                                          th:attr="data-avatar=${m.name}" th:title="${m.name}"
-                                          aria-hidden="true"></span>
+                <div class="table-wrap">
+                    <table class="bug-table" id="project-table">
+                        <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Bugs</th>
+                            <th>Team</th>
+                            <th>Documents</th>
+                            <th>In the switcher</th>
+                            <th><span class="sr-only">Actions</span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="p,rs : ${projects}" th:style="'--i:' + ${rs.index}"
+                            th:classappend="${p.active} ? '' : 'is-inactive'">
+                            <td data-label="Project">
+                                <span class="client-chip">
+                                    <span class="avatar" th:attr="data-avatar=${p.name}" aria-hidden="true"></span>
+                                    <a class="client-name" th:href="@{/bugs(project=${p.name})}"
+                                       th:text="${p.name}">Godrej</a>
                                 </span>
-                                <span class="num" th:if="${onIt != null and onIt.size() > 4}"
-                                      th:text="'+' + (${onIt.size()} - 4)">+2</span>
-                                <span class="muted" th:if="${onIt == null or onIt.isEmpty()}">Nobody yet</span>
-                            </a>
-                        </td>
+                            </td>
+                            <td data-label="Bugs" th:with="used=${usage.get(p.id)}">
+                                <a class="tag" th:if="${used != null and used > 0}" th:href="@{/bugs(project=${p.name})}"
+                                   th:text="${used}">3</a>
+                                <span class="muted" th:unless="${used != null and used > 0}">none</span>
+                            </td>
+                            <!-- Faces, and the link that opens the editor above. Read
+                                 only in the cell itself: it is the one place on this
+                                 page where a face is a fact rather than a control. -->
+                            <td data-label="Team" th:with="onIt=${projectTeam.get(p.id)}">
+                                <a class="team-cell" th:href="@{/settings(project=${p.name})}"
+                                   th:attr="aria-label='Edit who is on ' + ${p.name}">
+                                    <span class="face-stack" th:if="${onIt != null and !onIt.isEmpty()}">
+                                        <span class="avatar avatar-sm" th:each="m,ms : ${onIt}"
+                                              th:if="${ms.index < 4}"
+                                              th:attr="data-avatar=${m.name}" th:title="${m.name}"
+                                              aria-hidden="true"></span>
+                                    </span>
+                                    <span class="num" th:if="${onIt != null and onIt.size() > 4}"
+                                          th:text="'+' + (${onIt.size()} - 4)">+2</span>
+                                    <span class="muted" th:if="${onIt == null or onIt.isEmpty()}">Nobody yet</span>
+                                </a>
+                            </td>
 
-                        <!-- The only page that lists every project, so it is the
-                             only way into a project's documents that does not go
-                             through the one you happen to be looking at. -->
-                        <td data-label="Documents">
-                            <a class="tag" th:href="@{/projects/{id}/docs(id=${p.id})}"
-                               th:id="'docs-' + ${p.id}"
-                               th:attr="aria-label='Documents for ' + ${p.name}">Open</a>
-                        </td>
-                        <td data-label="In the switcher">
-                            <span class="badge" th:if="${p.active}" style="--c: var(--st-READY_FOR_TEST)">Shown</span>
-                            <span class="badge" th:unless="${p.active}" style="--c: var(--muted)">Hidden</span>
-                        </td>
-                        <td data-label="Actions" style="text-align:right" th:with="used=${usage.get(p.id)}">
-                            <div class="inline-form" style="justify-content:flex-end">
-                                <!-- Every row's buttons read the same out of context,
-                                     so each one says which project it acts on. -->
-                                <form method="post" th:action="@{/projects/{id}/active(id=${p.id})}" class="inline-form">
-                                    <input type="hidden" name="active" th:value="${p.active} ? 'false' : 'true'">
-                                    <button type="submit" class="btn btn-sm btn-ghost"
-                                            th:attr="aria-label=(${p.active} ? 'Hide ' : 'Restore ') + ${p.name}"
-                                            th:text="${p.active} ? 'Hide' : 'Restore'">Hide</button>
-                                </form>
-                                <!-- Removal only for a project nothing was raised against. -->
-                                <form method="post" th:if="${used == 0}"
-                                      th:action="@{/projects/{id}/delete(id=${p.id})}" class="inline-form"
-                                      onsubmit="return confirm('Remove this project?');">
-                                    <button type="submit" class="btn btn-sm btn-ghost"
-                                            th:attr="aria-label='Remove ' + ${p.name}">Remove</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
+                            <!-- The only page that lists every project, so it is the
+                                 only way into a project's documents that does not go
+                                 through the one you happen to be looking at. -->
+                            <td data-label="Documents">
+                                <a class="tag" th:href="@{/projects/{id}/docs(id=${p.id})}"
+                                   th:id="'docs-' + ${p.id}"
+                                   th:attr="aria-label='Documents for ' + ${p.name}">Open</a>
+                            </td>
+                            <td data-label="In the switcher">
+                                <span class="badge" th:if="${p.active}" style="--c: var(--st-READY_FOR_TEST)">Shown</span>
+                                <span class="badge" th:unless="${p.active}" style="--c: var(--muted)">Hidden</span>
+                            </td>
+                            <td data-label="Actions" style="text-align:right" th:with="used=${usage.get(p.id)}">
+                                <div class="inline-form" style="justify-content:flex-end">
+                                    <!-- Every row's buttons read the same out of context,
+                                         so each one says which project it acts on. -->
+                                    <form method="post" th:action="@{/projects/{id}/active(id=${p.id})}" class="inline-form">
+                                        <input type="hidden" name="active" th:value="${p.active} ? 'false' : 'true'">
+                                        <button type="submit" class="btn btn-sm btn-ghost"
+                                                th:attr="aria-label=(${p.active} ? 'Hide ' : 'Restore ') + ${p.name}"
+                                                th:text="${p.active} ? 'Hide' : 'Restore'">Hide</button>
+                                    </form>
+                                    <!-- Removal only for a project nothing was raised against. -->
+                                    <form method="post" th:if="${used == 0}"
+                                          th:action="@{/projects/{id}/delete(id=${p.id})}" class="inline-form"
+                                          onsubmit="return confirm('Remove this project?');">
+                                        <button type="submit" class="btn btn-sm btn-ghost"
+                                                th:attr="aria-label='Remove ' + ${p.name}">Remove</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <p class="hint">
@@ -226,325 +242,254 @@
             </p>
         </div>
 
-        <!-- ================= board columns ================= -->
-        <!-- One board at a time. Columns belong to a project — two projects
-             rarely run the same process, and a column is a row rather than a
-             compiled-in constant precisely so they need not. -->
-        <div th:if="${tab == 'board'}" class="stack">
+        <!-- ================= team ================= -->
+        <!-- Two screens. The roster is a list you scan; one person's account is
+             a screen of its own, reached from their row, and it is a list of
+             actions with nothing else on it — a place you do a thing, not a
+             place you read about it.
+
+             Nothing here links to the board. Somebody's bugs are the board's
+             question and the board answers it well; a filter link from an
+             administration page is a trapdoor out of the thing you came to do. -->
+
+        <!-- ---------- the roster ---------- -->
+        <div th:if="${tab == 'team' and editingMember == null}" class="stack">
 
             <div class="panel">
                 <div class="panel-head">
-                    <h2>Which board</h2>
-                    <span class="count-pill" th:if="${boardProject != null}"
-                          th:text="${#lists.size(boardColumns)}">6</span>
-                </div>
-                <div class="panel-pad">
-                    <!-- A GET form, so the board you are editing is in the URL
-                         and the page is linkable and reloadable. -->
-                    <form class="row row-inline" method="get" th:action="@{/settings}" id="board-picker">
-                        <input type="hidden" name="tab" value="board">
-                        <label style="flex: 3 1 260px">
-                            <span>Project</span>
-                            <select name="project" id="board-project">
-                                <option th:each="name : ${boardNames}" th:value="${name}"
-                                        th:text="${name}" th:selected="${name == boardProject}">Godrej</option>
-                            </select>
-                        </label>
-                        <div class="filter-actions">
-                            <button type="submit" class="btn" id="show-board">Show its columns</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+                    <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
+                    <h2>The team</h2>
+                    <span class="count-pill num" th:text="${#lists.size(members)}">8</span>
+                    <span class="spacer"></span>
 
-            <div class="empty" th:if="${boardProject == null}" id="no-board">
-                <span class="empty-art" aria-hidden="true">
-                    <svg class="i" style="width:19px;height:19px"><use href="#i-columns"/></svg>
-                </span>
-                <h3>No projects yet</h3>
-                <p>Columns belong to a project. Add one on the Projects tab and it arrives with a board.</p>
-                <div class="actions">
-                    <a class="btn btn-primary" th:href="@{/settings}">Add a project</a>
-                </div>
-            </div>
-
-            <div class="panel" th:if="${boardProject != null}">
-                <div class="panel-head">
-                    <h2 th:text="${boardProject} + ' — left to right'">Godrej — left to right</h2>
-                    <a class="btn btn-sm btn-ghost" th:href="@{/bugs(project=${boardProject})}">Open the board</a>
-                </div>
-
-                <div class="panel-pad column-editor">
-                    <article class="column-row" th:each="c,cs : ${boardColumns}"
-                             th:style="'--c:' + ${c.token} + '; --i:' + ${cs.index}"
-                             th:with="held=${columnUsage.get(c.id)}">
-
-                        <div class="column-rank">
-                            <span class="dot" aria-hidden="true"></span>
-                            <span class="num" th:text="${cs.count}">1</span>
-                        </div>
-
-                        <!-- Everything about one column, saved together. The key
-                             its bugs store is not on this form and never changes:
-                             renaming a column is a change of wording, not a move. -->
-                        <form method="post" th:action="@{/columns/{id}(id=${c.id})}" class="column-form">
-                            <div class="field-row">
-                                <label style="flex: 2 1 200px">
-                                    <span>Name</span>
-                                    <input type="text" name="label" th:value="${c.label}" required maxlength="40"
-                                           th:id="'column-name-' + ${c.id}"
-                                           autocomplete="off" autocapitalize="words" autocorrect="off"
-                                           spellcheck="false" enterkeyhint="done">
-                                </label>
-
-                                <label>
-                                    <span>Bugs here are</span>
-                                    <select name="done" th:id="'column-done-' + ${c.id}">
-                                        <option value="false" th:selected="${!c.doneState}">still work in hand</option>
-                                        <option value="true" th:selected="${c.doneState}">finished</option>
-                                    </select>
-                                </label>
-
-                                <label>
-                                    <span>Tell, on arrival</span>
-                                    <select name="notify" th:id="'column-notify-' + ${c.id}">
-                                        <option th:each="n : ${notifyModes}" th:value="${n}"
-                                                th:text="${n.label}" th:selected="${n == c.notify}">Nobody</option>
-                                    </select>
-                                </label>
-                            </div>
-
-
-                            <div class="column-save">
-                                <span class="hint" th:if="${held != null and held > 0}">
-                                    <a th:href="@{/bugs(project=${boardProject}, status=${c.statusKey})}"
-                                       th:text="${held} + ' bug' + (${held == 1} ? '' : 's') + ' here'">3 bugs here</a>
-                                </span>
-                                <span class="hint muted" th:unless="${held != null and held > 0}">empty</span>
-                                <span class="spacer"></span>
-                                <button type="submit" class="btn btn-sm btn-primary"
-                                        th:attr="aria-label='Save the ' + ${c.label} + ' column'">Save</button>
-                            </div>
-                        </form>
-
-                        <div class="column-actions">
-                            <!-- Reordering without a mouse and without script. -->
-                            <form method="post" th:action="@{/columns/{id}/move(id=${c.id})}" class="inline-form">
-                                <input type="hidden" name="direction" value="left">
-                                <button type="submit" class="icon-btn" th:disabled="${cs.first}"
-                                        th:attr="aria-label='Move ' + ${c.label} + ' earlier',
-                                                 title='Move ' + ${c.label} + ' earlier'">
-                                    <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
-                                </button>
-                            </form>
-                            <form method="post" th:action="@{/columns/{id}/move(id=${c.id})}" class="inline-form">
-                                <input type="hidden" name="direction" value="right">
-                                <button type="submit" class="icon-btn" th:disabled="${cs.last}"
-                                        th:attr="aria-label='Move ' + ${c.label} + ' later',
-                                                 title='Move ' + ${c.label} + ' later'">
-                                    <svg class="i" aria-hidden="true"><use href="#i-arrow-right"/></svg>
-                                </button>
-                            </form>
-
-                            <!-- A board needs one column, so the last will not go. -->
-                            <form method="post" th:action="@{/columns/{id}/delete(id=${c.id})}"
-                                  class="column-remove" th:if="${#lists.size(boardColumns) > 1}"
-                                  th:attr="onsubmit='return confirm(\'Remove the ' + ${c.label} + ' column?\');'">
-                                <label th:if="${held != null and held > 0}">
-                                    <span class="sr-only" th:text="'Where the bugs in ' + ${c.label} + ' go'">Move to</span>
-                                    <select name="moveTo" required>
-                                        <option th:each="other : ${boardColumns}" th:if="${other.id != c.id}"
-                                                th:value="${other.id}"
-                                                th:text="'→ ' + ${other.label}">→ Open</option>
-                                    </select>
-                                </label>
-                                <button type="submit" class="btn btn-sm btn-ghost"
-                                        th:attr="aria-label='Remove the ' + ${c.label} + ' column'">Remove</button>
-                            </form>
-                        </div>
-                    </article>
-                </div>
-            </div>
-
-            <div class="panel" th:if="${boardProject != null}">
-                <div class="panel-head"><h2>Add a column</h2></div>
-                <div class="panel-pad">
-                    <form method="post" th:action="@{/columns}" id="column-form" class="stack">
-                        <input type="hidden" name="project" th:value="${boardProject}">
-                        <div class="field-row">
-                            <label style="flex: 2 1 200px">
-                                <span>Name</span>
-                                <input type="text" name="label" id="column-name" required maxlength="40"
-                                       placeholder="e.g. Waiting on client" autocomplete="off"
-                                       autocapitalize="words" autocorrect="off" spellcheck="false"
-                                       enterkeyhint="done">
-                            </label>
-                            <label>
-                                <span>Bugs here are</span>
-                                <select name="done" id="column-done">
-                                    <option value="false">still work in hand</option>
-                                    <option value="true">finished</option>
-                                </select>
-                            </label>
-                            <label>
-                                <span>Tell, on arrival</span>
-                                <select name="notify" id="column-notify">
-                                    <option th:each="n : ${notifyModes}" th:value="${n}"
-                                            th:text="${n.label}">Nobody</option>
-                                </select>
-                            </label>
-                        </div>
-
-
-                        <div class="filter-actions">
-                            <button type="submit" class="btn btn-primary" id="add-column-btn">Add column</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <p class="hint" th:if="${boardProject != null}">
-                Renaming a column changes what it is called and nothing else — no bug moves, and the
-                history still reads with the wording that was on screen at the time. "Bugs here are
-                finished" is what the still-open counts, the urgent counts and the blocker list all
-                read, so a column you invent needs it set correctly. Removing a column asks where its
-                bugs go; the last one on a board cannot be removed. Columns can also be renamed,
-                recoloured and reordered from the board itself.
-            </p>
-        </div>
-
-        <!-- ================= team ================= -->
-        <div th:if="${tab == 'team'}" class="stack">
-
-            <div class="member-grid">
-                <article class="member-card" th:each="m,rs : ${members}"
-                         th:style="'--i:' + ${rs.index}"
-                         th:with="load=${workload.get(m.id)}"
-                         th:classappend="(${m.active} ? '' : 'is-inactive ') + (${m.name == me} ? 'is-me' : '')">
-
-                    <div class="member-head">
-                        <span class="avatar avatar-lg" th:attr="data-avatar=${m.name}" aria-hidden="true"></span>
-                        <span class="member-id">
-                            <a class="member-name" th:href="@{/bugs(assignee=${m.name})}"
-                               th:text="${m.name}" th:title="'Everything assigned to ' + ${m.name}">Nishana R</a>
-                            <a class="member-mail" th:href="|mailto:${m.email}|" th:text="${m.email}">a@b.com</a>
-                        </span>
-                        <span class="member-you" th:if="${m.name == me}">You</span>
-                    </div>
-
-                    <!-- This roster is also the users table, so a card has to say
-                         whether this person can actually sign in. Inline rather
-                         than a popover: a card lifts on hover, which makes it a
-                         stacking context, and anything opening out of one would
-                         paint under the card beside it. -->
-                    <details class="member-auth">
-                        <summary>
-                            <span class="auth-line">
-                                <svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>
-                                <span th:if="${m.hasPassword()}">Can sign in</span>
-                                <span class="muted" th:unless="${m.hasPassword()}">No sign-in</span>
-                                <svg class="i chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+                    <!-- Adding somebody is three fields and something you do
+                         once a quarter, so it opens off this button rather than
+                         sitting under the roster for ever. A <details>, like
+                         every other popover here, so it works with JS off. -->
+                    <details class="pop-wrap" id="add-member-pop">
+                        <summary aria-label="Add a team member">
+                            <span class="btn btn-sm btn-primary">
+                                <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
+                                <span>Add member</span>
                             </span>
                         </summary>
-
-                        <div class="auth-body">
-                            <form method="post" th:action="@{/team/{id}/password(id=${m.id})}"
-                                  class="auth-form">
-                                <label class="sr-only" th:for="'pw-' + ${m.id}"
-                                       th:text="'New password for ' + ${m.name}">New password</label>
-                                <!-- autocomplete=new-password stops the browser
-                                     offering the signed-in person's own password
-                                     for somebody else's account. -->
-                                <input type="password" name="password" th:id="'pw-' + ${m.id}"
-                                       required minlength="8" maxlength="72"
-                                       th:placeholder="${m.hasPassword()} ? 'New password' : 'Give them a password'"
-                                       autocomplete="new-password" enterkeyhint="done"
-                                       autocapitalize="none" autocorrect="off" spellcheck="false">
-                                <button type="submit" class="btn btn-sm btn-primary"
-                                        th:attr="aria-label='Set the password for ' + ${m.name}">Set</button>
+                        <div class="pop">
+                            <div class="pop-head"><span>New team member</span></div>
+                            <form class="pop-form" method="post" th:action="@{/team}" id="team-form">
+                                <label>
+                                    <span>Name</span>
+                                    <input type="text" name="name" id="member-name" required
+                                           placeholder="Full name" autocomplete="off"
+                                           autocapitalize="words" enterkeyhint="next" autocorrect="off"
+                                           spellcheck="false">
+                                </label>
+                                <label>
+                                    <span>Email</span>
+                                    <!-- type=text put no @ on the phone keyboard and let iOS
+                                         capitalise and autocorrect the address on the way in. -->
+                                    <input type="email" name="email" id="member-email" required
+                                           placeholder="name@firsteconomy.com" autocomplete="off"
+                                           inputmode="email" enterkeyhint="next"
+                                           autocapitalize="none" autocorrect="off" spellcheck="false">
+                                </label>
+                                <label>
+                                    <span>Password <em class="muted">optional</em></span>
+                                    <input type="password" name="password" id="member-password"
+                                           minlength="8" maxlength="72" placeholder="Set one later if you like"
+                                           autocomplete="new-password" enterkeyhint="done"
+                                           autocapitalize="none" autocorrect="off" spellcheck="false">
+                                </label>
+                                <button type="submit" class="btn btn-primary btn-block"
+                                        id="add-member">Add member</button>
                             </form>
-
-                            <form method="post" th:action="@{/team/{id}/password(id=${m.id})}"
-                                  th:if="${m.hasPassword()}" class="inline-form"
-                                  th:attr="onsubmit=|return confirm('Stop ${m.name} being able to sign in?');|">
-                                <input type="hidden" name="clear" value="true">
-                                <button type="submit" class="btn btn-sm btn-ghost"
-                                        th:attr="aria-label='Remove the sign-in for ' + ${m.name}">Remove sign-in</button>
-                            </form>
-
-                            <p class="hint">At least 8 characters. It is stored hashed and can only
-                                be replaced, never read back.</p>
                         </div>
                     </details>
+                </div>
 
-                    <div class="member-foot">
-                        <span class="tag" th:unless="${m.active}">Hidden</span>
-                        <span class="spacer"></span>
+                <!-- Every cell is one line, so the rows share a baseline all the
+                     way down. data-label is the mobile contract: under 780px the
+                     row becomes a card and the CSS prints each label from it, so
+                     the value must be the column's own heading, word for word. -->
+                <div class="table-wrap" th:if="${!#lists.isEmpty(members)}">
+                    <table class="bug-table roster-table" id="team-table">
+                        <thead>
+                        <tr>
+                            <th class="grow">Member</th>
+                            <th>Role</th>
+                            <th>On the team</th>
+                            <th class="row-act"><span class="sr-only">Actions</span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="m,rs : ${members}" th:style="'--i:' + ${rs.index}"
+                            th:attr="data-href=@{/settings(tab='team', member=${m.id})}"
+                            th:classappend="${m.active} ? '' : 'is-inactive'">
 
-                        <!-- One card looks like the next, so every button names its person. -->
-                        <a class="btn btn-sm btn-ghost" th:href="@{/bugs(assignee=${m.name})}"
-                           th:attr="aria-label='Bugs assigned to ' + ${m.name}">Their bugs</a>
+                            <!-- Name and address on one line: they identify the same
+                                 person, and a column each spent half the table saying
+                                 it twice. -->
+                            <td class="grow" data-label="Member">
+                                <span class="client-chip">
+                                    <span class="avatar" th:attr="data-avatar=${m.name}" aria-hidden="true"></span>
+                                    <span class="client-name" th:text="${m.name}">Nishana R</span>
+                                    <span class="tag" th:if="${m.name == me}">You</span>
+                                    <span class="member-mail" th:text="${m.email}">a@b.com</span>
+                                </span>
+                            </td>
 
-                        <form method="post" th:action="@{/team/{id}/active(id=${m.id})}" class="inline-form">
-                            <input type="hidden" name="active" th:value="${m.active} ? 'false' : 'true'">
-                            <button type="submit" class="btn btn-sm btn-ghost"
-                                    th:attr="aria-label=(${m.active} ? 'Hide ' : 'Restore ') + ${m.name}"
-                                    th:text="${m.active} ? 'Hide' : 'Restore'">Hide</button>
-                        </form>
-                        <!-- Removal only for someone with no history to break. -->
-                        <form method="post" th:if="${load != null and load.touched() == 0}"
-                              th:action="@{/team/{id}/delete(id=${m.id})}" class="inline-form"
-                              onsubmit="return confirm('Remove this team member?');">
-                            <button type="submit" class="btn btn-sm btn-ghost"
-                                    th:attr="aria-label='Remove ' + ${m.name}">Remove</button>
-                        </form>
+                            <!-- A badge for the exception and plain text for the rule.
+                                 Nineteen violet pills saying "Member" is a colour wash
+                                 you have to read past to find the two rows that differ,
+                                 which is the only reason to look down this column. -->
+                            <td data-label="Role">
+                                <span class="badge" th:if="${m.admin}" style="--c: var(--col-VIOLET)">Admin</span>
+                                <span class="muted" th:unless="${m.admin}">Member</span>
+                            </td>
+
+                            <td data-label="On the team">
+                                <span class="muted" th:if="${m.active}">Active</span>
+                                <span class="badge" th:unless="${m.active}" style="--c: var(--col-SLATE)">Hidden</span>
+                            </td>
+
+                            <!-- One way in, and it names its person: three buttons that
+                                 read the same down every row is what made this table
+                                 something to be careful in rather than something to
+                                 read. Everything that changes an account happens on the
+                                 screen this opens. -->
+                            <td class="row-act">
+                                <a class="btn btn-sm btn-ghost row-go" th:id="'manage-' + ${m.id}"
+                                   th:href="@{/settings(tab='team', member=${m.id})}"
+                                   th:attr="aria-label=|Manage ${m.name}|">
+                                    <span>Manage</span>
+                                    <svg class="i" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+                                </a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="empty" th:if="${#lists.isEmpty(members)}" id="no-members">
+                    <div class="empty-art">
+                        <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
                     </div>
-                </article>
+                    <h3>Nobody on the team yet</h3>
+                    <p>
+                        This roster is the users table. Add somebody and they can be named on a
+                        bug; give them a password and they can sign in.
+                    </p>
+                </div>
             </div>
+        </div>
+
+        <!-- ---------- one person's account ---------- -->
+        <!-- It replaces the roster rather than opening above it, and it is a
+             list of actions: a label, the control that changes it, and nothing
+             in between. The prose that used to sit under every button is in the
+             README, where it can be read once rather than every time. -->
+        <div th:if="${tab == 'team' and editingMember != null}" class="stack member-stack"
+             id="member-editor"
+             th:with="m=${editingMember},
+                      load=${workload.get(editingMember.id)},
+                      here=${'/settings?tab=team&member=' + editingMember.id}">
 
             <div class="panel">
-                <div class="panel-head"><h2>Add a team member</h2></div>
-                <div class="panel-pad">
-                    <form class="row row-inline" method="post" th:action="@{/team}" id="team-form">
-                        <label>
-                            <span>Name</span>
-                            <input type="text" name="name" id="member-name" required
-                                   placeholder="Full name" autocomplete="off"
-                                   autocapitalize="words" enterkeyhint="next" autocorrect="off"
-                                   spellcheck="false">
-                        </label>
-                        <label>
-                            <span>Email</span>
-                            <!-- type=text put no @ on the phone keyboard and let iOS
-                                 capitalise and autocorrect the address on the way in. -->
-                            <input type="email" name="email" id="member-email" required
-                                   placeholder="name@firsteconomy.com" autocomplete="off"
-                                   inputmode="email" enterkeyhint="next"
-                                   autocapitalize="none" autocorrect="off" spellcheck="false">
-                        </label>
-                        <!-- Optional, because most of this roster never sign in: they
-                             are names that appear on bugs. Filling it in is what turns
-                             somebody into an account. -->
-                        <label>
-                            <span>Password <em class="muted">optional</em></span>
-                            <input type="password" name="password" id="member-password"
-                                   minlength="8" maxlength="72" placeholder="Leave blank for no sign-in"
+                <div class="person-head">
+                    <span class="avatar avatar-lg" th:attr="data-avatar=${m.name}" aria-hidden="true"></span>
+                    <div class="person-id">
+                        <div class="person-name">
+                            <h2 th:text="${m.name}">Nishana R</h2>
+                            <span class="tag" th:if="${m.name == me}">You</span>
+                        </div>
+                        <a class="person-mail" th:href="|mailto:${m.email}|" th:text="${m.email}">a@b.com</a>
+                    </div>
+                    <span class="spacer"></span>
+                    <span class="badge" th:if="${m.admin}" style="--c: var(--col-VIOLET)">Admin</span>
+                    <span class="badge" th:unless="${m.active}" style="--c: var(--col-SLATE)">Hidden</span>
+                    <a class="btn btn-sm btn-ghost" th:href="@{/settings(tab='team')}" id="member-done">
+                        <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+                        <span>All members</span>
+                    </a>
+                </div>
+
+                <div class="act-list">
+
+                    <form method="post" th:action="@{/team/{id}/password(id=${m.id})}"
+                          class="act-row" id="member-password-form">
+                        <input type="hidden" name="back" th:value="${here}">
+                        <label class="act-label" for="member-password-new">Password</label>
+                        <div class="act-control">
+                            <!-- autocomplete=new-password stops the browser offering the
+                                 signed-in person's own password for somebody else's account. -->
+                            <input type="password" name="password" id="member-password-new"
+                                   required minlength="8" maxlength="72"
+                                   th:placeholder="${m.hasPassword()} ? 'New password' : 'Give them a password'"
                                    autocomplete="new-password" enterkeyhint="done"
                                    autocapitalize="none" autocorrect="off" spellcheck="false">
-                        </label>
-                        <div class="filter-actions">
-                            <button type="submit" class="btn btn-primary" id="add-member">Add member</button>
+                            <button type="submit" class="btn btn-sm btn-primary"
+                                    th:attr="aria-label='Set the password for ' + ${m.name}"
+                                    th:text="${m.hasPassword()} ? 'Change' : 'Set'">Set</button>
+                        </div>
+                    </form>
+
+                    <form method="post" th:action="@{/team/{id}/password(id=${m.id})}"
+                          th:if="${m.hasPassword()}" class="act-row"
+                          th:attr="onsubmit=|return confirm('Stop ${m.name} being able to sign in?');|">
+                        <input type="hidden" name="clear" value="true">
+                        <input type="hidden" name="back" th:value="${here}">
+                        <span class="act-label">Sign-in</span>
+                        <div class="act-control">
+                            <button type="submit" class="btn btn-sm btn-ghost" id="member-clear-password"
+                                    th:attr="aria-label='Remove the sign-in for ' + ${m.name}">Remove sign-in</button>
+                        </div>
+                    </form>
+
+                    <form method="post" th:action="@{/team/{id}/role(id=${m.id})}" class="act-row"
+                          th:attr="onsubmit=|return confirm('Change what ${m.name} may administer?');|">
+                        <input type="hidden" name="role" th:value="${m.admin} ? 'MEMBER' : 'ADMIN'">
+                        <input type="hidden" name="back" th:value="${here}">
+                        <span class="act-label">Role</span>
+                        <div class="act-control">
+                            <!-- A badge on somebody who cannot sign in does nothing but
+                                 mislead the roster, so the service refuses it. Disabled
+                                 rather than explained: the state is the sentence. -->
+                            <button type="submit" class="btn btn-sm btn-ghost" id="member-role"
+                                    th:disabled="${!m.admin and !m.hasPassword()}"
+                                    th:title="${!m.admin and !m.hasPassword()}
+                                            ? 'Give them a password first' : null"
+                                    th:text="${m.admin} ? 'Make a member' : 'Make an admin'">Make an admin</button>
+                        </div>
+                    </form>
+
+                    <form method="post" th:action="@{/team/{id}/active(id=${m.id})}" class="act-row"
+                          th:attr="onsubmit=${m.active}
+                                 ? |return confirm('Hide ${m.name} and stop them signing in?');| : null">
+                        <input type="hidden" name="active" th:value="${m.active} ? 'false' : 'true'">
+                        <input type="hidden" name="back" th:value="${here}">
+                        <span class="act-label">On the team</span>
+                        <div class="act-control">
+                            <button type="submit" class="btn btn-sm btn-ghost" id="member-active"
+                                    th:attr="aria-label=(${m.active} ? 'Deactivate ' : 'Restore ') + ${m.name}"
+                                    th:text="${m.active} ? 'Deactivate' : 'Restore'">Deactivate</button>
+                        </div>
+                    </form>
+
+                    <!-- Only somebody with no history to break: anybody named on a
+                         bug is deactivated instead, so what those bugs say still
+                         makes sense. Absent rather than disabled — a control that
+                         will never be pressable is a control to leave out. -->
+                    <form method="post" th:action="@{/team/{id}/delete(id=${m.id})}"
+                          th:if="${load != null and load.touched() == 0}" class="act-row"
+                          th:attr="onsubmit=|return confirm('Remove ${m.name} from the team?');|">
+                        <input type="hidden" name="back" value="/settings?tab=team">
+                        <span class="act-label">Remove</span>
+                        <div class="act-control">
+                            <button type="submit" class="btn btn-sm btn-danger" id="member-remove"
+                                    th:attr="aria-label='Remove ' + ${m.name}">Remove from the team</button>
                         </div>
                     </form>
                 </div>
             </div>
-
-            <p class="hint">
-                Hiding somebody keeps every bug they raised or were assigned exactly as it is — they just
-                stop appearing as a choice for new ones, and can no longer sign in.
-                This roster is the users table: a member with a password can sign in with their email
-                address, and one without is only ever a name on a bug.
-            </p>
         </div>
 
     </div>

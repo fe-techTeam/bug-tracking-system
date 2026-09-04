@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en"
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security" lang="en"
       th:fragment="page(title, content)">
 <head>
     <meta charset="UTF-8">
@@ -28,6 +29,10 @@
 
 <!-- One sprite for the whole app: stroked line icons, sized alongside their text. -->
 <svg width="0" height="0" class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-home" viewBox="0 0 24 24">
+        <path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/>
+        <path d="M9.5 21v-6h5v6"/>
+    </symbol>
     <symbol id="i-board" viewBox="0 0 24 24">
         <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
         <rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
@@ -53,7 +58,18 @@
         <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>
     </symbol>
     <symbol id="i-chevrons-right" viewBox="0 0 24 24"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></symbol>
+    <symbol id="i-chevrons-left" viewBox="0 0 24 24"><path d="m18 17-5-5 5-5"/><path d="m11 17-5-5 5-5"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-zoom-in" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/><path d="M8 11h6"/><path d="M11 8v6"/>
+    </symbol>
+    <symbol id="i-zoom-out" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/><path d="M8 11h6"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5Z"/></symbol>
     <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
     <symbol id="i-selector" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
@@ -295,12 +311,19 @@
         </div>
 
         <nav class="nav-links">
+            <!-- "Home", not "Board": the board is one of three ways to read the
+                 same bugs, and naming the way in after one of them made the
+                 other two feel like somewhere you had wandered off to. Plain
+                 /bugs on purpose — the view is remembered in the session, so
+                 this comes back to the list if the list is where you were, and
+                 keeps doing so on the next visit. Its id is unchanged; the
+                 Selenium notes name it. -->
             <a class="nav-link" th:href="@{/bugs}" id="board-link"
-               title="Board" aria-label="Board"
+               title="Home" aria-label="Home"
                th:classappend="${onBoard} ? 'is-active' : ''"
                th:attr="aria-current=${onBoard ? 'page' : null}">
-                <svg class="i" aria-hidden="true"><use href="#i-board"/></svg>
-                <span>Board</span>
+                <svg class="i" aria-hidden="true"><use href="#i-home"/></svg>
+                <span>Home</span>
             </a>
             <!-- Carries the project you were last on, so Documents opens the
                  one you are working in rather than the first one alphabetically. -->
@@ -312,13 +335,17 @@
                 <svg class="i" aria-hidden="true"><use href="#i-folder"/></svg>
                 <span>Documents</span>
             </a>
-            <!-- Team rather than Settings: the roster is the thing anybody
-                 comes here to look at, and everything else behind Settings —
-                 projects, a board's columns — is a tab away once you land.
-                 The account menu still holds Settings by name. -->
+            <!-- Opens the team drawer: who is on the project you are looking
+                 at, and a tick to put somebody else on it. That is daily work,
+                 so it stays for everybody.
+
+                 Its no-script fallback is Settings, which only an admin may
+                 open — so for everybody else the link is marked .nav-link-js
+                 and appears only once the inline script in <head> has confirmed
+                 scripting works. A link that 403s is worse than no link. -->
             <a class="nav-link" th:href="@{/settings(tab='team')}" id="settings-link"
                title="Team" aria-label="Team"
-               th:classappend="${onTeam} ? 'is-active' : ''"
+               th:classappend="${(onTeam ? 'is-active ' : '') + (isAdmin ? '' : 'nav-link-js')}"
                th:attr="aria-current=${onTeam ? 'page' : null}">
                 <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
                 <span>Team</span>
@@ -403,9 +430,24 @@
                             <b th:text="${#authentication.name}">Nishana R</b>
                             <span>Recorded on your comments and changes</span>
                         </span>
+                        <!-- Only for the people it says something about. A badge
+                             reading "Member" on everybody is a badge nobody
+                             reads; one reading "Admin" on two people out of
+                             twenty is the whole message. -->
+                        <span class="badge role-badge" sec:authorize="hasRole('ADMIN')"
+                              style="--c: var(--col-VIOLET)">Admin</span>
                     </div>
 
+                    <!-- Your own password, which is not administration and so
+                         is not behind Settings. Everybody has this; only an
+                         admin has the line under it. -->
+                    <a class="pop-item" id="menu-account" th:href="@{/account}">
+                        <svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>
+                        <span>Your account</span>
+                    </a>
+
                     <a class="pop-item" id="menu-settings" th:href="@{/settings}"
+                       sec:authorize="hasRole('ADMIN')"
                        th:classappend="${onTeam} ? 'is-active' : ''"
                        th:attr="aria-current=${onTeam ? 'page' : null}">
                         <svg class="i" aria-hidden="true"><use href="#i-settings"/></svg>
@@ -435,13 +477,53 @@
      thumbnail is a real link, so this only saves leaving the page. -->
 <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Attachment">
     <div class="lightbox-bar">
+        <!-- Where you are in the set, so stepping through it is a thing with an
+             end rather than an arrow you keep pressing. Hidden when a bug has
+             one thing on it and there is nowhere to step to. -->
+        <span class="lightbox-count num" id="lightbox-count" hidden>1 / 4</span>
         <span class="lightbox-name" id="lightbox-name">file</span>
+
+        <!-- Only for a picture: there is nothing to zoom in a video that its own
+             controls do not already do better. -->
+        <span class="lightbox-zoom" id="lightbox-zoom" hidden>
+            <button type="button" class="icon-btn icon-btn-sm" id="lightbox-zoom-out"
+                    title="Zoom out" aria-label="Zoom out">
+                <svg class="i" aria-hidden="true"><use href="#i-zoom-out"/></svg>
+            </button>
+            <button type="button" class="lightbox-zoom-level num" id="lightbox-zoom-level"
+                    title="Fit to the window" aria-label="Zoom level — click to fit to the window">100%</button>
+            <button type="button" class="icon-btn icon-btn-sm" id="lightbox-zoom-in"
+                    title="Zoom in" aria-label="Zoom in">
+                <svg class="i" aria-hidden="true"><use href="#i-zoom-in"/></svg>
+            </button>
+        </span>
+
         <a class="btn btn-sm btn-ghost" id="lightbox-open" href="#" target="_blank" rel="noopener">Open</a>
         <button type="button" class="icon-btn" id="lightbox-close" title="Close" aria-label="Close">
             <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
         </button>
     </div>
-    <div class="lightbox-stage" id="lightbox-stage"></div>
+
+    <!-- The arrows sit over the stage rather than beside it: a picture that
+         gave up 90px on each side to two buttons was smaller for it on every
+         screen, including the ones with nothing to step to. -->
+    <div class="lightbox-body">
+        <button type="button" class="lightbox-nav lightbox-prev" id="lightbox-prev" hidden
+                title="Previous attachment" aria-label="Previous attachment">
+            <svg class="i" aria-hidden="true"><use href="#i-chevron-left"/></svg>
+        </button>
+        <div class="lightbox-stage" id="lightbox-stage"></div>
+        <button type="button" class="lightbox-nav lightbox-next" id="lightbox-next" hidden
+                title="Next attachment" aria-label="Next attachment">
+            <svg class="i" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+        </button>
+    </div>
+
+    <!-- Everything else on the bug, so stepping through is a thing you can see
+         the shape of. app.js fills it; empty markup here means one attachment
+         costs nothing. -->
+    <div class="lightbox-strip" id="lightbox-strip" hidden role="group"
+         aria-label="The other attachments in this set"></div>
 </div>
 
 <!-- ========================= quick search =========================

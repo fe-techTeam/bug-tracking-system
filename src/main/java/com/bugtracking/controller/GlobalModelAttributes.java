@@ -28,6 +28,12 @@ public class GlobalModelAttributes {
     /** Where the last-used project is parked between pages. */
     static final String PROJECT_KEY = "bugtracking.project";
 
+    /** And the way you were last reading it: board, list or stats. */
+    static final String VIEW_KEY = "bugtracking.view";
+
+    /** The only three answers {@code ?view=} has. */
+    private static final java.util.Set<String> VIEWS = java.util.Set.of("board", "list", "stats");
+
     /** How many notifications the bell popover lists before "View all". */
     private static final int POPOVER_LIMIT = 8;
 
@@ -59,6 +65,25 @@ public class GlobalModelAttributes {
     @ModelAttribute("cols")
     public BoardColumns columns(HttpServletRequest request) {
         return recovering(request) ? new BoardColumns(List.of()) : columns.snapshot();
+    }
+
+    /**
+     * Whether the person reading this page may administer the setup.
+     *
+     * <p>{@code sec:authorize} answers the same question, but only as a
+     * yes/no around a whole element. The navbar needs it as a <em>value</em> —
+     * one link that keeps its id and its drawer behaviour either way and only
+     * changes which class it carries — and duplicating the link under two
+     * authorize branches would put the same id in the template twice.
+     */
+    @ModelAttribute("isAdmin")
+    public boolean isAdmin(HttpServletRequest request) {
+        return !recovering(request)
+                && com.bugtracking.config.AccountPrincipal
+                        .of(org.springframework.security.core.context.SecurityContextHolder
+                                .getContext().getAuthentication())
+                        .map(com.bugtracking.config.AccountPrincipal::isAdmin)
+                        .orElse(false);
     }
 
     /** Drives the count on the bell in the navbar. */
@@ -99,6 +124,32 @@ public class GlobalModelAttributes {
         }
         Object remembered = session.getAttribute(PROJECT_KEY);
         return remembered instanceof String name && !name.isBlank() ? name : null;
+    }
+
+    /**
+     * How you last read the bugs — the board, the same bugs as a list, or the
+     * numbers.
+     *
+     * <p>Remembered for the same reason the project is: Home is one link, and
+     * which of the three it should open is a thing about you rather than a
+     * thing about the link. Somebody who works from the list gets the list
+     * back, on the next page and on the next visit, without having to pick it
+     * again.
+     *
+     * <p>Only ever set from a board URL, and only to one of the three names —
+     * {@code /documents?view=} means nothing here, and neither does anything a
+     * hand-typed URL invents.
+     */
+    @ModelAttribute("currentView")
+    public String currentView(HttpServletRequest request, HttpSession session) {
+        String asked = request.getParameter("view");
+        if (request.getRequestURI().startsWith("/bugs")
+                && asked != null && VIEWS.contains(asked.trim())) {
+            session.setAttribute(VIEW_KEY, asked.trim());
+            return asked.trim();
+        }
+        Object remembered = session.getAttribute(VIEW_KEY);
+        return remembered instanceof String name && VIEWS.contains(name) ? name : "board";
     }
 
     /** Lets the navbar mark which section you are in. */

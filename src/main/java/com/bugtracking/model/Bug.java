@@ -1,5 +1,6 @@
 package com.bugtracking.model;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -10,6 +11,7 @@ import java.util.Set;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -139,6 +141,26 @@ public class Bug {
      */
     @Column(name = "blocked_by")
     private Long blockedBy;
+
+    /**
+     * When this is meant to be done by, or null — which is most bugs.
+     *
+     * <p>A date and not a timestamp: "by Friday" is what anybody actually
+     * means, and an hour on it would be a precision nobody sets and everybody
+     * would then have to read past.
+     *
+     * <p>Optional on purpose, and staying optional. A required due date is one
+     * people fill in with a guess to get past the form, and a board where every
+     * card carries a made-up date is a board where no date means anything.
+     *
+     * <p>{@code @DateTimeFormat} is load-bearing: an {@code <input type="date">}
+     * submits ISO ({@code 2026-09-20}), while Spring's default binder for
+     * LocalDate parses the short form for the machine's locale. Without this the
+     * form rejects the very value the browser's own date picker produced.
+     */
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    @Column(name = "due_date")
+    private LocalDate dueDate;
 
     /**
      * When this bug was moved to the trash, or null while it is live.
@@ -303,6 +325,33 @@ public class Bug {
     @Transient
     public String getAssigneesLabel() {
         return assignees.isEmpty() ? null : String.join(", ", assignees);
+    }
+
+    public LocalDate getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(LocalDate dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    /**
+     * Whether the date has been and gone. Today is <em>not</em> past due —
+     * something due today is due today.
+     *
+     * <p>This answers a question about the date and nothing else. Whether the
+     * bug is <em>late</em> also depends on whether the column it is sitting in
+     * counts as finished, which this class cannot know: a bug closed last month
+     * that was due last week is done, not overdue. {@code BoardColumns.late}
+     * is the one that answers that, and it is what every screen calls.
+     */
+    public boolean isPastDue() {
+        return dueDate != null && dueDate.isBefore(LocalDate.now());
+    }
+
+    /** Due today — worth saying differently from "due in nine days". */
+    public boolean isDueToday() {
+        return dueDate != null && dueDate.isEqual(LocalDate.now());
     }
 
     public LocalDateTime getDeletedAt() {

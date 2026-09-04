@@ -92,12 +92,13 @@ public final class BoardQuery {
      *
      * <p>For the numbers on the Stats view: "2 urgent" is a link to those two
      * bugs, and leaving the view where it was would apply the filter to a page
-     * of totals that does not show a bug at all. Dropping the view falls back
-     * to the board, which is where those bugs are.
+     * of totals that does not show a bug at all. The board is where those bugs
+     * are, and it now has to be said rather than left out: a URL with no view
+     * on it means whichever one you were last reading.
      */
     public String board(String key, Object value) {
         Map<String, String> next = new LinkedHashMap<>(params);
-        next.remove("view");
+        next.put("view", "board");
         String text = value == null ? null : String.valueOf(value).trim();
         if (text == null || text.isEmpty()) {
             next.remove(key);

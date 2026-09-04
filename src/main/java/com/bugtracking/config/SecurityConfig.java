@@ -1,11 +1,12 @@
 package com.bugtracking.config;
 
+import com.bugtracking.model.MemberRole;
 import com.bugtracking.model.TeamMember;
 import com.bugtracking.repository.TeamMemberRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -13,9 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
 
 /**
  * Sign-in for the web pages.
@@ -26,11 +25,16 @@ import java.util.Map;
  * <em>display name</em> — so comments, status changes and the history trail
  * read "Nishana R" rather than an email address.
  *
- * <p>The accounts configured under {@code bugtracking.security} are still
- * honoured, but only as a fallback for an address the table has no password
- * for. {@link AccountSeeder} copies them into the table on startup, so in
- * practice the table answers and the properties are the way a first account
- * gets in on an empty database.
+ * <p>The table is the only source. There is no configured account, no
+ * in-memory user and no fallback: an address with no row, or a row with no
+ * hash, cannot sign in. {@link BootstrapAdmin} is how the first admin gets
+ * into an empty database, and it does that by writing a row — not by being
+ * one.
+ *
+ * <p>Each row also carries a {@link MemberRole}, which becomes
+ * {@code ROLE_ADMIN} on top of the {@code ROLE_USER} everybody gets. What that
+ * buys is listed in {@link #filterChain} and is deliberately short:
+ * administration, not work.
  */
 @Configuration
 public class SecurityConfig {
@@ -46,56 +50,37 @@ public class SecurityConfig {
      * <p>Read through the repository rather than {@code TeamMemberService},
      * which now needs the {@link PasswordEncoder} declared above — going
      * through the service would make this bean and that one wait on each other.
+     *
+     * <p>A row without a hash is a name that appears on bugs, not an account,
+     * so it is turned away exactly like an address nobody has: whether somebody
+     * is on the roster is not something the sign-in page should tell you.
      */
     @Bean
-    UserDetailsService userDetailsService(SecurityProperties properties,
-                                          TeamMemberRepository team,
-                                          PasswordEncoder encoder) {
-        // Hashed once at startup, not per attempt: BCrypt is deliberately slow,
-        // and re-hashing the configured password on every sign-in would spend
-        // that cost on the login page for no gain.
-        Map<String, String> configured = new LinkedHashMap<>();
-        for (SecurityProperties.Account account : properties.getAccounts()) {
-            String email = account.getEmail() == null ? "" : account.getEmail().trim();
-            if (!email.isEmpty()) {
-                configured.put(email.toLowerCase(Locale.ROOT), encoder.encode(account.getPassword()));
-            }
-        }
-
+    UserDetailsService userDetailsService(TeamMemberRepository team) {
         return email -> {
             String key = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
-            TeamMember member = team.findByEmailIgnoreCase(key).orElse(null);
+            TeamMember member = team.findByEmailIgnoreCase(key)
+                    .filter(TeamMember::hasPassword)
+                    .orElseThrow(() -> new UsernameNotFoundException("No account for " + email));
 
-            if (member != null && member.hasPassword()) {
-                return account(member.getName(), member.getPasswordHash(), member.isActive());
-            }
-
-            // No row, or a row that is only a name on bugs. The properties are
-            // what is left, and how the very first sign-in works on a database
-            // where nobody has a password yet.
-            String hash = configured.get(key);
-            if (hash == null) {
-                throw new UsernameNotFoundException("No account for " + email);
-            }
-            String displayName = member != null ? member.getName() : key;
-            return account(displayName, hash, member == null || member.isActive());
+            return account(member.getName(), member.getPasswordHash(), member.isActive(),
+                    member.getId(), member.getEmail(), member.getRole());
         };
     }
 
     /**
      * getUsername() becomes Authentication.getName(), hence the display name.
+     * The id and the email travel alongside it — see {@link AccountPrincipal}
+     * for why a display name is not enough to change your own password by.
      *
      * <p>Somebody hidden on the Team page is disabled rather than missing:
      * Spring then answers "account is disabled" instead of "bad credentials",
      * which is the difference between knowing you were switched off and
      * assuming you mistyped.
      */
-    private static UserDetails account(String displayName, String passwordHash, boolean active) {
-        return User.withUsername(displayName)
-                .password(passwordHash)
-                .roles("USER")
-                .disabled(!active)
-                .build();
+    private static UserDetails account(String displayName, String passwordHash, boolean active,
+                                       Long memberId, String email, MemberRole role) {
+        return new AccountPrincipal(displayName, passwordHash, active, memberId, email, role);
     }
 
     @Bean
@@ -111,6 +96,38 @@ public class SecurityConfig {
                     // The JSON API stays open so scripts and WebDriver helpers keep
                     // working. Change this line to .authenticated() to close it.
                     .requestMatchers("/api/**").permitAll()
+
+                    // ---- administration ----
+                    // The line is drawn around the *setup*, not around the
+                    // work. Raising a bug, moving a card, commenting, filing a
+                    // document, renaming a column on the board and ticking
+                    // somebody onto a project all stay open to anybody signed
+                    // in - a tracker that asks permission before letting you
+                    // file a bug is one people route around.
+                    //
+                    // What an admin has that a member does not is the setup
+                    // everybody else works inside: who exists, who can sign in,
+                    // what their password is, and which projects there are.
+                    //
+                    // Settings is the administration console, so a member does
+                    // not get to look at it either — not a page of controls with
+                    // the controls taken out, just not theirs. Their own account
+                    // is at /account, which is open to everybody signed in.
+                    //
+                    // The navbar's Team entry falls back to this page when
+                    // JavaScript is off, so for a member it is rendered as a
+                    // drawer trigger that only appears once scripting has said
+                    // it will work — see .nav-link-js in layout.html.
+                    .requestMatchers("/settings", "/settings/**").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST,
+                            "/team", "/team/*/password", "/team/*/role",
+                            "/team/*/delete", "/team/*/active").hasRole("ADMIN")
+                    // Deliberately not "/projects/**": that would take the
+                    // documents area (/projects/{id}/docs/**) and a project's
+                    // own team list with it, and both of those are daily work.
+                    .requestMatchers(HttpMethod.POST,
+                            "/projects", "/projects/*/active", "/projects/*/delete").hasRole("ADMIN")
+
                     .anyRequest().authenticated())
 
             .formLogin(form -> form

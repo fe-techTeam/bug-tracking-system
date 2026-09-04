@@ -27,7 +27,6 @@
              naming the same thing across two bars is what a breadcrumb is for
              getting rid of. -->
         <div th:replace="~{fragments :: crumbs(${ {
-                 {'Board', '/bugs'},
                  {bug.project ?: 'No project', '/bugs?project=' + (bug.project ?: '')},
                  {'BUG-' + bug.id, null} } })}"></div>
 
@@ -98,8 +97,15 @@
                      In the same place the raise form puts them, and holding
                      only the report's: anything attached to a comment belongs
                      under that comment, where it was said. -->
-                <div class="report-sec" id="attachments"
-                     th:with="shots=${attachments.?[image]}, files=${attachments.?[!image]}">
+                <!-- data-gallery is what the viewer steps through: everything
+                     with a data-lightbox inside this section, in the order it is
+                     drawn. A comment's own files are a gallery of their own, so
+                     opening a screenshot somebody replied with does not walk you
+                     off into the report's. -->
+                <div class="report-sec" id="attachments" data-gallery="attachments"
+                     th:with="shots=${attachments.?[image]},
+                              clips=${attachments.?[playable]},
+                              files=${attachments.?[!image and !playable]}">
                     <h3>
                         <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
                         Attachments
@@ -109,8 +115,10 @@
 
                 <!-- The pill is a total and the panel shows two things, so say
                      which is which: "5" over three thumbnails reads as a miscount. -->
-                <p class="hint" th:if="${!#lists.isEmpty(shots) and !#lists.isEmpty(files)}">
-                    <span class="num" th:text="${#lists.size(shots)}">3</span> shown here,
+                <p class="hint"
+                   th:if="${(!#lists.isEmpty(shots) or !#lists.isEmpty(clips)) and !#lists.isEmpty(files)}">
+                    <span class="num"
+                          th:text="${#lists.size(shots) + #lists.size(clips)}">3</span> shown here,
                     <span class="num" th:text="${#lists.size(files)}">2</span> listed below.
                 </p>
 
@@ -121,7 +129,7 @@
                     <div class="shot" th:each="a : ${shots}">
                         <a class="shot-open"
                            th:href="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
-                           th:attr="data-lightbox=${a.fileName}"
+                           th:attr="data-lightbox=${a.fileName}, data-lightbox-kind='image'"
                            target="_blank" rel="noopener" th:title="${a.fileName}">
                             <img th:src="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
                                  th:alt="${a.fileName}" loading="lazy">
@@ -143,6 +151,48 @@
                             </form>
                         </span>
                     </div>
+                </div>
+
+                <!-- A screen recording is the same evidence a screenshot is,
+                     so it is played where a screenshot is shown rather than
+                     listed as a file to fetch. preload="metadata" is what keeps
+                     a bug with four clips on it from pulling four videos down
+                     before anybody presses play — it fetches enough for the
+                     duration and the first frame and stops. -->
+                <div class="clip-grid" th:unless="${#lists.isEmpty(clips)}">
+                    <figure class="clip" th:each="a : ${clips}">
+                        <video class="clip-player" controls preload="metadata" playsinline
+                               th:src="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
+                               th:attr="aria-label=${a.fileName}"></video>
+                        <!-- Plays here as it always did; this only offers the
+                             big version, in the same viewer the screenshots
+                             open in, with the rest of the bug's evidence beside
+                             it. A real link, so with JavaScript off it is the
+                             file — which is what it was before there was a
+                             viewer to open. -->
+                        <a class="clip-expand"
+                           th:href="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
+                           th:attr="data-lightbox=${a.fileName}, data-lightbox-kind='video',
+                                    aria-label=|Open ${a.fileName} in the viewer|"
+                           th:title="|Open ${a.fileName} in the viewer|"
+                           target="_blank" rel="noopener">
+                            <svg class="i" aria-hidden="true"><use href="#i-expand"/></svg>
+                        </a>
+                        <figcaption class="shot-foot">
+                            <span class="shot-name" th:text="${a.fileName}">recording.mp4</span>
+                            <span class="muted num" th:text="${a.readableSize}">4.2 MB</span>
+                            <form method="post" class="inline-form"
+                                  th:action="@{/bugs/{id}/attachments/{aid}/delete(id=${bug.id},aid=${a.id})}"
+                                  th:attr="data-confirm=|Remove ${a.fileName}?|">
+                                <input type="hidden" name="actor" class="actor-field">
+                                <button type="submit" class="icon-btn icon-btn-sm"
+                                        th:title="|Remove ${a.fileName}|"
+                                        th:attr="aria-label=|Remove ${a.fileName}|">
+                                    <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
+                                </button>
+                            </form>
+                        </figcaption>
+                    </figure>
                 </div>
 
                 <div class="rail-files" th:unless="${#lists.isEmpty(files)}">
@@ -191,8 +241,10 @@
                 <div class="panel-head">
                     <svg class="i" aria-hidden="true" style="color:var(--muted)"><use href="#i-message"/></svg>
                     <h2>Comments</h2>
-                    <span class="count-pill" th:if="${!#lists.isEmpty(comments)}"
-                          th:text="${#lists.size(comments)}">0</span>
+                    <!-- Everything said, not just what opened a thread: a bug
+                         with one comment and nine answers to it has ten. -->
+                    <span class="count-pill num" th:if="${commentTotal > 0}"
+                          th:text="${commentTotal}">0</span>
                 </div>
 
                 <!-- data-people drives the @ autocomplete; the server matches
@@ -225,29 +277,48 @@
                             <span>Attach</span>
                             <input type="file" name="files" id="comment-files" multiple>
                         </label>
+                        <!-- Wraps the selection in a ``` fence, and pretty-prints
+                             it on the way if it turns out to be JSON — which is
+                             what a developer is usually pasting. Hidden until
+                             app.js reveals it: there is nothing behind it with
+                             JavaScript off, and typing the fences by hand still
+                             works and always did. -->
+                        <button type="button" class="btn btn-sm btn-ghost code-insert" hidden
+                                data-code-insert="comment-text"
+                                title="Wrap the selection in a code block"
+                                aria-label="Wrap the selection in a code block">
+                            <svg class="i" aria-hidden="true"><use href="#i-code"/></svg>
+                            <span>Code</span>
+                        </button>
                         <span class="file-note" id="comment-file-note" aria-live="polite"></span>
                         <span class="spacer"></span>
                         <button type="submit" class="btn btn-primary btn-sm" id="add-comment">Comment</button>
                     </div>
                 </form>
 
-                <!-- Oldest first, so a thread reads as a conversation. Each
-                     comment can be answered, and one level of nesting is all
-                     there is: a reply to a reply is filed against the same
-                     parent, which keeps an exchange a run under the thing it
-                     is about rather than a staircase off the right edge. -->
+                <!-- Oldest first, so a thread reads as a conversation. Every
+                     comment can be answered, replies included — and every
+                     answer under one comment is drawn as one run, indented
+                     once. See CommentService.conversationFor for why the tree
+                     is flattened to be drawn. -->
                 <ol class="thread" th:unless="${#lists.isEmpty(comments)}" id="comment-list">
                     <li th:each="c,st : ${comments}" th:style="'--i:' + ${st.index}"
-                        th:with="kids=${replies.get(c.id)}">
-                        <div th:replace="~{bugs/detail :: comment(${c}, ${me}, ${bug}, ${commentFiles})}"></div>
+                        th:with="run=${replies.get(c.id)}">
+                        <div th:replace="~{bugs/detail :: comment(${c}, ${me}, ${bug},
+                                                                  ${commentFiles})}"></div>
 
-                        <ol class="thread thread-replies" th:if="${kids != null}">
-                            <li th:each="r : ${kids}">
-                                <div th:replace="~{bugs/detail :: comment(${r}, ${me}, ${bug}, ${commentFiles})}"></div>
+                        <ol class="thread thread-replies" th:if="${run != null}">
+                            <li th:each="r : ${run}">
+                                <div th:replace="~{bugs/detail :: comment(${r}, ${me}, ${bug},
+                                                                          ${commentFiles})}"></div>
                             </li>
                         </ol>
                     </li>
                 </ol>
+
+                <p class="pop-empty" th:if="${#lists.isEmpty(comments)}" id="no-comments">
+                    Nothing said yet.
+                </p>
             </div>
 
             <!-- ---------- supporting docs ----------
@@ -434,7 +505,7 @@
                                 <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
                                 <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
                             </label>
-                            <p class="pop-empty" id="assignee-none" hidden>Nobody by that name.</p>
+                            <p class="pop-empty pick-none" id="assignee-none" hidden>Nobody by that name.</p>
                         </div>
                         <p class="pop-empty" th:if="${#lists.isEmpty(people)}">
                             Nobody on this project yet.
@@ -515,6 +586,36 @@
 
                     <p class="assign-hint" th:if="${#lists.isEmpty(blockerOptions) and bug.blockedBy == null}">
                         No other open bug on this project to wait on.
+                    </p>
+                </div>
+
+                <!-- Changing the date is a decision on its own, so it is made
+                     here rather than by opening the whole edit form to touch one
+                     field — the same reason status, assignees and the blocker
+                     are all editable from this rail. A plain form and a native
+                     date input: it posts and works with scripting off. -->
+                <div class="report-sec">
+                    <span class="field-label">
+                        <svg class="i" aria-hidden="true"><use href="#i-clock"/></svg>
+                        Due
+                    </span>
+                    <form class="due-form" method="post" id="due-form"
+                          th:action="@{/bugs/{id}/due(id=${bug.id})}">
+                        <input type="hidden" name="actor" class="actor-field">
+                        <label class="sr-only" for="due-date">Due date</label>
+                        <input type="date" name="dueDate" id="due-date" th:value="${bug.dueDate}">
+                        <button type="submit" class="btn btn-sm btn-primary" id="save-due">Save</button>
+                        <!-- Its own button rather than "empty the box and save":
+                             clearing a date is a thing you decide, not a thing
+                             you do by deleting characters. -->
+                        <button type="submit" class="btn btn-sm btn-ghost" name="clear" value="true"
+                                th:if="${bug.dueDate != null}" id="clear-due">Clear</button>
+                    </form>
+                    <!-- Only when the date has something to say. Repeating
+                         "12 Sep 2026" under a box already showing it is noise;
+                         "Late" is not. -->
+                    <p class="due-note" th:if="${cols.late(bug) or cols.dueToday(bug)}">
+                        <span th:replace="~{fragments :: due(${bug}, ${cols}, false)}"></span>
                     </p>
                 </div>
 
@@ -612,6 +713,30 @@
                                                 moved it from <b th:text="${h.oldValue}">Open</b>
                                                 to <b th:text="${h.newValue}">Fixed</b>
                                             </span>
+                                            <!-- The fallback below would render "changed due from
+                                                 ... to ..." and read as a noun nobody uses. Setting
+                                                 and clearing one are different sentences too. -->
+                                            <!-- Nested single-value tests, never `a and b`: these
+                                                 values are Strings, and Thymeleaf's truthiness only
+                                                 applies to the whole expression — SpEL's own `and`
+                                                 tries to convert each side to a Boolean and quietly
+                                                 yields nothing for "25 Dec 2026". Every other case
+                                                 in this switch tests one value for the same reason. -->
+                                            <span th:case="'due'">
+                                                <span th:if="${h.newValue}">
+                                                    <span th:if="${h.oldValue}">
+                                                        moved the due date from <b th:text="${h.oldValue}">1 Sep 2026</b>
+                                                        to <b th:text="${h.newValue}">12 Sep 2026</b>
+                                                    </span>
+                                                    <span th:unless="${h.oldValue}">
+                                                        set it due <b th:text="${h.newValue}">12 Sep 2026</b>
+                                                    </span>
+                                                </span>
+                                                <span th:unless="${h.newValue}">
+                                                    cleared the due date<span th:if="${h.oldValue}">,
+                                                    which was <b th:text="${h.oldValue}">1 Sep 2026</b></span>
+                                                </span>
+                                            </span>
                                             <span th:case="'doc'">added the doc <b th:text="${h.newValue}">Test notes</b></span>
                                             <span th:case="'doc-renamed'">renamed <b th:text="${h.oldValue}">Untitled page</b>
                                                 to <b th:text="${h.newValue}">Test notes</b></span>
@@ -646,7 +771,9 @@
      courtesy rather than a rule.
      ========================================================================== -->
 <div th:fragment="comment(c, me, bug, commentFiles)" class="comment"
-     th:with="files=${commentFiles.get(c.id)}, mine=${c.createdBy != null and c.createdBy == me}">
+     th:id="'c' + ${c.id}"
+     th:with="files=${commentFiles.get(c.id)},
+              mine=${c.createdBy != null and c.createdBy == me}">
     <span class="avatar" th:attr="data-avatar=${c.createdBy}" th:title="${c.createdBy}"
           aria-hidden="true"></span>
 
@@ -664,15 +791,21 @@
 
         <!-- What was attached to this comment, under it. A picture is shown;
              anything else is a line. -->
-        <div class="comment-files" th:if="${files != null}">
+        <div class="comment-files" th:if="${files != null}" data-gallery="comment">
             <a class="comment-shot" th:each="a : ${files}" th:if="${a.image}"
                th:href="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
-               th:attr="data-lightbox=${a.fileName}"
+               th:attr="data-lightbox=${a.fileName}, data-lightbox-kind='image'"
                target="_blank" rel="noopener" th:title="${a.fileName}">
                 <img th:src="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
                      th:alt="${a.fileName}" loading="lazy">
             </a>
-            <a class="comment-file" th:each="a : ${files}" th:unless="${a.image}"
+            <!-- A clip said in a comment plays where it was said. Narrower
+                 than the report's, because a comment is a narrower column. -->
+            <video class="comment-clip-player" th:each="a : ${files}" th:if="${a.playable}"
+                   controls preload="metadata" playsinline
+                   th:src="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
+                   th:attr="aria-label=${a.fileName}, title=${a.fileName}"></video>
+            <a class="comment-file" th:each="a : ${files}" th:unless="${a.image or a.playable}"
                th:href="@{/bugs/{id}/attachments/{aid}(id=${bug.id},aid=${a.id})}"
                target="_blank" rel="noopener">
                 <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
@@ -686,14 +819,36 @@
         <div class="comment-tools">
             <details class="comment-tool">
                 <summary><span>Reply</span></summary>
+                <!-- Everybody this reply is joining: whoever wrote the comment,
+                     and anybody further up the exchange. Answering somebody who
+                     was themselves answering tags both, which is what keeps a
+                     nested conversation together now that the page draws it
+                     flat. Never yourself. -->
                 <form class="comment-inline" method="post" enctype="multipart/form-data"
-                      th:action="@{/bugs/{id}/comments(id=${bug.id})}">
+                      th:action="@{/bugs/{id}/comments(id=${bug.id})}"
+                      th:with="tagging=${mentionTags.get(c.id) == null ? null
+                                       : mentionTags.get(c.id).?[#this != #vars.me]}">
                     <input type="hidden" name="actor" class="actor-field">
                     <input type="hidden" name="parentId" th:value="${c.id}">
                     <label>
                         <span class="sr-only">Reply</span>
-                        <textarea name="text" rows="2" required
-                                  th:placeholder="'Reply to ' + ${c.createdBy}"></textarea>
+                        <!-- Who answered whom used to be a little arrow beside the
+                             name, which is one more mark to learn to read; an @
+                             mention is one the reader already knows, it sits in
+                             the words where the answer is, and it tells the
+                             people as well — the same mentions anybody would
+                             have typed by hand.
+
+                             Server-side, so they are there with scripting off.
+                             app.js only moves the caret past them.
+
+                             data-mentions is what app.js binds the @ menu to; the
+                             roster it reads comes off data-people on the form at
+                             the top of the section, so it is set once. -->
+                        <textarea name="text" rows="2" required data-mentions
+                                  th:text="${#lists.isEmpty(tagging) ? ''
+                                          : '@' + #strings.listJoin(tagging, ' @') + ' '}"
+                                  placeholder="Reply… type @ to tag someone else"></textarea>
                     </label>
                     <div class="comment-inline-foot">
                         <button type="submit" class="btn btn-sm btn-primary">Reply</button>
@@ -708,7 +863,8 @@
                     <input type="hidden" name="actor" class="actor-field">
                     <label>
                         <span class="sr-only">Comment</span>
-                        <textarea name="text" rows="3" required th:text="${c.text}"></textarea>
+                        <textarea name="text" rows="3" required data-mentions
+                                  th:text="${c.text}"></textarea>
                     </label>
                     <div class="comment-inline-foot">
                         <button type="submit" class="btn btn-sm btn-primary">Save</button>
@@ -718,9 +874,7 @@
 
             <form method="post" class="inline-form" th:if="${mine}"
                   th:action="@{/bugs/{id}/comments/{cid}/delete(id=${bug.id},cid=${c.id})}"
-                  th:attr="data-confirm=${c.parentId == null}
-                           ? 'Delete this comment? Its replies and their files go with it.'
-                           : 'Delete this reply?'">
+                  data-confirm="Delete this comment? Anything replying to it goes too.">
                 <input type="hidden" name="actor" class="actor-field">
                 <button type="submit" class="comment-tool-btn is-danger">Delete</button>
             </form>

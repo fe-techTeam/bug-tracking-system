@@ -18,6 +18,12 @@
 
 /* ---------- tokens: light ---------- */
 :root {
+    /* Not decoration: this is what makes the browser draw its *own* controls
+       the right way round — the calendar popup out of a date field, a native
+       scrollbar, the autofill background. Set here and flipped in both dark
+       blocks below, so it follows the theme the same way every token does. */
+    color-scheme: light;
+
     /* the scene */
     --bg:          #eef4f2;
     --bg-far:      #e1ebe7;
@@ -132,6 +138,10 @@
     /* One stacking scale for the whole app. Every z-index below is one of
        these, so "what sits on top of what" is answered in one place rather
        than by whoever last picked a number. */
+    --z-under:   -1;      /* a wash or a grid painted behind its own box    */
+    --z-local:    1;      /* inside one component only: a sticky head over
+                             the list it belongs to, a merged cell over its
+                             neighbours. Never compared with anything below */
     --z-toolbar: 20;      /* the sticky filter bar                          */
     --z-stats:   25;      /* the stats panel, which drops over the toolbar  */
     --z-sheet-corner: 22; /* a sheet's frozen corner, over its own sticky row */
@@ -139,7 +149,9 @@
     --z-raised:  50;      /* a card whose menu is open — see .panel:has()   */
     --z-nav:     60;      /* the navbar, above every page                   */
     --z-menu:    80;      /* anything that opens: menus, popovers           */
-    --z-toast:   95;      /* the one thing that outranks a menu             */
+    --z-overlay: 90;      /* the full-screen ones: drawer, lightbox, palette */
+    --z-toast:   95;      /* the one thing that outranks all of those, so an
+                             Undo is never buried under what it undoes      */
 
     --ease: cubic-bezier(.22, .72, .18, 1);
     --fast: 120ms;
@@ -150,6 +162,7 @@
 /* ---------- tokens: dark ---------- */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
+        color-scheme: dark;
         --bg:          #0f1413;
         --bg-far:      #0a0e0d;
         --tint-a:      #12a598;
@@ -214,6 +227,7 @@
 }
 
 [data-theme="dark"] {
+    color-scheme: dark;
     --bg:          #0f1413;
     --bg-far:      #0a0e0d;
     --tint-a:      #12a598;
@@ -310,7 +324,7 @@ body::before {
     content: "";
     position: fixed;
     inset: 0;
-    z-index: -1;
+    z-index: var(--z-under);
     pointer-events: none;
     background:
         radial-gradient(1100px 620px at 8% -12%, color-mix(in oklab, var(--tint-a) var(--wash-1), transparent), transparent 62%),
@@ -404,6 +418,12 @@ a { color: inherit; text-decoration: none; }
 
 
 .nav-sep { flex: none; width: 1px; height: 22px; background: var(--line); }
+
+/* Chrome that only works with scripting, hidden until the inline script in
+   <head> has put .js on <html>. Used for the Team entry when the reader is not
+   an admin: it opens the drawer, and its no-script fallback is a page they may
+   not open, so it is better absent than answering 403. */
+html:not(.js) .nav-link-js { display: none; }
 
 .nav-links { display: flex; align-items: center; gap: 2px; min-width: 0; }
 
@@ -525,6 +545,10 @@ a { color: inherit; text-decoration: none; }
 .user-card .who { display: grid; min-width: 0; line-height: 1.35; }
 .user-card b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-card span { font-size: 11.5px; color: var(--muted); }
+/* Pushed to the far edge, and only ever drawn for an admin — see layout.html
+   for why "Member" is not a badge. The colour comes from the badge's own --c,
+   so this only has to place it. */
+.user-card .role-badge { flex: none; margin-left: auto; align-self: center; }
 
 /* ---------- notifications, read where you are ---------- */
 .pop-notif { width: 380px; }
@@ -722,37 +746,6 @@ a { color: inherit; text-decoration: none; }
 
 /* The board's bar carries the filters too — see "the board's own bar" below. */
 
-/* ---------- KPI tiles ---------- */
-.kpi-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-
-.kpi {
-    position: relative;
-    display: grid;
-    gap: 1px;
-    padding: 9px 11px 9px 13px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    background: var(--surface);
-    color: var(--text);
-    overflow: hidden;
-    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease),
-                transform var(--fast) var(--ease);
-    animation: rise var(--mid) var(--ease) both;
-    animation-delay: calc(var(--i, 0) * 40ms);
-}
-.kpi::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 3px;
-    background: var(--c, var(--accent));
-}
-a.kpi:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var(--c) 45%, var(--line)); }
-.kpi.is-hot { background: color-mix(in oklab, var(--c) 8%, var(--surface)); border-color: color-mix(in oklab, var(--c) 34%, var(--line)); }
-
-.kpi-value { font-size: 21px; font-weight: 650; letter-spacing: -.035em; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.kpi-label { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
-
 /* ---------- severity rows ---------- */
 .heat { display: grid; gap: 4px; }
 
@@ -879,7 +872,8 @@ label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font
 label .req { color: var(--danger); }
 label .hint { font-weight: 400; font-size: 11.5px; color: var(--muted); }
 
-input[type=text], input[type=search], input[type=email], input[type=password], select, textarea {
+input[type=text], input[type=search], input[type=email], input[type=password],
+input[type=date], select, textarea {
     font: inherit;
     font-size: 13.5px;
     width: 100%;
@@ -892,6 +886,34 @@ input[type=text], input[type=search], input[type=email], input[type=password], s
     transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
 }
 textarea { height: auto; min-height: 72px; padding: 8px 10px; line-height: 1.55; resize: vertical; }
+
+/* A date field is half native, and the half this stylesheet cannot reach is
+   the half that looked wrong: the calendar button, the little spin fields and
+   the picker that drops out of it are drawn by the browser. `color-scheme` on
+   :root is what tells it which way round to draw them — without it the popup
+   is a white sheet on a dark page and the calendar glyph is a black smudge.
+   Everything below is the small remainder: the glyph tinted to match the
+   muted icons beside it, and the text sitting on the same baseline as a text
+   input's does. */
+input[type=date] {
+    /* The calendar button is drawn inside the padding box, so it needs less
+       room on the right than the 10px of text-indent the shared rule gives. */
+    padding-right: 8px;
+}
+input[type=date]::-webkit-calendar-picker-indicator {
+    /* color-scheme above already draws it the right way round for the theme;
+       this only softens it to the weight of the muted icons beside it. No
+       `appearance: none` on the input itself — it buys nothing here and is
+       what makes an iOS date field lose its vertical centring. */
+    opacity: .5;
+    cursor: pointer;
+    transition: opacity var(--fast) var(--ease);
+}
+input[type=date]:hover::-webkit-calendar-picker-indicator,
+input[type=date]:focus::-webkit-calendar-picker-indicator { opacity: 1; }
+/* The spin fields carry their own padding, which pushes the text off the
+   baseline every other input sits on. */
+input[type=date]::-webkit-datetime-edit { padding: 0; color: inherit; }
 
 /* Safari draws a search field as a capsule and ignores the height, and its
    clear button lands on top of the "/" hint. */
@@ -1095,7 +1117,7 @@ select {
 .fmenu-col .fmenu-head {
     position: sticky;
     top: -6px;                        /* cancels the column's padding */
-    z-index: 1;
+    z-index: var(--z-local);
     margin: -6px -6px 2px;
     padding: 8px 8px 5px;
     background: var(--surface-pop);
@@ -1220,6 +1242,11 @@ select {
     border-bottom: 1px solid var(--line);
 }
 .panel-head h2 { margin-right: auto; }
+/* A head that also carries a control on the right says so with a .spacer, and
+   then the spacer is what pushes it there — otherwise the h2's own auto margin
+   takes half the gap first and the count pill beside the title drifts into the
+   middle of the bar. */
+.panel-head:has(> .spacer) h2 { margin-right: 0; }
 
 .count-pill {
     padding: 1px 7px;
@@ -1239,10 +1266,12 @@ select {
    The board
    ========================================================================== */
 .kanban {
-    display: grid;
-    grid-auto-flow: column;
-    /* Wide enough that a two-line title is two lines rather than four. */
-    grid-auto-columns: minmax(288px, 1fr);
+    /* Flex rather than grid, and for one reason: grid-auto-columns sets every
+       track to the same width, so a folded column could not be narrower than
+       an open one. `flex: 1 0 288px` on .kcol says exactly what the old
+       minmax(288px, 1fr) said — never below 288, share what is spare — while
+       leaving a single column free to opt out of it. */
+    display: flex;
     /* Wider than it was: the columns have no box of their own any more, so the
        gap is the only thing telling one from the next. */
     gap: 18px;
@@ -1290,6 +1319,12 @@ select {
 .kcol {
     display: flex;
     flex-direction: column;
+    /* The whole of what .kanban's grid-auto-columns used to say: 288px is wide
+       enough that a two-line title is two lines rather than four, and no shrink
+       means a narrow window scrolls the board instead of squeezing a column
+       below the width of the cards in it. Growing shares out whatever is spare,
+       which is what the old 1fr did. */
+    flex: 1 0 288px;
     min-width: 0;
     /* One constant for every column, empty or full: the height they may grow
        to before they scroll inside themselves. dvh, and the navbar counted —
@@ -1305,7 +1340,23 @@ select {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 2px 4px 10px;
+    /* The rule belongs to the heading, so it sits close under the words and
+       well clear of the cards — 7px above it, 11px below. The other way round
+       (which is what a bottom padding alone gives, since .kcol-body pads its
+       cards by only 2px) makes it read as the top edge of the first card.
+
+       Inset by that same 2px so the rule is exactly as wide as the cards under
+       it rather than two pixels prouder at each end. The 2px margin plus 2px
+       padding leaves the heading text where it always sat. */
+    margin: 0 2px 11px;
+    padding: 2px 2px 7px;
+    /* The one place the board says what colour a column is. A rule under the
+       heading rather than a tint behind the cards: the cards already carry
+       severity as colour, and two colour systems on one surface cancel each
+       other out. Mixed down to 45% so a row of them reads as a track through
+       the board — cool waiting, warm working, green done — rather than as a
+       row of highlighters. */
+    border-bottom: 2px solid color-mix(in oklab, var(--c) 45%, transparent);
 }
 /* The one piece of colour left on the board's chrome. Status is a journey, and
    with no column background there is nowhere else for it to be said. */
@@ -1347,6 +1398,68 @@ select {
 .kcol-plus:hover { background: var(--surface-3); color: var(--text); }
 .kcol-menu { margin-left: 0; }
 
+/* ---------- folding a column out of the way ----------
+   Seven columns is a board you scroll; four columns and three folded strips is
+   a board you read. Purely a view — no bug moves and nothing is saved to the
+   server — so the state lives in this browser, per project, and the button is
+   revealed by app.js rather than rendered here: with JavaScript off there is
+   nothing behind it. */
+.kcol-fold {
+    display: grid;
+    place-items: center;
+    width: 22px; height: 22px;
+    flex: none;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease), background var(--fast) var(--ease),
+                color var(--fast) var(--ease);
+}
+.kcol:hover .kcol-fold,
+.kcol-fold:focus-visible { opacity: 1; }
+.kcol-fold:hover { background: var(--surface-3); color: var(--text); }
+/* A pointer that cannot hover has no way to reveal it. */
+@media (hover: none) { .kcol-fold { opacity: 1; } }
+
+.kcol.is-collapsed {
+    /* The one column that opts out of the 288px every other one keeps. */
+    flex: 0 0 46px;
+    min-width: 46px;
+}
+.kcol.is-collapsed > .kcol-body,
+.kcol.is-collapsed .kcol-plus,
+.kcol.is-collapsed .kcol-menu,
+.kcol.is-collapsed .kcol-grip { display: none; }
+
+/* Folded, the head is the whole column, so it grows a box of its own — the
+   only time a column has one. The colour moves to the top edge, which is the
+   only edge left to put it on. */
+.kcol.is-collapsed > .kcol-head {
+    flex-direction: column;
+    gap: 10px;
+    min-height: min(340px, var(--kcol-h));
+    /* No bottom margin: there is no body under it to clear. */
+    margin: 0;
+    padding: 10px 6px 12px;
+    border: 1px solid var(--line);
+    border-top: 2px solid color-mix(in oklab, var(--c) 55%, transparent);
+    border-radius: var(--r-lg);
+    background: var(--surface-2);
+}
+/* Bottom-to-top, the way a book spine reads. */
+.kcol.is-collapsed h3 {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    min-height: 0;
+}
+/* Its own control is the only thing left to click, so it stops hiding, and it
+   goes to the top where the "..." was rather than to the bottom of the strip. */
+.kcol.is-collapsed .kcol-fold { opacity: 1; order: -1; transform: rotate(180deg); }
+
 .kcol-body {
     display: grid;
     gap: 8px;
@@ -1376,7 +1489,7 @@ select {
 .kcol-empty {
     display: grid;
     place-items: center;
-    min-height: calc(var(--kcol-h) - 46px);
+    min-height: calc(var(--kcol-h) - 58px);
     padding: 14px 8px;
     border: 1px dashed var(--line-strong);
     border-radius: var(--r-lg);
@@ -1427,8 +1540,12 @@ select {
 .kanban:has(.kcol-menu[open]), .kanban:has(#add-column[open]) { padding-bottom: 250px; }
 
 .kcol-pop { display: grid; gap: 9px; min-width: 234px; padding: 9px; }
-.kcol-rename { display: flex; gap: 6px; }
-.kcol-rename input { flex: 1 1 auto; min-width: 0; }
+/* Everything about one column, saved together — the name, whether its bugs
+   count as finished, and who is told when one lands here. The last two used to
+   be in a fuller editor behind Settings; there is no Board tab now. */
+.kcol-edit { display: grid; gap: 9px; }
+.kcol-edit label { display: grid; gap: 4px; }
+.kcol-rename input { width: 100%; }
 .kcol-moves { display: flex; gap: 6px; }
 .kcol-moves .inline-form { flex: 1 1 0; }
 .kcol-moves .btn { width: 100%; justify-content: center; }
@@ -1456,22 +1573,7 @@ select {
     transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
 }
 .swatch:hover { transform: scale(1.14); }
-.swatch.is-active,
-.swatch-pick input:checked + .swatch {
-    box-shadow: 0 0 0 2px var(--surface-pop), 0 0 0 3.5px var(--c);
-}
-.swatch-pick { position: relative; display: inline-flex; cursor: pointer; }
-/* The radio is the control; the circle beside it is what you see. Kept in the
-   layout rather than display:none so it stays focusable and announced. */
-.swatch-pick input {
-    position: absolute;
-    width: 1px; height: 1px;
-    opacity: 0;
-    margin: 0;
-}
-.swatch-pick:focus-within .swatch {
-    box-shadow: 0 0 0 2px var(--surface-pop), 0 0 0 3.5px var(--accent);
-}
+.swatch.is-active { box-shadow: 0 0 0 2px var(--surface-pop), 0 0 0 3.5px var(--c); }
 
 /* The tile that adds one more, at the end of the board. */
 /* Adding a column is something you do once a project and then never again, so
@@ -1513,49 +1615,6 @@ select {
 .kcol-new[open] .kcol-new-btn, .kcol-new .fmenu[open] .kcol-new-btn { color: var(--text); }
 .kcol-add { display: grid; gap: 9px; }
 .kcol-add label { display: grid; gap: 4px; }
-
-/* ---------- the same columns, edited in full in Settings ---------- */
-.column-editor { display: grid; gap: 10px; }
-.column-row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 10px 12px;
-    padding: 11px 13px;
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--c);
-    border-radius: var(--r-lg);
-    background: var(--surface-2);
-    animation: rise var(--mid) var(--ease) both;
-    animation-delay: calc(var(--i, 0) * 30ms);
-}
-.column-rank {
-    display: grid;
-    justify-items: center;
-    align-content: start;
-    gap: 5px;
-    padding-top: 4px;
-    color: var(--muted);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-}
-.column-form { display: grid; gap: 10px; min-width: 0; }
-.column-save { display: flex; align-items: center; gap: 8px; }
-.column-actions {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    padding-top: 9px;
-    border-top: 1px solid var(--line);
-}
-.column-remove { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-
-@media (max-width: 780px) {
-    .column-row { grid-template-columns: minmax(0, 1fr); }
-    .column-rank { justify-items: start; grid-auto-flow: column; justify-content: start; gap: 7px; }
-    .column-remove { margin-left: 0; width: 100%; }
-}
 
 .kcard {
     position: relative;
@@ -1617,8 +1676,67 @@ select {
     font-size: 12.5px;
     color: var(--muted);
 }
-.kcard-said { display: inline-flex; align-items: center; gap: 4px; }
-.kcard-said svg.i { width: 13px; height: 13px; }
+/* The two counts on a card are the same kind of thing — a glyph and a number —
+   so they are drawn the same way. Attachments used to read "3 attachments" in
+   prose beside an icon-and-number comment count, which made one line of a card
+   argue with itself. */
+.kcard-said,
+.kcard-files { display: inline-flex; align-items: center; gap: 4px; }
+.kcard-said svg.i,
+.kcard-files svg.i { width: 13px; height: 13px; }
+
+/* ---------- a due date ----------
+   Optional, so most cards never show one, and quiet when they do: a date the
+   whole team met is not news. It earns colour in exactly two states — due
+   today, and past due while the bug is still open work — because those are the
+   only two a person should act on. Whether a bug is *late* is asked of the
+   board (BoardColumns.late), never of the date alone: a closed bug that was due
+   last week is done, and painting it red would say somebody should act when
+   nobody should.
+
+   One class on the board card, in the list and on the bug page, so a date can
+   never read as urgent on one screen and calm on the next. */
+.due {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    flex: none;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+/* The word, not the colour, is what carries the state for anybody who cannot
+   see the colour. It is the same size as the date beside it and only a little
+   heavier — a capsule or a glyph here would out-shout the title, which is the
+   thing you are actually scanning the column for. */
+.due-state { font-weight: 620; }
+
+/* Today: warm, because "warm = needs a person" is the board's own rule and
+   today is the day it needs one. --sev-HIGH rather than a token of its own —
+   it is the same orange the severity scale already uses for that meaning, and
+   it is defined in both themes. */
+.due.is-today { color: var(--sev-HIGH); }
+/* Past due and still work in hand. The only red on a card that is not severity,
+   so it is text and nothing else. */
+.due.is-late { color: var(--danger); }
+
+.bug-table .due { font-size: 12.5px; }
+
+/* ---------- setting one, from the bug's own page ---------- */
+.due-form {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+/* Only the sizing: the height, font, border and background are the shared
+   input rule's now, so this field matches Severity and Environment on the edit
+   form rather than being its own thing. */
+.due-form input[type="date"] { flex: 1 1 140px; min-width: 0; }
+.due-form .btn { flex: none; }
+/* Only drawn when the date has something to say — see the template. */
+.due-note { margin-top: 7px; font-size: 12.5px; }
 
 .kcard-foot {
     display: flex;
@@ -1649,20 +1767,33 @@ select {
     text-overflow: ellipsis;
 }
 
-/* ---------- moving a card without dragging it ----------
-   The summary is out of the flow, in the corner where the copy button used to
-   be, so it costs the card no height. The list it opens is an ordinary block
-   at the foot of the card — .kcol-body scrolls, and a popover out of it would
-   be clipped by the column. */
-.kcard-move > summary {
+/* ---------- the card's own menu ----------
+   The two things anybody does to a bug without opening it: move it along, or
+   throw it away. The summary is out of the flow, in the corner, so it costs the
+   card no height. What it opens is an ordinary block at the foot of the card
+   rather than a floating panel — .kcol-body scrolls and .kanban scrolls
+   sideways, so a popover that left the card would be clipped by the column it
+   is in.
+
+   Carries .fmenu as well, which is where one-open-at-a-time, click-away and
+   Escape come from. A <details>, so it opens with JavaScript off and every
+   option stays a real submit button: dragging is a mouse's shortcut and always
+   has been — a phone cannot do it and neither can a keyboard, so this is the
+   route that always works. */
+/* .fmenu is position:relative, which would make the <details> itself the box
+   the summary corners against — and the <details> sits at the foot of the card,
+   so the button landed beside the menu instead of up in the corner. The card is
+   the positioned ancestor this wants. */
+.kcard-menu { position: static; }
+.kcard-menu > summary {
     position: absolute;
     top: 8px; right: 8px;
     list-style: none;
     cursor: pointer;
 }
-.kcard-move > summary::-webkit-details-marker { display: none; }
-.kcard-move > summary::marker { content: ""; }
-.kcard-move-btn {
+.kcard-menu > summary::-webkit-details-marker { display: none; }
+.kcard-menu > summary::marker { content: ""; }
+.kcard-menu-btn {
     display: grid;
     place-items: center;
     width: 22px; height: 22px;
@@ -1672,77 +1803,27 @@ select {
     transition: opacity var(--fast) var(--ease), background var(--fast) var(--ease),
                 color var(--fast) var(--ease);
 }
-.kcard:hover .kcard-move-btn,
-.kcard-move > summary:focus-visible .kcard-move-btn,
-.kcard-move[open] .kcard-move-btn { opacity: 1; }
-.kcard-move-btn:hover,
-.kcard-move[open] .kcard-move-btn { background: var(--surface-3); color: var(--text); }
-
-.kcard-move-list {
-    display: grid;
-    gap: 2px;
-    margin-top: 2px;
-    padding-top: 9px;
-    border-top: 1px solid var(--line);
-}
-.kcard-move-list button {
-    padding: 6px 9px;
-    border: 0;
-    border-radius: var(--r-sm);
-    background: none;
-    color: var(--text-2);
-    font: inherit;
-    font-size: 12.5px;
-    text-align: left;
-    cursor: pointer;
-    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
-}
-.kcard-move-list button:hover { background: var(--surface-3); color: var(--text); }
-
-/* A title beside a control in the corner needs the room for it. */
-.kcard:has(.kcard-move) .kcard-title { padding-right: 22px; }
-
-/* ---------- moving a card without dragging it ----------
-   The summary is out of the flow, in the corner, so it costs the card no
-   height. The list it opens is an ordinary block at the foot of the card:
-   .kcol-body scrolls, and a popover out of it would be clipped by the column.
-   Dragging is a mouse's shortcut and always has been — a phone cannot do it
-   and neither can a keyboard, so this is the route that always works. */
-.kcard-move > summary {
-    position: absolute;
-    top: 8px; right: 8px;
-    list-style: none;
-    cursor: pointer;
-}
-.kcard-move > summary::-webkit-details-marker { display: none; }
-.kcard-move > summary::marker { content: ""; }
-.kcard-move-btn {
-    display: grid;
-    place-items: center;
-    width: 22px; height: 22px;
-    border-radius: var(--r-sm);
-    color: var(--muted);
-    opacity: 0;
-    transition: opacity var(--fast) var(--ease), background var(--fast) var(--ease),
-                color var(--fast) var(--ease);
-}
-.kcard:hover .kcard-move-btn,
-.kcard-move > summary:focus-visible .kcard-move-btn,
-.kcard-move[open] .kcard-move-btn { opacity: 1; }
-.kcard-move-btn:hover,
-.kcard-move[open] .kcard-move-btn { background: var(--surface-3); color: var(--text); }
+.kcard:hover .kcard-menu-btn,
+.kcard-menu > summary:focus-visible .kcard-menu-btn,
+.kcard-menu[open] .kcard-menu-btn { opacity: 1; }
+.kcard-menu-btn:hover,
+.kcard-menu[open] .kcard-menu-btn { background: var(--surface-3); color: var(--text); }
 /* No hover on a touch screen to reveal it with. */
-@media (hover: none) { .kcard-move-btn { opacity: 1; } }
+@media (hover: none) { .kcard-menu-btn { opacity: 1; } }
 
-.kcard-move-list {
-    display: grid;
-    gap: 2px;
+.kcard-menu-pop {
     margin-top: 2px;
-    padding-top: 9px;
+    padding-top: 8px;
     border-top: 1px solid var(--line);
+    animation: menu-in var(--fast) var(--ease) both;
 }
-.kcard-move-list button {
-    padding: 6px 9px;
+.kcard-menu-list { display: grid; gap: 2px; }
+.kcard-menu-opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 8px;
     border: 0;
     border-radius: var(--r-sm);
     background: none;
@@ -1753,10 +1834,33 @@ select {
     cursor: pointer;
     transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
 }
-.kcard-move-list button:hover { background: var(--surface-3); color: var(--text); }
+.kcard-menu-opt:hover { background: var(--surface-3); color: var(--text); }
+.kcard-menu-opt svg.i { flex: none; width: 14px; height: 14px; }
+/* A dot in the column's own colour, so the list reads the way the board does:
+   status is a journey, and this is the journey. */
+.kcard-menu-dot {
+    flex: none;
+    width: 8px; height: 8px;
+    border-radius: var(--r-full);
+    background: var(--c, var(--muted));
+}
+/* Where it already is. Listed rather than left out — the whole journey is what
+   makes the one it is on mean anything — and disabled, because moving a bug to
+   the column it is in is not a move. */
+.kcard-menu-opt[disabled] {
+    background: var(--surface-3);
+    color: var(--text);
+    font-weight: 560;
+    cursor: default;
+}
+.kcard-menu-danger { color: var(--danger); }
+.kcard-menu-danger:hover {
+    background: color-mix(in oklab, var(--danger) 13%, transparent);
+    color: var(--danger);
+}
 
 /* Room in the corner for the control that lives there. */
-.kcard:has(.kcard-move) .kcard-title { padding-right: 24px; }
+.kcard:has(.kcard-menu) .kcard-title { padding-right: 24px; }
 
 /* Three faces and a count: six overlapping avatars ran out of card. */
 .face-n {
@@ -1782,7 +1886,11 @@ select {
    ========================================================================== */
 .table-wrap { overflow-x: auto; border-radius: var(--r-xl); }
 
-.bug-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 620px; }
+/* Two more columns than it had — severity in words, and the row's own actions
+   — so the width it stops shrinking at goes up with them. Below 780px it stops
+   being a table at all and each row becomes a card, which is where a hand-held
+   screen reads it. */
+.bug-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 760px; }
 .bug-table td.grow, .bug-table th.grow { width: 99%; }
 
 /* Not sticky: overflow-x on .table-wrap forces overflow-y, so the header would
@@ -1825,6 +1933,105 @@ select {
     transition: inset var(--fast) var(--ease);
 }
 .bug-table tbody tr:hover td.rail::before { inset: 0 auto 0 0; }
+
+/* Severity, in words, at the end of the row. The rail down the left edge is
+   the colour and the meter is the count — rules two and three of the design
+   system — and the word is what makes either of them a legend. All three
+   together are what the severity filter already shows, so the row and the menu
+   that narrows it say the same thing the same way. */
+.bug-table th.sev, .bug-table td.sev { width: 1%; }
+.sev-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    color: color-mix(in oklab, var(--c) 74%, var(--text));
+    font-size: 12px;
+    font-weight: 560;
+}
+
+/* The row's own actions, at the end of the row. The copy button used to trail
+   the title, where it read as part of the sentence it was sitting in. */
+.bug-table th.row-act, .bug-table td.row-act { width: 1%; text-align: right; }
+.bug-table td.row-act { padding-left: 4px; }
+.bug-table th.rail-h { padding: 0; }
+
+/* The whole row is the link its title is — app.js widens the target, this says
+   so before it is clicked. Only where the row actually carries a destination:
+   the trash's rows do not. */
+.bug-table tbody tr[data-href] { cursor: pointer; }
+
+/* A heading that sorts. It *is* the heading rather than a link inside one, so
+   it takes the cell's own type and its own padding; only the colour and the
+   mark change when the list is in that order. The mark is invisible until the
+   heading is hovered or on, because eight arrows down a header row is a
+   diagram of nothing. */
+.bug-table th:has(.th-sort) { padding: 0; }
+.th-sort {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--fast) var(--ease);
+}
+.th-sort:hover { color: var(--text-2); }
+.th-sort .sort-mark {
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease), transform var(--mid) var(--ease);
+}
+.th-sort:hover .sort-mark { opacity: .5; }
+.th-sort.is-on { color: var(--accent); }
+.th-sort.is-on .sort-mark { opacity: 1; }
+.th-sort.is-flipped .sort-mark { transform: rotate(180deg); }
+
+/* The status cell edits in place. Shaped like the .badge it replaced — the
+   same tint, the same dot, the same size — because it says exactly what that
+   said, and a list should not change its vocabulary to become editable.
+   The arrow is the one every select in this stylesheet draws, re-tinted:
+   background-color and background-image are separate properties, so the fill
+   can be the status colour while the two gradients stay where they are. */
+.status-inline { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+.status-inline::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    margin-top: -2.5px;
+    border-radius: var(--r-full);
+    background: var(--c);
+    pointer-events: none;
+}
+.status-select {
+    width: auto;
+    max-width: 168px;
+    height: 24px;
+    padding: 0 24px 0 19px;
+    border-radius: var(--r-full);
+    border-color: color-mix(in oklab, var(--c) 30%, transparent);
+    background-color: color-mix(in oklab, var(--c) 11%, transparent);
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 13px) calc(50% + 1px), calc(100% - 9px) calc(50% + 1px);
+    color: color-mix(in oklab, var(--c) 76%, var(--text));
+    font-size: 11.5px;
+    font-weight: 560;
+}
+.status-select:hover {
+    border-color: color-mix(in oklab, var(--c) 48%, transparent);
+    background-color: color-mix(in oklab, var(--c) 18%, transparent);
+}
+/* The list the browser drops out of it is drawn by the browser — colour-scheme
+   on :root is what makes it the right way round — but the tint above is
+   inherited into it on some, and a red option list is not a status. */
+.status-select option { background: var(--surface-flat); color: var(--text); }
 
 .bug-id { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 
@@ -1907,6 +2114,19 @@ select {
 .meter.sev-MEDIUM   i:nth-child(-n+2),
 .meter.sev-HIGH     i:nth-child(-n+3),
 .meter.sev-CRITICAL i:nth-child(-n+4) { background: var(--c); }
+
+/* A status, as a single mark. The revamp took this rule out and left the
+   markup behind, so every .dot in the app — the board's own headings, the
+   Status and Environment filter columns, the chips that say what the list is
+   narrowed to, the picker on a bug's page — was an empty span with no size,
+   painting nothing. --c is what colours it, so it means whatever it sits in. */
+.dot {
+    flex: none;
+    width: 7px; height: 7px;
+    border-radius: var(--r-full);
+    background: var(--c, var(--muted));
+}
+.dot-lg { width: 9px; height: 9px; }
 
 .client-chip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
 .client-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2038,6 +2258,92 @@ select {
 
 .pre { white-space: pre-wrap; font-size: 13.5px; color: var(--text-2); }
 
+/* ---------- a fenced block, in a report or a comment ----------
+   Somebody pasting a response body onto a bug is pasting evidence, and evidence
+   read as a paragraph — wrapped, proportional, its indentation collapsed — is
+   evidence nobody can check. app.js finds ``` fences in the text already on the
+   page and turns them into these. With JavaScript off the fences stay visible
+   in the text, which carries exactly the same information: nothing here is the
+   only way to read anything. */
+.code-block {
+    margin: 10px 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+    /* So the head's corners are the block's corners, and a long line scrolls
+       inside the <pre> rather than widening the panel it sits in. */
+    overflow: hidden;
+}
+.code-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 5px 4px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-3);
+}
+.code-lang {
+    font-size: 10px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    font-weight: 650;
+    color: var(--muted);
+}
+/* Quiet until the block is hovered or something in it is focused: a report
+   with five blocks in it is otherwise ten buttons before a line of evidence. */
+.code-act {
+    padding: 3px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 560;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease), background var(--fast) var(--ease),
+                color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.code-block:hover .code-act,
+.code-act:focus-visible { opacity: 1; }
+@media (hover: none) { .code-act { opacity: 1; } }
+.code-act:hover {
+    background: var(--surface-2);
+    border-color: var(--line-strong);
+    color: var(--text);
+}
+.code-act[aria-pressed="true"] { color: var(--accent); }
+
+.code-block pre {
+    margin: 0;
+    padding: 10px 12px;
+    /* The point of the whole component: never wrapped. A JSON body folded to
+       the column width is a wall, and a stack trace folded is a lie about
+       which line is which. */
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+.code-block code {
+    font-family: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text-2);
+    white-space: pre;
+}
+
+/* The button that puts a block into the box you are typing in. In the comment
+   composer it sits with the paperclip and borrows that row's sizing; under the
+   report box it gets a row of its own. */
+.detail-tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.detail-tools .hint { min-width: 0; }
+
 /* pre-wrap breaks at whitespace and nowhere else, and the primary content of a
    bug tracker is a stack trace or a URL: one unbroken token that would push the
    panel wider than the screen and take the page's layout with it. */
@@ -2154,6 +2460,22 @@ select {
 .comment-file .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .comment-file .mt { flex: none; color: var(--muted); font-size: 11px; }
 
+/* A clip said in a comment. Capped rather than full width: a comment is a
+   paragraph somebody wrote, and a 700px player in the middle of one stops
+   being part of the sentence. contain for the same reason a screenshot is —
+   a portrait recording cropped to a landscape band is the middle of a phone
+   screen and none of the thing being reported. */
+.comment-clip-player {
+    display: block;
+    width: 100%;
+    max-width: 420px;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface-3);
+}
+
 /* ---------- comments: the box comes first, then the thread ---------- */
 .comment-box {
     display: grid;
@@ -2163,6 +2485,11 @@ select {
     background: var(--surface-2);
 }
 .comment-row { display: flex; align-items: flex-start; gap: 10px; }
+/* The @ menu is absolute and hangs off the field's own box. Without this it
+   measures itself against .panel, which is the nearest positioned ancestor,
+   and lands above the whole thread instead of above the line being typed. */
+.comment-row label,
+.comment-inline label { position: relative; }
 .comment-row label { flex: 1; }
 .comment-row textarea { min-height: 62px; background: var(--surface-flat); }
 .comment-actions { display: flex; align-items: center; gap: 8px; padding-left: 32px; }
@@ -2179,17 +2506,33 @@ select {
 /* One comment: the face, then everything said and everything you can do. */
 .comment { display: flex; gap: 10px; }
 
-/* Replies sit under what they answer, indented once and no further. A reply to
-   a reply is filed against the same parent, so this is the only level there
-   is — a tree in a column this wide is a staircase off the right-hand edge. */
+/* Replies sit under what they answer, indented once — and once is all there
+   is, however deep the exchange actually goes. A tree drawn as a tree is a
+   staircase off the right-hand edge, and an indent that has to stop somewhere
+   makes the page explain two things at once: how deep this is, and how deep it
+   is allowed to look. So the depth lives in the data and the drawing is one
+   run under the comment it is about, in the order it was said.
+
+   The rail is the whole of the decoration: with several conversations on a bug
+   it is the only thing saying where one ends and the next begins. */
 .thread-replies {
     margin: 10px 0 0;
     padding-left: 14px;
     border-left: 2px solid var(--line);
-    gap: 10px;
+    gap: 12px;
 }
 .thread-replies > li { padding: 0; border-bottom: none; animation: none; }
 .thread-replies .avatar { width: 22px; height: 22px; font-size: 9px; }
+
+/* Arriving at one comment — from the redirect after posting, or from a link
+   somebody pasted. It says which one and then gets out of the way; nothing
+   moves, because a thread that reflows under you is a thread you lose. */
+.comment { border-radius: var(--r-md); }
+.comment:target { animation: comment-land var(--slow) var(--ease) both; }
+@keyframes comment-land {
+    from { background: color-mix(in oklab, var(--accent) 15%, transparent); }
+    to   { background: transparent; }
+}
 
 /* Reply, Edit, Delete. Quiet text buttons, because they are three things you
    almost never do sitting under something you always read. */
@@ -2318,99 +2661,108 @@ select {
 
 /* ==========================================================================
    The team
+   --------------------------------------------------------------------------
+   Two screens. The roster is a table — a list for administering accounts is
+   columns you scan down, not cards you read across — and one person's account
+   is a screen of its own that replaces it, and is nothing but the controls.
+
+   Every cell in the table holds one line. That is the whole alignment rule
+   here: a two-line cell beside a one-line cell has to pick a baseline, and
+   whichever it picks the column beside it is wrong.
    ========================================================================== */
-.member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(272px, 1fr)); gap: 12px; }
+.roster-table tbody tr.is-inactive td { opacity: .6; }
+/* The row is the link its Manage button is — app.js widens the target, this
+   says so before it is clicked. */
+.roster-table tbody tr[data-href] { cursor: pointer; }
 
-.member-card {
+/* Name then address on one line. The address is the tiebreak between two
+   Vikrams rather than a column in its own right, so it trails the name in the
+   same cell and gives way first when the table is narrow. */
+.roster-table .client-chip { width: 100%; }
+/* The name never gives way; the address is what shrinks and ellipses. */
+.roster-table .client-name { flex: 0 0 auto; }
+.member-mail {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The chevron on Manage: the row goes somewhere, and a button that only says
+   "Manage" does not say that. */
+.row-go svg.i { margin-left: -1px; color: var(--muted); }
+.row-go:hover svg.i { color: inherit; }
+
+/* A table under a panel head rather than filling the panel on its own — the
+   head owns the top corners now, so the scrollport must not round them or the
+   header row's background is clipped into a notch. */
+.panel > .panel-head + .table-wrap { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* A search over a scrolling list of people, inside a popover. A roster is
+   twenty rows and a popover is not twenty rows tall, and reading twenty is
+   slower than typing three letters. */
+.pick-block { display: grid; gap: 6px; min-width: 0; }
+.pick-block .field-label { margin: 0; }
+/* .pick-search carries its own gutter for the popovers it was written for; in
+   here the grid gap above is the gutter, and both together is a hole. */
+.pick-block .pick-search { margin: 0; }
+.pick-scroll { display: grid; gap: 1px; max-height: 208px; overflow-y: auto; overscroll-behavior: contain; }
+/* The rows are the full width of the list, so the scrollbar must not sit on
+   top of the last one's rounded corner. */
+.pick-scroll .pick-opt { min-width: 0; }
+
+/* Adding somebody is a popover off the roster's head: three fields is a form,
+   not a panel that stays open under the table for ever. */
+.pop-form { display: grid; gap: 9px; padding: 4px 9px 9px; }
+/* Direct children only, all three of them. A .pick-opt row is a <label> with an
+   <input> in it, so an unscoped `.pop-form label` (0,1,1) beat `.pick-opt`
+   (0,1,0) whatever the source order, turned every person in the picker into a
+   one-column grid and stacked their checkbox, face and name down the popover. */
+.pop-form > label { display: grid; gap: 4px; font-size: 12px; font-weight: 520; color: var(--text-2); }
+.pop-form > label em { font-style: normal; font-weight: 400; }
+.pop-form > label input { height: 32px; font-size: 13px; }
+
+/* ---------- one person's account ----------
+   Who they are, then a list of actions: a label, the control that changes it,
+   and nothing in between. The paragraphs that used to sit under every button
+   are in the README, where they can be read once rather than every time. */
+/* One panel of controls, so it gets a reading width of its own — and is
+   centred in it. .stack-narrow is 1120px and left-aligned, which is right for
+   a page of tables; 620px of labelled buttons pinned to the left edge of a
+   wide screen reads as a layout that failed rather than one that chose. */
+.member-stack { max-width: 620px; margin-inline: auto; }
+.person-head { display: flex; align-items: center; gap: 14px; padding: 14px 16px; flex-wrap: wrap; }
+.person-id { display: grid; gap: 1px; min-width: 0; }
+.person-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.person-name h2 { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-mail { font-size: 12.5px; color: var(--muted); }
+a.person-mail:hover { color: var(--accent); }
+
+/* One column for the labels and one for the controls, so every button on the
+   screen starts at the same x — which a stack of panels, each with its own
+   padding, could not promise. */
+.act-row {
     display: grid;
-    gap: 11px;
-    padding: 14px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-xl);
-    background: var(--surface);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
-    box-shadow: var(--shadow-1);
-    transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease), border-color var(--fast) var(--ease);
-    animation: rise var(--mid) var(--ease) both;
-    animation-delay: calc(var(--i, 0) * 35ms + 30ms);
+    grid-template-columns: 124px minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    margin: 0;
+    padding: 11px 16px;
+    border-top: 1px solid var(--line);
 }
-.member-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--line-strong); }
-.member-card.is-inactive { opacity: .55; }
-.member-card.is-me { border-color: color-mix(in oklab, var(--accent) 45%, var(--line)); }
-
-.member-head { display: flex; align-items: center; gap: 11px; min-width: 0; }
-.member-id { display: grid; min-width: 0; gap: 1px; }
-.member-name { font-size: 14px; font-weight: 600; letter-spacing: -.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.member-mail { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.member-you {
-    padding: 1px 6px;
-    border-radius: var(--r-full);
-    background: var(--accent-soft);
-    color: color-mix(in oklab, var(--accent) 80%, var(--text));
-    font-size: 10px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-}
-
-.stat-tile {
-    display: grid;
-    gap: 1px;
-    padding: 7px 9px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    background: var(--surface-2);
-    color: var(--text);
-    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
-}
-a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50%, var(--line)); background: color-mix(in oklab, var(--c, var(--accent)) 9%, var(--surface-2)); }
-.stat-value { font-size: 17px; font-weight: 650; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--c, var(--text)); }
-.stat-name { font-size: 10.5px; color: var(--muted); }
-.stat-tile.is-zero .stat-value { color: var(--muted); opacity: .5; }
-
-.member-foot { display: flex; align-items: center; gap: 6px; }
-.member-foot .spacer { flex: 1; }
-
-/* ---------- one person's page ---------- */
-.person-hero { display: flex; align-items: center; gap: 16px; padding: 16px 18px; flex-wrap: wrap; }
-.person-id { display: grid; gap: 2px; min-width: 0; }
-.person-id h1 { font-size: 22px; }
-.person-id .person-mail { font-size: 13px; color: var(--muted); }
-.person-hero .kpi-row { margin-left: auto; grid-template-columns: repeat(4, minmax(78px, 1fr)); min-width: 348px; }
-/* 800 predates the 780 breakpoint and should fold into it. Dropping min-width
-   alone left four 78px tracks in a 292px panel, clipping the last tile. */
-@media (max-width: 800px) {
-    .person-hero .kpi-row {
-        margin-left: 0;
-        min-width: 0;
-        width: 100%;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
+.act-label { font-size: 12.5px; font-weight: 560; color: var(--text-2); }
+/* Row height comes from the tallest control a row can hold — the password
+   field — so a row of buttons does not sit shorter than the one above it. */
+.act-control { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 30px; }
+.act-control input { flex: 0 1 240px; height: 30px; font-size: 13px; }
+.act-control .btn { flex: none; }
 
 /* min() so a single auto-fit track can go under 360px: with a bare minmax the
    floor stands even when there is only one column, and it overflows. */
 .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 14px; align-items: start; }
-
-/* a compact bug row, used on the person page */
-.mini-list { list-style: none; margin: 0; padding: 0; }
-.mini-row {
-    display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 9px;
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--line);
-    transition: background var(--fast) var(--ease);
-    animation: rise var(--mid) var(--ease) both;
-    animation-delay: calc(var(--i, 0) * 22ms + 30ms);
-}
-.mini-row:last-child { border-bottom: none; }
-.mini-row:hover { background: var(--surface-2); }
-.mini-row .mini-title { font-size: 13px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mini-row:hover .mini-title { color: var(--accent); }
-.mini-row .bug-id { font-size: 11px; }
 
 /* ==========================================================================
    Forms
@@ -2589,9 +2941,10 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
    give up 10px to a button that is invisible most of the time. */
 .bug-table .copy-md { --mark: 13px; width: 20px; height: 20px; border-radius: var(--r-sm); }
 
-/* Sits with the title rather than in a column of its own — the table is read
-   left to right and an actions column would push Reported off a laptop. */
-.bug-table .copy-md { display: inline-grid; vertical-align: middle; margin-left: 5px; }
+/* In the actions column at the end of the row, not trailing the title: beside
+   the title it read as part of the sentence it was sitting in, and it is about
+   the row rather than about the words. */
+.bug-table .copy-md { display: inline-grid; vertical-align: middle; }
 
 @media (pointer: coarse) {
     /* Left at its drawn size and given a target around it, rather than grown
@@ -2653,28 +3006,6 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
 }
 .login-card form { display: grid; gap: 15px; }
 
-/* The heading doubles as a switch between the configured sign-ins. */
-.welcome-switch {
-    padding: 0;
-    border: 0;
-    border-bottom: 1px dashed transparent;
-    background: none;
-    color: inherit;
-    font: inherit;
-    letter-spacing: inherit;
-    cursor: pointer;
-    transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
-}
-.welcome-switch:hover {
-    color: var(--accent);
-    border-bottom-color: color-mix(in oklab, var(--accent) 45%, transparent);
-}
-.welcome-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-sm); }
-
-.login-switch-note { margin: 0 0 16px; color: var(--muted); font-size: 12px; text-align: center; }
-.login-switch-note b { color: var(--text-2); font-weight: 560; }
-.login-card .sub:has(+ .login-switch-note:not([hidden])) { margin-bottom: 11px; }
-
 /* An input with an icon sitting inside its left edge. */
 .field-icon { position: relative; display: block; }
 .field-icon > svg.i {
@@ -2705,6 +3036,13 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
     cursor: pointer;
 }
 .reveal:hover { background: var(--surface-3); color: var(--text); }
+
+/* The same button on a field of the app's normal height. .field-icon above is
+   the sign-in page's taller variant, with a lens on the left and a 42px box;
+   this is just the room on the right and something to position against. */
+.field-reveal { position: relative; display: block; }
+.field-reveal input { padding-right: 36px; }
+.field-reveal .reveal { width: 26px; height: 26px; right: 3px; }
 
 .login-submit { width: 100%; height: 44px; margin-top: 3px; font-size: 14px; border-radius: var(--r-md); }
 
@@ -2746,7 +3084,7 @@ a.stat-tile:hover { border-color: color-mix(in oklab, var(--c, var(--accent)) 50
     content: "";
     position: absolute;
     inset: 0;
-    z-index: -1;
+    z-index: var(--z-under);
     background-image:
         linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px);
@@ -2869,7 +3207,12 @@ svg.i.chev, svg.i.switcher-chev, svg.i.tick, svg.i.go { width: 12px; height: 12p
        second line rather than take the page with it. */
     .panel-head { flex-wrap: wrap; row-gap: 8px; }
     .toolbar { top: var(--nav-h); }
-    .kanban { grid-auto-columns: minmax(228px, 84vw); }
+    /* Narrower, and with few enough columns one takes most of the screen so the
+       next peeks in and says the board continues. The flex form of what
+       grid-auto-columns: minmax(228px, 84vw) said: never below 228, never past
+       84vw. A folded column keeps its own 46px — .kcol.is-collapsed carries a
+       class more than this does, so it wins wherever they meet. */
+    .kcol { flex: 1 0 228px; max-width: 84vw; }
     .detail-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -3547,8 +3890,43 @@ html:not(.js) .js-only { display: none; }
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* ---------- a clip, played where a screenshot is shown ----------
+   A screen recording is the same evidence a screenshot is, so it sits in the
+   same place and not in the list of files below. Wider tiles than the
+   screenshot grid, because a video is watched rather than scanned and the
+   controls a browser draws over a 168px player overlap each other. */
+.clip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+    margin-bottom: 12px;
+}
+.clip {
+    display: grid;
+    grid-template-rows: auto auto;
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface-2);
+    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.clip:hover { border-color: var(--accent); background: var(--surface-3); }
+.clip-player {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+    border-radius: var(--r-md);
+    background: var(--surface-3);
+}
+.clip .shot-foot .muted { flex: none; font-size: 10.5px; }
+
 /* Both lists are grid tracks in the rail: an empty one still costs its gap. */
 .shot-grid:not(:has(.shot)) { display: none; }
+.clip-grid:not(:has(.clip)) { display: none; }
 .rail-files:not(:has(.rail-file)) { display: none; }
 
 /* The file input on the raise form takes several at once. */
@@ -3610,15 +3988,19 @@ html:not(.js) .js-only { display: none; }
 .rail-file .mt { display: flex; gap: 5px; min-width: 0; }
 .rail-file .mt > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---------- the lightbox ----------
+/* ---------- the attachment viewer ----------
    An attachment opens over the page, not instead of it: you are still reading
-   the bug. The thumbnail stays a real link, so this is only a shortcut. */
+   the bug. Every thumbnail stays a real link to the file, so all of this is a
+   shortcut — with scripting off a click is the attachment in a new tab, which
+   is what it always was.
+
+   Three rows: what it is, the thing itself, and the rest of the evidence. */
 .lightbox {
     position: fixed;
     inset: 0;
-    z-index: var(--z-toast);
+    z-index: var(--z-overlay);
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 10px;
     padding: 18px;
     background: color-mix(in oklab, var(--text) 62%, transparent);
@@ -3633,7 +4015,7 @@ html:not(.js) .js-only { display: none; }
 .lightbox-bar {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     justify-self: center;
     max-width: 100%;
     padding: 7px 8px 7px 14px;
@@ -3649,19 +4031,193 @@ html:not(.js) .js-only { display: none; }
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* Where you are in the set, before the name of the one you are on. */
+.lightbox-count {
+    flex: none;
+    padding: 1px 7px;
+    border-radius: var(--r-full);
+    background: var(--surface-3);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* The zoom controls, as one group with a rule either side of it: they are
+   about the picture, and the buttons beside them are about the overlay. */
+.lightbox-zoom {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+}
+.lightbox-zoom[hidden] { display: none; }
+.lightbox-zoom-level {
+    min-width: 44px;
+    padding: 3px 4px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.lightbox-zoom-level:hover { background: var(--surface-3); color: var(--text); }
+
+/* The arrows sit over the stage, not beside it: a picture that gave up 90px on
+   each side to two buttons was smaller for it on every screen. */
+.lightbox-body { position: relative; min-height: 0; }
+
+.lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: var(--z-raised);
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-full);
+    background: var(--surface-pop);
+    color: var(--text-2);
+    box-shadow: var(--shadow-3);
+    cursor: pointer;
+    opacity: .7;
+    transition: opacity var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.lightbox-nav:hover, .lightbox-nav:focus-visible { opacity: 1; color: var(--text); }
+.lightbox-nav[hidden] { display: none; }
+.lightbox-nav .i { width: 18px; height: 18px; }
+.lightbox-prev { left: 4px; }
+.lightbox-next { right: 4px; }
 
 .lightbox-stage {
     display: grid;
+    /* Spelled out rather than left implicit, and it is what makes the picture
+       fit: an implicit auto row is sized by whatever lands in it, so the media
+       had no definite height to measure its own max-height against and simply
+       drew at its natural size. A landscape screenshot hid that — max-width
+       binds first and the height follows the aspect ratio — but a phone
+       screenshot is narrow and tall, so nothing capped it and the stage clipped
+       everything below the fold. A track fixed to the stage gives the 100%s
+       underneath something real to resolve against. */
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
     place-items: center;
+    width: 100%;
+    height: 100%;
     min-height: 0;
+    /* A picture zoomed past the window has to be clipped by the stage, or it
+       paints over the bar naming it and the strip under it. */
+    overflow: hidden;
 }
-.lightbox-stage img {
+.lightbox-media {
     max-width: 100%;
     max-height: 100%;
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-3);
     background: var(--surface-flat);
-    animation: rise var(--mid) var(--ease) both;
+    transform-origin: center center;
+    transition: transform var(--mid) var(--ease);
+    /* Opacity only, and deliberately not `rise`: that one ends at
+       `transform: none` and is filled forwards, and a running animation beats an
+       inline style — so the entrance would have quietly cancelled every zoom and
+       every pan the moment it finished. */
+    animation: lightbox-in var(--mid) var(--ease) both;
+}
+@keyframes lightbox-in { from { opacity: 0; } to { opacity: 1; } }
+/* Dragging has to track the pointer exactly; a transition on transform turns a
+   drag into the picture chasing the cursor a frame behind. */
+.lightbox-img.is-dragging { transition: none; }
+.lightbox-img.is-zoomed { cursor: grab; }
+.lightbox-img.is-dragging { cursor: grabbing; }
+/* Pointer events are the pan, so the browser must not also scroll or pinch the
+   overlay out from under it. */
+.lightbox-img.is-zoomed { touch-action: none; }
+.lightbox-video { width: auto; }
+
+/* The rest of the bug's evidence, along the bottom. Scrolls on its own when
+   there is more of it than there is window. */
+.lightbox-strip {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 2px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+.lightbox-strip[hidden] { display: none; }
+.lightbox-thumb {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 62px;
+    height: 44px;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--surface-flat);
+    color: var(--muted);
+    cursor: pointer;
+    opacity: .55;
+    transition: opacity var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.lightbox-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.lightbox-thumb:hover { opacity: .85; }
+.lightbox-thumb.is-here {
+    opacity: 1;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 35%, transparent);
+}
+.lightbox-thumb.is-clip { background: var(--surface-3); }
+
+/* The clip's own way into the viewer, in the corner of the player it is about.
+   Quiet until the card is hovered, like the copy button on a row. */
+.clip { position: relative; }
+.clip-expand {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-md);
+    background: color-mix(in oklab, var(--text) 55%, transparent);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: var(--surface-flat);
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease);
+}
+.clip:hover .clip-expand, .clip-expand:focus-visible { opacity: 1; }
+@media (pointer: coarse) {
+    /* Nothing hovers on a phone, so it is simply there. */
+    .clip-expand { opacity: 1; }
+}
+
+@media (max-width: 780px) {
+    /* Less chrome around a smaller picture. The bar keeps the name and the way
+       out; the file name is the first thing to give up its room, because the
+       thing you are looking at is the thing you came for. */
+    .lightbox { gap: 8px; padding: 10px; }
+    .lightbox-bar { gap: 6px; padding: 6px 6px 6px 11px; }
+    .lightbox-name { font-size: 12px; }
+    .lightbox-zoom { padding: 0 4px; }
+    .lightbox-zoom-level { min-width: 38px; }
+    .lightbox-nav { width: 34px; height: 34px; }
+    .lightbox-prev { left: 0; }
+    .lightbox-next { right: 0; }
+    /* Left-aligned rather than centred: a strip of eight that starts in the
+       middle of the screen is one you have to scroll to find the start of. */
+    .lightbox-strip { justify-content: flex-start; gap: 6px; }
+    .lightbox-thumb { width: 52px; height: 38px; }
 }
 
 
@@ -3669,7 +4225,7 @@ html:not(.js) .js-only { display: none; }
 .pop-head-sticky {
     position: sticky;
     top: -5px;                      /* cancels the .pop padding */
-    z-index: 1;
+    z-index: var(--z-local);
     background: var(--surface-pop);
     margin: -5px -5px 4px;
     padding: 10px 12px;
@@ -3737,7 +4293,7 @@ kbd {
 .palette {
     position: fixed;
     inset: 0;
-    z-index: var(--z-toast);
+    z-index: var(--z-overlay);
     display: grid;
     align-content: start;
     justify-items: center;
@@ -3962,7 +4518,8 @@ kbd {
     .topbar-sub { display: none; }
 
     /* iOS zooms in on any field under 16px and never zooms back out. */
-    input[type=text], input[type=search], input[type=email], input[type=password], select, textarea,
+    input[type=text], input[type=search], input[type=email], input[type=password],
+    input[type=date], select, textarea,
     .search-wrap input, .switcher-search input, .field-icon input,
     .pick-search input { font-size: 16px; }
 
@@ -3999,6 +4556,13 @@ kbd {
     .bug-table td.rail { position: absolute; inset: 0 auto 0 0; width: 4px; }
     .bug-table td.rail::before { inset: 0 auto 0 0; width: 4px; }
     .bug-table tbody tr:hover td.rail::before { inset: 0 auto 0 0; }
+
+    /* Wide enough to read a column name in, on the line the labels leave. */
+    .bug-table td[data-label] .status-select { max-width: 100%; width: 100%; }
+
+    /* The copy button has no label to print and no column to sit in, so it goes
+       to the end of the card, against the right edge. */
+    .bug-table td.row-act { justify-self: end; text-align: right; padding: 2px 0 0; }
 
     .bug-table td[data-label] {
         display: grid;
@@ -4075,6 +4639,19 @@ kbd {
         max-width: none;
     }
 
+    /* A 124px label column plus a control does not fit beside itself on a
+       phone: the label goes over the control it names. */
+    .act-row { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+    .act-control input { flex: 1 1 auto; }
+
+    /* Same bug in a panel: the roster's Add member popover hangs off a button
+       at the right-hand end of a panel head, and 320px of it does not fit
+       beside a panel that is itself inset from the screen. It takes the panel's
+       width instead of the bars' trick of restyling the containing block —
+       .panel is as tall as the table under it, and `top: 100%` against that
+       would open the form below the whole roster. */
+    .panel-head .pop { width: calc(100vw - 44px); }
+
     /* Same bug, other menu: min-width 196px with nothing clamping it and
        nowrap children, opening from a button in the middle of the bar. */
     .toolbar .fmenu { position: static; }
@@ -4119,9 +4696,7 @@ kbd {
    until something else is tapped. Only the lift is undone — the colour change
    is still useful feedback that the tap landed. */
 @media (hover: none) {
-    .kcard:hover       { transform: none; box-shadow: none; }
-    .member-card:hover { transform: none; box-shadow: var(--shadow-1); }
-    a.kpi:hover        { transform: none; }
+    .kcard:hover { transform: none; box-shadow: none; }
 }
 
 /* ==========================================================================
@@ -4547,7 +5122,7 @@ kbd {
 
 /* Merged cells. The covered ones stay in the DOM and keep posting, so the grid
    the server folds back together is still a rectangle. */
-.gsheet td.is-merged { z-index: 1; }
+.gsheet td.is-merged { z-index: var(--z-local); }
 .gsheet td.is-covered { display: none; }
 
 /* A frozen row rides above the grid at an offset the editor measures, because
@@ -4569,7 +5144,7 @@ kbd {
     right: -3px; top: 0; bottom: 0;
     width: 7px;
     cursor: col-resize;
-    z-index: 1;
+    z-index: var(--z-local);
 }
 .col-grip::after {
     content: "";
@@ -4725,33 +5300,32 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .team-cell:hover { background: var(--surface-3); color: var(--text); }
 .team-cell .num { color: var(--muted); font-size: 11.5px; }
 
-/* ---------- a member's sign-in, folded into their card ---------- */
-.member-auth > summary { list-style: none; cursor: pointer; }
-.member-auth > summary::-webkit-details-marker { display: none; }
-.member-auth > summary::marker { content: ""; }
-
-.auth-line {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 6px 9px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    background: var(--surface-2);
-    font-size: 12px;
-    color: var(--text-2);
-    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+/* ---------- your own account ----------
+   One page about you rather than about the work: the name everything records
+   you as, and the password you sign in with. Changing a password used to be an
+   admin's job, which is how passwords stop being changed. */
+.account-who { display: flex; align-items: center; gap: 15px; }
+.account-id { display: grid; gap: 2px; min-width: 0; }
+.account-id > b { font-size: 15px; font-weight: 600; }
+.account-id > .muted {
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-.auth-line:hover { border-color: var(--line-strong); background: var(--surface-3); }
-.auth-line svg.i:first-child { flex: none; color: var(--muted); }
-/* Somebody who can sign in is the notable state, so it is the one that is lit. */
-.member-auth:has(.auth-line > span:not(.muted)) .auth-line > svg.i:first-child { color: var(--accent); }
-.auth-line .chev { margin-left: auto; color: var(--muted); transition: transform var(--mid) var(--ease); }
-.member-auth[open] .auth-line .chev { transform: rotate(180deg); }
+/* One short form, so it gets a reading width of its own. .stack-narrow is
+   1120px — right for the two-column pages it was written for, and far too wide
+   for three password fields.
 
-.auth-body { display: grid; gap: 8px; padding: 10px 2px 0; }
-.auth-form { display: flex; align-items: center; gap: 6px; margin: 0; }
-.auth-form input { flex: 1; min-width: 0; height: 30px; font-size: 13px; }
+   Centred, which .stack-narrow is not: at 1120px a left-aligned column fills
+   the screen and nobody notices, but 560px pinned to the left edge reads as a
+   layout that failed rather than one that chose a width. */
+.account-stack { max-width: 560px; margin-inline: auto; }
+.account-who .badge { margin-left: auto; flex: none; }
+.account-save { flex-wrap: wrap; }
+/* The hint sits after the button and takes what is left, rather than being
+   stretched to match it the way a .row child would be. */
+.account-save .hint { flex: 1 1 180px; min-width: 0; }
 
 
 /* ==========================================================================
@@ -4795,61 +5369,26 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 
 /* ---------- Stats ---------- */
 
-/* Five tiles, not the drawer's two-up grid: this is a page, and the fifth
-   would otherwise sit alone on a second row. */
-.kpi-row-wide { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
-
-/* One bar and one sentence under the tiles. A row of numbers is not yet a
-   reading of them, and "54% finished" is the reading. */
-.progress { display: grid; gap: 7px; margin-top: 12px; }
-.progress-track {
-    height: 7px;
-    border-radius: var(--r-full);
-    background: var(--surface-3);
-    overflow: hidden;
-}
-.progress-track i {
-    display: block;
-    height: 100%;
-    width: var(--w, 0%);
-    border-radius: inherit;
-    background: linear-gradient(90deg,
-        color-mix(in oklab, var(--col-GREEN) 78%, var(--accent)), var(--col-GREEN));
-    transition: width var(--slow) var(--ease);
-}
-.progress .hint b { color: var(--text); }
+/* The page is two panels of .heat rows now — where the work is sitting, and
+   what is owed by when. The tiles, the progress bar and the activity feed it
+   used to carry are gone, and so are the rules that painted them. */
 
 /* A row that states a number without offering to go and show you those bugs —
-   "no environment" is not something the board can be filtered to. Same shape
-   as the links beside it, minus every affordance that promises a click. */
+   the board can be filtered to a column, but not to "due inside a month".
+   Same shape as the links beside it, minus every affordance that promises a
+   click. */
 .heat-card.is-flat { cursor: default; }
 .heat-card.is-flat:hover { background: var(--surface-2); color: var(--text-2); }
 
-/* The team block lists the project's own people, so a second .heat directly
-   under the first is the off-team stragglers. Without this they read as one
-   list with an unexplained gap. */
+/* The due windows are named by a span of time rather than by a column, and
+   "This month" beside its dot does not fit the 84px the board's own rows use. */
+.heat-due .heat-card { grid-template-columns: 104px minmax(0, 1fr) auto; }
+
+/* Two .heat lists directly under one another read as one list with an
+   unexplained gap without this. */
 .heat + .heat { margin-top: 4px; }
 .heat-name .tag { flex: none; }
 
-/* ---------- what has been happening ---------- */
-.feed { display: grid; gap: 1px; list-style: none; margin: 0; padding: 0; }
-.feed-row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 9px;
-    padding: 7px 8px;
-    border-radius: var(--r-md);
-    font-size: 12.5px;
-    color: var(--text-2);
-    animation: rise var(--mid) var(--ease) both;
-    animation-delay: calc(var(--i, 0) * 22ms);
-    transition: background var(--fast) var(--ease);
-}
-.feed-row:hover { background: var(--surface-2); }
-.feed-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.feed-text b { color: var(--text); font-weight: 600; }
-.feed-row .when { flex: none; font-size: 11.5px; color: var(--muted); }
 
 /* ==========================================================================
    Drawers — a panel beside the page, never instead of it
@@ -4868,20 +5407,22 @@ body.is-resizing { cursor: col-resize; user-select: none; }
    containing block for a fixed descendant — a drawer opened from inside one
    would be pinned to the height of the bar.
    ========================================================================== */
-.drawer { position: fixed; inset: 0; z-index: var(--z-toast); }
+.drawer { position: fixed; inset: 0; z-index: var(--z-overlay); }
 .drawer[hidden] { display: none; }
 
-/* A flat dim and nothing else. No blur and no gradient: a ramp reads as a
-   smudge rather than as depth, and blurring the whole page to put a panel over
-   it is expensive for something the panel's own shadow already says. */
+/* Nothing is painted here, and that is the point. The drawer opens *beside*
+   the page rather than instead of it — you are still reading the board while
+   you check who is on the project — and dimming everything says "this is
+   modal" about something that is not. The panel is 97% opaque with a shadow
+   under it, so it reads perfectly well over an undimmed page; the dim was
+   saying something the shadow already said, louder.
+
+   The layer itself stays. It is what catches a click outside the panel and
+   closes the drawer, which is the whole reason it spans the viewport. */
 .drawer-scrim {
     position: absolute;
     inset: 0;
-    background: var(--scrim);
-    opacity: 0;
-    transition: opacity var(--mid) var(--ease);
 }
-.drawer.is-open .drawer-scrim { opacity: 1; }
 
 /* Floating, not welded to the edge. A panel that runs from the top of the
    window to the bottom of it is another edge of the browser; inset on all four

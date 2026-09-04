@@ -1,5 +1,6 @@
 package com.bugtracking.model;
 
+import com.bugtracking.service.AttachmentService;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -78,6 +79,31 @@ public class Attachment {
 
     public boolean isImage() {
         return contentType != null && contentType.startsWith("image/");
+    }
+
+    /**
+     * A screen recording rather than a screenshot.
+     *
+     * <p>Worked out from the file's name, not from the stored type: that is
+     * what the download route serves it as, and a row written before this app
+     * knew what a .mov was still holds application/octet-stream. Parsing the
+     * stored string would also mean a malformed one throwing out of a getter
+     * a template calls.
+     */
+    public boolean isVideo() {
+        return AttachmentService.isVideo(AttachmentService.mediaTypeFor(fileName));
+    }
+
+    /**
+     * Whether the page can draw a player for this, as opposed to a link.
+     *
+     * <p>Asks {@code AttachmentService} rather than keeping a second list of
+     * formats here: which types may be put in the page is one decision, and it
+     * is the same decision that sets {@code Content-Disposition} on the way
+     * out. Two lists that have to agree eventually do not.
+     */
+    public boolean isPlayable() {
+        return AttachmentService.isPlayableVideo(AttachmentService.mediaTypeFor(fileName));
     }
 
     public Long getId() {

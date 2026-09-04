@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page('Your account', ~{::section})}">
+<body>
+<section>
+    <header class="topbar">
+        <h1 class="topbar-title">Your account</h1>
+        <div class="topbar-actions">
+            <div th:replace="~{fragments :: bell}"></div>
+        </div>
+    </header>
+
+    <div class="content">
+        <!-- Its own width, not .stack-narrow's 1120px: this page is one short
+             form, and a password field three feet wide reads as a mistake. -->
+        <div class="stack account-stack">
+
+            <!-- Who you are, as everything else in the app records you. The name
+                 is not editable here: it is written as text into every comment,
+                 history line and bug you are named on, so changing it is a
+                 rename an admin does on the roster — not something to do from a
+                 form about a password. -->
+            <div class="panel">
+                <div class="panel-pad account-who">
+                    <span class="avatar avatar-xl" th:attr="data-avatar=${#authentication.name}"
+                          aria-hidden="true"></span>
+                    <div class="account-id">
+                        <b th:text="${#authentication.name}">Nishana R</b>
+                        <span class="muted" th:text="${signInEmail}">nishana@firsteconomy.com</span>
+                    </div>
+                    <span class="badge" th:if="${isAdmin}" style="--c: var(--col-VIOLET)">Admin</span>
+                    <span class="badge" th:unless="${isAdmin}" style="--c: var(--col-SLATE)">Member</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>
+                    <h2>Change your password</h2>
+                </div>
+
+                <!-- No row behind the sign-in: the account exists only in the
+                     configuration, and there is nothing stored to change. Said
+                     plainly rather than by showing a form that can only fail. -->
+                <div class="panel-pad" th:if="${account == null}">
+                    <p class="hint">
+                        You are signed in on an account that has no row on the team, so there is
+                        no stored password to change. Ask an admin to add you with a password of
+                        your own — after that this is where you change it.
+                    </p>
+                </div>
+
+                <div class="panel-pad" th:if="${account != null and !account.hasPassword()}">
+                    <p class="hint">
+                        Your account has no stored password yet. An admin sets the first one on
+                        Settings &gt; Team; you change it here afterwards.
+                    </p>
+                </div>
+
+                <div class="panel-pad" th:if="${account != null and account.hasPassword()}">
+                    <form method="post" th:action="@{/account/password}" class="stack" id="password-form">
+                        <label>
+                            <span>Current password</span>
+                            <!-- current-password, so a manager offers the one it
+                                 has for this site rather than saving a new one. -->
+                            <span class="field-reveal">
+                                <input type="password" name="current" id="current-password" required
+                                       autocomplete="current-password" enterkeyhint="next">
+                                <!-- Added by app.js; without JS the field simply stays masked. -->
+                                <button type="button" class="reveal" data-reveal="current-password" hidden
+                                        aria-pressed="false"
+                                        title="Show password" aria-label="Show password">
+                                    <svg class="i" aria-hidden="true"><use href="#i-eye"/></svg>
+                                </button>
+                            </span>
+                        </label>
+
+                        <label>
+                            <span>New password</span>
+                            <span class="field-reveal">
+                                <input type="password" name="password" id="new-password" required
+                                       minlength="8" autocomplete="new-password" enterkeyhint="next">
+                                <!-- Added by app.js; without JS the field simply stays masked. -->
+                                <button type="button" class="reveal" data-reveal="new-password" hidden
+                                        aria-pressed="false"
+                                        title="Show password" aria-label="Show password">
+                                    <svg class="i" aria-hidden="true"><use href="#i-eye"/></svg>
+                                </button>
+                            </span>
+                        </label>
+
+                        <label>
+                            <span>New password again</span>
+                            <span class="field-reveal">
+                                <input type="password" name="confirm" id="confirm-password" required
+                                       minlength="8" autocomplete="new-password" enterkeyhint="done">
+                                <!-- Added by app.js; without JS the field simply stays masked. -->
+                                <button type="button" class="reveal" data-reveal="confirm-password" hidden
+                                        aria-pressed="false"
+                                        title="Show password" aria-label="Show password">
+                                    <svg class="i" aria-hidden="true"><use href="#i-eye"/></svg>
+                                </button>
+                            </span>
+                        </label>
+
+                        <!-- .inline-form, not .row: .row stretches every child to
+                             fill the line, which turns a two-word button into a
+                             half-panel slab with a hint stretched beside it. -->
+                        <div class="inline-form account-save">
+                            <button type="submit" class="btn btn-primary" id="change-password">
+                                Change password
+                            </button>
+                            <span class="hint">At least 8 characters. You stay signed in.</span>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+</body>
+</html>

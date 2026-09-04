@@ -3,6 +3,7 @@ package com.bugtracking.controller;
 import com.bugtracking.model.BoardColumn;
 import com.bugtracking.model.Bug;
 import com.bugtracking.model.ColumnColour;
+import com.bugtracking.model.ColumnNotify;
 import com.bugtracking.model.Comment;
 import com.bugtracking.model.DocType;
 import com.bugtracking.model.Environment;
@@ -32,6 +33,7 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,9 +43,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.security.Principal;
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,6 +57,10 @@ import java.util.Map;
 @Controller
 @RequestMapping("/bugs")
 public class BugController {
+
+    /** How a due date reads back in the flash message. */
+    private static final java.time.format.DateTimeFormatter DUE_STAMP =
+            java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH);
 
     private final BugService service;
     private final BoardColumnService board;
@@ -112,20 +118,25 @@ public class BugController {
                 // addAttribute, not addFlashAttribute: these belong in the query
                 // string, and Spring encodes them — project names have spaces.
                 redirect.addAttribute("project", landing);
-                // Whichever view was asked for survives the redirect. Naming
-                // "list" here was enough while it was the only one; with Stats
-                // beside it, /bugs?view=stats landed on the board instead.
-                if ("list".equals(view) || "stats".equals(view)) {
-                    redirect.addAttribute("view", view);
-                }
+                // The view does not need carrying any more: it is remembered in
+                // the session by GlobalModelAttributes, and the redirected
+                // request reads it from there like any other.
                 return "redirect:/bugs";
             }
         }
 
         // Three ways to look at the same project: the board, the same bugs as a
         // list, and the numbers behind them. Anything else is the board.
-        String mode = switch (view == null ? "" : view) {
-            case "list", "stats" -> view;
+        //
+        // A URL with no ?view= on it means "the way I was reading these", not
+        // "the board": that is what makes Home one link rather than three, and
+        // what makes the list stay the list when you search from it or change
+        // project. The session holds it — see GlobalModelAttributes.currentView
+        // — so it survives a walk off to Settings and the next visit. Anything
+        // that means the board says so, ?view=board included.
+        String asked = view == null || view.isBlank() ? remembered(session) : view;
+        String mode = switch (asked == null ? "" : asked) {
+            case "list", "stats" -> asked;
             default -> "board";
         };
 
@@ -140,6 +151,10 @@ public class BugController {
         model.addAttribute("bugs", bugs);
         model.addAttribute("boardColumns", boardColumns);
         model.addAttribute("columns", groupByColumn(boardColumns, bugs));
+        // For the picker in a column's own menu. The columns are edited here
+        // and nowhere else now — Settings has no Board tab — so the menu that
+        // renames a column is also where "who gets told" is chosen.
+        model.addAttribute("notifyModes", ColumnNotify.values());
         // One lookup for the whole board, so a blocked card can say so.
         model.addAttribute("blockers", service.blockersFor(bugs));
         // A card shows how many comments and files a bug has. Two queries for
@@ -149,7 +164,6 @@ public class BugController {
         model.addAttribute("fileCounts", attachments.countsFor(onScreen));
         model.addAttribute("dashboard", dashboard);
         model.addAttribute("boardTotal", service.dashboard(null).total());
-        model.addAttribute("activity", history.recent(project == null ? null : dashboard.bugIds()));
         model.addAttribute("selectedProject", project);
         model.addAttribute("severities", Severity.values());
         model.addAttribute("environments", Environment.values());
@@ -268,6 +282,12 @@ public class BugController {
             return name;
         }
         return names.stream().findFirst().orElse(null);
+    }
+
+    /** The view this session was last reading, or null on a fresh one. */
+    private static String remembered(jakarta.servlet.http.HttpSession session) {
+        Object view = session.getAttribute(GlobalModelAttributes.VIEW_KEY);
+        return view instanceof String name ? name : null;
     }
 
     private static boolean isBlank(String value) {
@@ -445,11 +465,14 @@ public class BugController {
         model.addAttribute("selectedProject", bug.getProject());
         model.addAttribute("boardColumns", board.forProject(bug.getProject()));
         model.addAttribute("people", peopleFor(bug));
-        // Split into what opens a thread and what answers it, so the page
-        // draws one level of nesting without walking the list twice.
+        // What opens a thread, and what answers each comment in it — so the
+        // page can walk the tree to any depth without walking the list twice.
         CommentService.Conversation thread = comments.conversationFor(id);
         model.addAttribute("comments", thread.roots());
         model.addAttribute("replies", thread.replies());
+        // Who each comment's Reply box opens already tagging: its author, and
+        // anybody further up the exchange it belongs to.
+        model.addAttribute("mentionTags", thread.tags());
         model.addAttribute("commentTotal", thread.roots().size()
                 + thread.replies().values().stream().mapToInt(List::size).sum());
         model.addAttribute("attachments", attachments.forBug(id));
@@ -514,15 +537,48 @@ public class BugController {
         return "redirect:/bugs/" + id;
     }
 
+    /**
+     * Moves a bug, from its own page or from a row on the list.
+     *
+     * <p>{@code from} is what makes the list's status picker worth having: a
+     * change made on a filtered, sorted list lands back on that same list
+     * rather than on the bug, which is a page the person deliberately did not
+     * open. Absent — every link written before this, and the bug's own page —
+     * it goes where it always went.
+     */
     @PostMapping("/{id}/status")
     public String changeStatus(@PathVariable Long id,
                                @RequestParam String status,
                                @RequestParam(required = false) String actor,
+                               @RequestParam(required = false) String from,
                                RedirectAttributes flash) {
         Bug moved = service.changeStatus(id, status, actor);
         flash.addFlashAttribute("message", "Bug #" + id + " moved to "
                 + board.snapshot().label(moved) + ".");
-        return "redirect:/bugs/" + id;
+        return "redirect:" + backTo(from, "/bugs/" + id);
+    }
+
+    /**
+     * Where a change made from a list should land.
+     *
+     * <p>A redirect target that arrives as a request parameter is an open
+     * redirect unless something refuses everything else, and "starts with a
+     * slash" is not that something: {@code //evil.example} is a
+     * protocol-relative URL every browser reads as another origin. So this
+     * accepts one shape and one only — the board itself, with or without a
+     * query string — and hands back the caller's own default for anything else.
+     * Control characters go too, because a newline in a Location header is a
+     * second header.
+     */
+    private static String backTo(String from, String fallback) {
+        if (from == null) {
+            return fallback;
+        }
+        String target = from.trim();
+        if (!target.equals("/bugs") && !target.startsWith("/bugs?")) {
+            return fallback;
+        }
+        return target.chars().anyMatch(c -> c < 0x20 || c == 0x7f) ? fallback : target;
     }
 
     /**
@@ -542,6 +598,29 @@ public class BugController {
     }
 
     /** Records — or clears, with a blank value — the bug holding this one up. */
+    /**
+     * Sets or clears the due date from the bug's own page.
+     *
+     * <p>{@code clear} is a button rather than an empty field: clearing a date
+     * is something you decide, not something you do by deleting characters —
+     * and it means the Save button never has to guess whether a blank box was
+     * "no date" or "I have not typed it yet".
+     */
+    @PostMapping("/{id}/due")
+    public String setDue(@PathVariable Long id,
+                         @RequestParam(required = false)
+                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+                         @RequestParam(defaultValue = "false") boolean clear,
+                         @RequestParam(required = false) String actor,
+                         RedirectAttributes flash) {
+        LocalDate wanted = clear ? null : dueDate;
+        Bug saved = service.setDueDate(id, wanted, actor);
+        flash.addFlashAttribute("message", saved.getDueDate() == null
+                ? "BUG-" + id + " has no due date."
+                : "BUG-" + id + " is due " + DUE_STAMP.format(saved.getDueDate()) + ".");
+        return "redirect:/bugs/" + id;
+    }
+
     @PostMapping("/{id}/block")
     public String block(@PathVariable Long id,
                         @RequestParam(required = false) Long blockedBy,
@@ -582,7 +661,9 @@ public class BugController {
         flash.addFlashAttribute("message", rejected == null
                 ? "Comment added to bug #" + id + "."
                 : "Comment added, but " + rejected);
-        return "redirect:/bugs/" + id + "#comments";
+        // At the comment rather than at the section: a reply three levels down
+        // a long thread is otherwise somewhere you have to go and find.
+        return "redirect:/bugs/" + id + "#c" + saved.getId();
     }
 
     /** Changing the words of a comment you wrote. */
@@ -598,10 +679,10 @@ public class BugController {
         } catch (IllegalArgumentException e) {
             flash.addFlashAttribute("message", e.getMessage());
         }
-        return "redirect:/bugs/" + id + "#comments";
+        return "redirect:/bugs/" + id + "#c" + commentId;
     }
 
-    /** Removing one you wrote, its replies and every file on any of them. */
+    /** Removing one you wrote, everything under it, and every file on any of them. */
     @PostMapping("/{id}/comments/{commentId}/delete")
     public String deleteComment(@PathVariable Long id,
                                 @PathVariable Long commentId,
@@ -682,17 +763,16 @@ public class BugController {
                 : builder.filename(name, StandardCharsets.UTF_8))
                 .build();
 
-        long length;
-        try {
-            length = resource.contentLength();
-        } catch (IOException e) {
-            length = attachment.getSizeBytes();
-        }
-
+        // Content-Length is deliberately not set here. Spring answers a Range
+        // request on a ResponseEntity<Resource> itself, with 206 and the
+        // region asked for — but only computes the length for it if nothing
+        // has already declared one, and a full length on a partial body is
+        // what makes a browser give up on a video after the first seek.
+        // The converter sets the right one either way, so there is nothing to
+        // replace it with.
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .contentType(type)
-                .contentLength(length)
                 .body(resource);
     }
 

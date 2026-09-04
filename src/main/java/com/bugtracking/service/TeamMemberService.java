@@ -1,6 +1,7 @@
 package com.bugtracking.service;
 
 import com.bugtracking.model.Bug;
+import com.bugtracking.model.MemberRole;
 import com.bugtracking.model.Severity;
 import com.bugtracking.model.TeamMember;
 import com.bugtracking.repository.BugRepository;
@@ -125,6 +126,7 @@ public class TeamMemberService {
     public void remove(Long id) {
         TeamMember member = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("No team member found with id " + id));
+        refuseIfLastAdmin(member, "remove " + member.getName());
         long used = bugsNaming(member.getName());
         if (used > 0) {
             throw new IllegalArgumentException(member.getName() + " is named on " + used
@@ -262,8 +264,87 @@ public class TeamMemberService {
     public TeamMember clearPassword(Long id) {
         TeamMember member = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("No team member found with id " + id));
+        refuseIfLastAdmin(member, "take away " + member.getName() + "'s password");
         member.setPasswordHash(null);
         return repository.save(member);
+    }
+
+    /**
+     * Changes your own password, having proved you know the current one.
+     *
+     * <p>This is the one password path that is not administration, and the only
+     * one that asks for the old password. An admin setting somebody's password
+     * on Settings &gt; Team cannot know it; the person themselves can, and
+     * asking is what stops a walked-away-from session being enough to lock its
+     * owner out of their own account.
+     */
+    public TeamMember changeOwnPassword(Long id, String current, String next) {
+        TeamMember member = repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No team member found with id " + id));
+
+        if (!member.hasPassword()) {
+            // Signed in on a password from application.properties: there is no
+            // stored hash to compare against and nothing here to change.
+            throw new IllegalArgumentException(
+                    "Your account has no stored password yet. Ask an admin to set one on Settings > Team.");
+        }
+        // Deliberately the same wording for a wrong password and a missing one:
+        // this form is reachable by whoever is at the keyboard.
+        if (current == null || !encoder.matches(current, member.getPasswordHash())) {
+            throw new IllegalArgumentException("That is not your current password.");
+        }
+        if (current.equals(next)) {
+            throw new IllegalArgumentException("That is the password you already have.");
+        }
+
+        member.setPasswordHash(hash(next));
+        return repository.save(member);
+    }
+
+    /**
+     * Makes somebody an administrator, or takes it back.
+     *
+     * <p>Two things are refused. A badge on a name that cannot sign in does
+     * nothing but mislead the roster, so a password has to come first; and the
+     * last admin who can sign in cannot be demoted, because only an admin may
+     * promote anybody and the app would have locked its own door.
+     */
+    public TeamMember setRole(Long id, MemberRole role) {
+        TeamMember member = repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No team member found with id " + id));
+        MemberRole wanted = role == null ? MemberRole.MEMBER : role;
+
+        if (wanted == MemberRole.ADMIN && !member.hasPassword()) {
+            throw new IllegalArgumentException(member.getName()
+                    + " cannot sign in yet, so an admin role would do nothing. Set a password first.");
+        }
+        if (wanted != MemberRole.ADMIN) {
+            refuseIfLastAdmin(member, "make " + member.getName() + " a member");
+        }
+
+        member.setRole(wanted);
+        return repository.save(member);
+    }
+
+    /**
+     * Stops the last way in from being closed.
+     *
+     * <p>Four routes lead to the same place — demoting, deactivating, removing
+     * and clearing a password — and any of them applied to the only admin who
+     * can still sign in leaves an installation nobody can administer, which
+     * nothing inside the app can undo. So all four ask here first.
+     */
+    private void refuseIfLastAdmin(TeamMember member, String what) {
+        if (!member.isActiveAdmin()) {
+            return;
+        }
+        boolean anotherOne = repository.findAllByOrderByNameAsc().stream()
+                .anyMatch(other -> !other.getId().equals(member.getId()) && other.isActiveAdmin());
+        if (!anotherOne) {
+            throw new IllegalArgumentException("There would then be no administrator left, "
+                    + "and only an administrator can appoint one. Make somebody else an admin "
+                    + "before you " + what + ".");
+        }
     }
 
     private String hash(String rawPassword) {
@@ -313,19 +394,10 @@ public class TeamMemberService {
     public TeamMember setActive(Long id, boolean active) {
         TeamMember member = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("No team member found with id " + id));
+        if (!active) {
+            refuseIfLastAdmin(member, "deactivate " + member.getName());
+        }
         member.setActive(active);
         return repository.save(member);
-    }
-
-    /** Used by the seeder: adds only the people who are not already here. */
-    public int addMissing(List<String[]> nameAndEmail) {
-        int added = 0;
-        for (String[] person : nameAndEmail) {
-            if (!repository.existsByEmailIgnoreCase(person[1])) {
-                repository.save(new TeamMember(person[0], person[1]));
-                added++;
-            }
-        }
-        return added;
     }
 }

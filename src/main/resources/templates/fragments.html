@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security" lang="en">
 <body>
 
 <!-- The notification bell, in the navbar on every page.
@@ -336,6 +337,70 @@
      Settings. With JavaScript off the drawer never opens and the navbar link
      is what it looks like — a link to Settings > Team.
      ========================================================================== -->
+<!-- ===================== a due date =====================
+     One fragment for all three places a due date is drawn — the board card,
+     the list's Due column and the bug's own rail — so a date can never read as
+     urgent on one screen and calm on the next.
+
+     No icon and no filled pill. On a 230px card, next to "2 attachments" and a
+     comment count, a clock glyph and a coloured capsule were two decorations
+     competing with the title, which is the thing you are scanning the column
+     for. The word and the colour say it on their own.
+
+     "Late" is asked of the board, never of the date: cols.late() is pastDue
+     AND the column still counting as work in hand, so a bug closed last month
+     that was due last week reads plainly. The word is there as well as the
+     colour because red on its own is not something everybody can see.
+
+     card=true  short date, prefixed — the card has no heading to say what it is
+     card=false full date, bare    — the list column and the rail are labelled -->
+<span th:fragment="due(bug, cols, card)" class="due"
+      th:if="${bug.dueDate != null}"
+      th:classappend="${cols.late(bug) ? 'is-late' : (cols.dueToday(bug) ? 'is-today' : '')}"
+      th:title="'Due ' + ${#temporals.format(bug.dueDate, 'EEEE d MMMM yyyy')}">
+
+    <span class="due-state" th:if="${cols.late(bug)}">Late</span>
+    <span class="due-state" th:if="${cols.dueToday(bug)}">Today</span>
+    <span class="due-state" th:if="${card and !cols.late(bug) and !cols.dueToday(bug)}">Due</span>
+
+    <!-- The date itself is redundant on the day it is due: "Today 4 Sep" is
+         two ways of saying one thing. -->
+    <span th:unless="${cols.dueToday(bug)}"
+          th:text="${card} ? ${#temporals.format(bug.dueDate, 'd MMM')}
+                           : ${#temporals.format(bug.dueDate, 'd MMM yyyy')}">12 Sep</span>
+</span>
+
+<!-- A sortable heading on the bug list.
+
+     Two order names, not one: every sort here has an opposite, and which one is
+     on is the difference between "soonest due" and "latest due". The first
+     click sets `first`, a second sets `second`, and a third is the first again
+     — so a heading is a switch you can leave in either position rather than a
+     one-way trip you undo through a menu. `first` is the ascending half of the
+     pair, which is also the one a first click should land on.
+
+     `newest` is the list's own default, so passing it as a value would write
+     ?sort=newest into a URL that means the same without it. Null clears it
+     instead, and BoardQuery drops the parameter.
+
+     `q` and `sort` come from the model rather than the call, the way `bell`
+     reads what it needs: this only ever heads the bug list. -->
+<th th:fragment="sortHead(first, second, label, cls)"
+    th:class="${cls}"
+    th:with="now=${sort} ?: 'newest',
+             on=${now == first or now == second},
+             flipped=${now == second},
+             next=${now == first} ? ${second} : ${first}"
+    th:attr="aria-sort=${on} ? (${flipped} ? 'descending' : 'ascending') : 'none'">
+    <a class="th-sort" th:href="@{${'/bugs' + q.with('sort', next == 'newest' ? null : next)}}"
+       th:classappend="${on} ? (${flipped} ? 'is-on is-flipped' : 'is-on') : ''"
+       th:title="${on} ? 'Sorted by ' + ${label} + ' — click to turn it round'
+                       : 'Sort by ' + ${label}">
+        <span th:text="${label}">Title</span>
+        <svg class="i sort-mark" aria-hidden="true"><use href="#i-chevron"/></svg>
+    </a>
+</th>
+
 <div th:fragment="teamPanel" class="drawer-body drawer-pick"
      th:attr="data-project=${project != null ? project.name : null},
               data-edit=${edit} ? 'yes' : null">
@@ -421,7 +486,11 @@
              find out the person you want is not among them. Outside the form
              above on purpose, and it says what it does rather than being a
              lone + in a header. -->
-        <details class="team-add" id="team-drawer-add">
+        <!-- Admin-only: adding somebody to the company is a roster change, and
+             the roster is administration. Ticking one of the people already on
+             it onto this project is not, so the list above stays open to
+             everybody — that is the thing this drawer is for. -->
+        <details class="team-add" id="team-drawer-add" sec:authorize="hasRole('ADMIN')">
             <summary>
                 <span class="pick-opt pick-add">
                     <span class="pick-add-mark" aria-hidden="true">

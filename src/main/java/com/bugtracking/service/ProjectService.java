@@ -274,16 +274,4 @@ public class ProjectService {
         columns.removeProject(project.getName());
         repository.delete(project);
     }
-
-    /** Used by the seeder: adds only the projects that are not already here. */
-    public int addMissing(List<String> names) {
-        int added = 0;
-        for (String name : names) {
-            if (!repository.existsByNameIgnoreCase(name)) {
-                repository.save(new Project(name));
-                added++;
-            }
-        }
-        return added;
-    }
 }

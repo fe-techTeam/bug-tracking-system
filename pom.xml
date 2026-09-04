@@ -61,6 +61,13 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
+    <!-- SMTP. Inert until spring.mail.host and bugtracking.mail.enabled are
+         set - see .env.example. Nothing is sent without both. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+
     <!-- Login, logout, password hashing, CSRF -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

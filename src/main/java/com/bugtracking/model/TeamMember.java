@@ -3,11 +3,15 @@ package com.bugtracking.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -63,6 +67,33 @@ public class TeamMember {
     @JsonIgnore
     @Column(name = "password_hash", length = 100)
     private String passwordHash;
+
+    /**
+     * What this person may administer. Everybody is a {@link MemberRole#MEMBER}
+     * until somebody makes them otherwise.
+     *
+     * <p>Not null even for the people who never sign in: a role is what the row
+     * <em>would</em> be allowed to do, and leaving it null would mean every
+     * read had to decide what a missing one meant.
+     *
+     * <p>{@code @JdbcTypeCode(VARCHAR)} is the same load-bearing annotation
+     * {@link BoardColumn} carries: without it Hibernate maps the enum to H2's
+     * native ENUM type, writing today's constants into the column type itself,
+     * and adding a third role later becomes a schema change that ddl-auto will
+     * not make.
+     *
+     * <p>The {@code default 'MEMBER'} in the column definition is what lets H2
+     * add this to a table that already has people in it. {@code ddl-auto=update}
+     * would otherwise emit a bare {@code add column ... not null}, which H2
+     * refuses on a non-empty table — it logs the failure and carries on, and the
+     * next read of the roster fails on a column that is not there. Postgres
+     * never sees this: {@code V6__team_member_roles.sql} owns that schema and
+     * says the same thing.
+     */
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'MEMBER'")
+    private MemberRole role = MemberRole.MEMBER;
 
     /** Someone who has left stays in the table so old bugs still read correctly. */
     @Column(nullable = false)
@@ -120,6 +151,41 @@ public class TeamMember {
     /** Whether this person can sign in at all — an account, not just a name. */
     public boolean hasPassword() {
         return passwordHash != null && !passwordHash.isBlank();
+    }
+
+    /**
+     * {@code @JsonIgnore} for the same reason the hash carries one, if less
+     * sharply: {@code /api/team} serialises this entity and {@code /api/**} is
+     * permitAll, so without it an unauthenticated GET answers "which of these
+     * accounts is worth attacking". The roster page reads this server-side and
+     * is behind sign-in; the open API has no business publishing it.
+     */
+    @JsonIgnore
+    public MemberRole getRole() {
+        return role;
+    }
+
+    public void setRole(MemberRole role) {
+        this.role = role == null ? MemberRole.MEMBER : role;
+    }
+
+    /** Whether this person may change the setup, not just work inside it. */
+    @JsonIgnore
+    public boolean isAdmin() {
+        return role == MemberRole.ADMIN;
+    }
+
+    /**
+     * An admin who can actually sign in, which is the only kind that counts
+     * when the app is deciding whether anybody is left who can administer it.
+     * A row marked ADMIN with no password is a name on a bug wearing a badge.
+     *
+     * <p>Hidden from the API most of all: it is "admin, and has a password",
+     * which is the single most useful sentence an attacker could be handed.
+     */
+    @JsonIgnore
+    public boolean isActiveAdmin() {
+        return isAdmin() && active && hasPassword();
     }
 
     public boolean isActive() {

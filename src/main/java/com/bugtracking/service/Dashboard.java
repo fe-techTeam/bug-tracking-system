@@ -24,6 +24,9 @@ import java.util.Map;
  * @param maxStatus   the largest per-status count, so bars can be scaled
  * @param unassigned  bugs with nobody on them at all, whatever column they
  *                    are sitting in — the queue nobody has picked up
+ * @param dueWeek     open bugs owed within seven days
+ * @param dueMonth    open bugs owed within a month
+ * @param dueQuarter  open bugs owed within three months
  * @param bugIds      ids in scope, used to narrow the activity timeline
  */
 public record Dashboard(
@@ -36,6 +39,9 @@ public record Dashboard(
         long open,
         long maxStatus,
         long unassigned,
+        long dueWeek,
+        long dueMonth,
+        long dueQuarter,
         List<Long> bugIds) {
 
     public boolean isEmpty() {
@@ -54,6 +60,17 @@ public record Dashboard(
     /** Bar length as a percentage of the busiest status. Never divides by zero. */
     public double share(long count) {
         return maxStatus == 0 ? 0 : (count * 100.0) / maxStatus;
+    }
+
+    /**
+     * Bar length inside the Due panel, as a percentage of the widest of the
+     * three windows. Scaled to the quarter rather than to the whole project:
+     * the three counts are windows on the same list, and drawing them against
+     * a total most of the board never had a date for would leave all three
+     * bars flat whatever the numbers said.
+     */
+    public double dueShare(long count) {
+        return dueQuarter == 0 ? 0 : (count * 100.0) / dueQuarter;
     }
 
     /** Percentage of the scope, for the stacked distribution bar. */

@@ -13,9 +13,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * In-app notifications for the events the BRD calls out: assigned, fixed,
- * reopened and closed. No email is sent - that needs a mail server, which does
- * not exist yet.
+ * Notifications for the events the BRD calls out: assigned, fixed, reopened and
+ * closed. Each one rings the bell in the app and, when SMTP is configured, is
+ * emailed to the same person - see {@link EmailService}, which mirrors this
+ * class rather than deciding anything of its own.
  *
  * <p>A notification is addressed to one person, and the reads here answer for
  * that person only. Who that is comes from the security context rather than a
@@ -45,8 +46,17 @@ public class NotificationService {
 
     private final NotificationRepository repository;
 
-    public NotificationService(NotificationRepository repository) {
+    /**
+     * The same news, by email. Every send mirrors a row saved here — this class
+     * decides who hears what, including the two guards above, and the mailer
+     * only carries the decision out. It is inert unless SMTP is configured, so
+     * on an instance with no mail server nothing below behaves differently.
+     */
+    private final EmailService email;
+
+    public NotificationService(NotificationRepository repository, EmailService email) {
         this.repository = repository;
+        this.email = email;
     }
 
     /**
@@ -64,6 +74,9 @@ public class NotificationService {
             return;
         }
         repository.save(new Notification(bugId, type, to, message));
+        // Queued, not sent: the mailer waits for this transaction to commit, so
+        // a change that rolls back is never announced. See EmailService.
+        email.bugNotification(bugId, type, to, message);
     }
 
     /**
@@ -86,6 +99,7 @@ public class NotificationService {
             return;
         }
         repository.save(new Notification(link, type, to, message));
+        email.linkNotification(link, type, to, message);
     }
 
     /** The recipient to use, or null when raising this would be noise. */

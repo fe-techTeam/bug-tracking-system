@@ -25,9 +25,12 @@ import java.nio.charset.StandardCharsets;
  * {@code BoardColumnApiController} instead, which is where CSRF is waived and
  * a 204 is more use than a redirect.
  *
- * <p>Where you land afterwards is {@code from}: the board you were dragging on,
- * or the Settings tab you were editing in. It is a switch rather than a return
- * URL, so no request can talk this into redirecting somewhere off-site.
+ * <p>Where you land afterwards is the board you were editing. There used to be
+ * a second, fuller editor behind Settings and a {@code from} switch to say
+ * which of the two you had come from; the columns are edited on the board and
+ * nowhere else now, so there is one destination and no switch. It is built
+ * from the project name rather than taken as a return URL, so no request can
+ * talk this into redirecting somewhere off-site.
  */
 @Controller
 @RequestMapping("/columns")
@@ -42,7 +45,7 @@ public class BoardColumnController {
     /** Kept so a bookmarked or mistyped GET arrives somewhere useful. */
     @GetMapping
     public String list() {
-        return "redirect:/settings?tab=board";
+        return "redirect:/bugs";
     }
 
     @PostMapping
@@ -51,7 +54,6 @@ public class BoardColumnController {
                       @RequestParam(required = false) String colour,
                       @RequestParam(defaultValue = "false") boolean done,
                       @RequestParam(required = false) String notify,
-                      @RequestParam(required = false) String from,
                       RedirectAttributes flash) {
         try {
             BoardColumn added = service.add(project, label, ColumnColour.of(colour),
@@ -60,7 +62,7 @@ public class BoardColumnController {
         } catch (IllegalArgumentException e) {
             flash.addFlashAttribute("message", e.getMessage());
         }
-        return back(from, project);
+        return back(project);
     }
 
     /**
@@ -75,7 +77,6 @@ public class BoardColumnController {
                        @RequestParam(required = false) String colour,
                        @RequestParam(required = false) Boolean done,
                        @RequestParam(required = false) String notify,
-                       @RequestParam(required = false) String from,
                        RedirectAttributes flash) {
         String project = service.findById(id).getProject();
         try {
@@ -87,24 +88,22 @@ public class BoardColumnController {
         } catch (IllegalArgumentException e) {
             flash.addFlashAttribute("message", e.getMessage());
         }
-        return back(from, project);
+        return back(project);
     }
 
     /** One place left or right — the route that needs no JavaScript. */
     @PostMapping("/{id}/move")
     public String move(@PathVariable Long id,
-                       @RequestParam String direction,
-                       @RequestParam(required = false) String from) {
+                       @RequestParam String direction) {
         // Nothing to announce: the board redraws in the new order, which is the
         // whole message.
         BoardColumn column = service.move(id, "left".equals(direction) ? -1 : 1);
-        return back(from, column.getProject());
+        return back(column.getProject());
     }
 
     @PostMapping("/{id}/delete")
     public String remove(@PathVariable Long id,
                          @RequestParam(required = false) Long moveTo,
-                         @RequestParam(required = false) String from,
                          RedirectAttributes flash) {
         String project = service.findById(id).getProject();
         try {
@@ -112,15 +111,12 @@ public class BoardColumnController {
         } catch (IllegalArgumentException e) {
             flash.addFlashAttribute("message", e.getMessage());
         }
-        return back(from, project);
+        return back(project);
     }
 
-    /** The board you were on, or the Settings tab you were editing in. */
-    private static String back(String from, String project) {
+    /** The board you were editing, which is the only place these forms live. */
+    private static String back(String project) {
         String encoded = project == null ? "" : UriUtils.encodeQueryParam(project, StandardCharsets.UTF_8);
-        if ("board".equals(from)) {
-            return "redirect:/bugs?project=" + encoded;
-        }
-        return "redirect:/settings?tab=board&project=" + encoded;
+        return "redirect:/bugs?project=" + encoded;
     }
 }

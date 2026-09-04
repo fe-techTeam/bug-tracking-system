@@ -6,20 +6,27 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import com.bugtracking.service.EmailService;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
 
 /**
- * One line at startup naming the database and the attachment store that are
- * actually live.
+ * One line at startup naming the database, the attachment store and the mail
+ * setup that are actually live.
  *
  * <p>With H2, Supabase and S3 all configurable, "which one am I talking to?"
  * stops being obvious — and a profile that silently failed to activate looks
  * exactly like one that worked until data goes missing. This answers it in the
  * log, from the real connection rather than from the properties that were
  * meant to shape it.
+ *
+ * <p>Mail is here for the same reason and one more: Settings used to carry a
+ * tab that said this and offered a test send, which was a screen to hold one
+ * button. Whether email goes anywhere is decided entirely by {@code .env}, so
+ * the answer belongs beside the other two things {@code .env} decides.
  */
 @Component
 public class ConnectionsStartupLog {
@@ -29,17 +36,21 @@ public class ConnectionsStartupLog {
     private final DataSource dataSource;
     private final AttachmentProperties attachments;
     private final S3Properties s3;
+    private final EmailService email;
 
-    public ConnectionsStartupLog(DataSource dataSource, AttachmentProperties attachments, S3Properties s3) {
+    public ConnectionsStartupLog(DataSource dataSource, AttachmentProperties attachments,
+                                 S3Properties s3, EmailService email) {
         this.dataSource = dataSource;
         this.attachments = attachments;
         this.s3 = s3;
+        this.email = email;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void report() {
         log.info("Database: {}", describeDatabase());
         log.info("Attachments: {}", describeStorage());
+        log.info("Email: {}", email.describe());
     }
 
     private String describeDatabase() {

@@ -21,8 +21,10 @@ mvn clean package
 java -jar target\bugtracking-1.0.0.jar
 ```
 
-The first startup seeds 4 example bugs. Data is stored in `data\bugtracking.mv.db`
-and survives restarts. Delete the `data` folder to start over.
+The first startup gives you an empty tracker: no bugs, no projects, nobody on the team. Everything
+comes from the database and is created in the app. See [Accounts](#signing-in) for how the
+first administrator gets in. Data is stored in `data\bugtracking.mv.db` and survives restarts.
+Delete the `data` folder to start over.
 
 ## What you can do
 
@@ -35,16 +37,23 @@ and survives restarts. Delete the `data` folder to start over.
 | View one bug in full | `/bugs/{id}` |
 | Edit a bug | `/bugs/{id}/edit` |
 | Change status quickly | dropdown on the detail page |
-| Rename, recolour, reorder or add a board column | a column's ⋯ menu on `/bugs`, or `/settings?tab=board` |
+| Set or clear a due date | the *Due* field on `/bugs/new` and `/bugs/{id}/edit` |
+| Rename, reorder, add or remove a board column | a column's ⋯ menu on `/bugs` |
+| Say a column means "finished", or who is told when a bug lands in it | the same ⋯ menu |
+| Fold a column out of the way | the `«` beside its heading on `/bugs` |
 | Delete a bug | detail page |
 | Sign in / out | `/login`, and the ⏻ button in the top bar |
+| Change your own password | *Your account* in the top-right menu, or `/account` |
+| Make somebody an admin, or set their password | `/settings?tab=team` — admins only |
+| Turn on email, and test it | `.env`, then `/settings?tab=team` |
 | Inspect the raw database | `/h2-console` (sign in first; JDBC URL `jdbc:h2:file:./data/bugtracking`, user `sa`, no password) |
 
 A bug has: title, **description — the whole report, in one box**,
 severity (Critical / High / Medium / Low), **environment (QA / UAT / Production)**,
 status (whichever column of its project's board it is sitting in), **project**, module,
-reported by, assigned to, and automatic created/updated timestamps. Each bug also carries
-**comments**, **attachments** and a **history trail**.
+reported by, assigned to, an **optional due date**, and automatic created/updated timestamps. Each bug also carries
+**comments**, **attachments** (screenshots, logs and **screen recordings**, which play in the page)
+and a **history trail**.
 
 ## Against the BRD
 
@@ -58,28 +67,56 @@ Built from the Business Requirement Document, v1.0 (27-Aug-2026). Where the app 
 | **Environment (QA / UAT / Production)** | done |
 | **Lifecycle: Open → In Progress → Ready to test → Testing → Closed, plus On Hold** | done |
 | **FR-005 Assign / reassign a bug** | done |
+| **Due date, optional** | done — shown on the card, in the list, and sortable |
 | FR-006 Update bug status | done |
 | **FR-007 Comments** | done |
 | **FR-008 Attachments, with type and size validation** | done |
 | FR-009 Search and filter — id, title, description, module, project, people, status, severity, environment, assignee | done |
 | **Sorting** — newest, oldest, recently updated, severity, status, title | done |
 | **FR-010 Bug history** | done |
-| **FR-011 Notifications — assigned, ready for test, on hold, closed, @mentions** | done (in-app; no email) |
+| **FR-011 Notifications — assigned, ready for test, on hold, closed, @mentions** | done (in-app, and by email when SMTP is configured) |
 | FR-002 Dashboard — totals per status, per severity, urgent count | done |
-| **FR-001 Login / logout** | done (single account) |
-| FR-001 User accounts, QA/Developer/Admin roles, role-based permissions | not built — see below |
+| **FR-001 Login / logout** | done (per-person accounts) |
+| **FR-001 User accounts and roles** | done — Member and Admin; see below |
 
-### What is deliberately not built: roles
+### Signing in, and who administers
 
-Login and logout exist (see **Signing in** below), but there is **one shared account**, not user
-accounts with roles. So the business rules that depend on a role are not enforced — "a developer
-should not directly close a bug", "only authorized QA users can raise bugs", and role-scoped views.
-The lifecycle they govern is fully modelled; nothing yet restricts *who* may move a bug along it.
+There is **one administrator account**, `admin@firsteconomy.com`, and everybody else is a plain
+member. It is deliberately not a person: an admin account tied to somebody's name leaves when they
+do, and administration is the one thing nobody can grant themselves back.
 
-Getting there means per-person credentials on the `team_members` table (a `password_hash` and a
-`role` column), which is a natural next step now that sign-in is in place.
+It is created by `BootstrapAdmin` on a database where no admin can sign in, from
+`BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` in `.env` — never from a committed file. The
+moment one active admin has a password those values are ignored, so a password changed on
+Settings &gt; Team is never undone by a restart, and clearing them once you are in changes nothing.
 
-Also still open from the BRD: user management (§6), and the future-enhancement list in §19.
+**The last admin cannot be taken away.** Demoting, deactivating, removing or clearing the password
+of the only admin who can still sign in is refused by all four routes, because only an admin can
+appoint one and nothing inside the app could undo it.
+
+### The shape of the roles
+
+Two roles, `MEMBER` and `ADMIN`, on the `team_members` row. The line between them is drawn around
+the **setup**, not around the work:
+
+- **Everybody signed in** raises bugs, moves them, comments, is assigned, files documents, renames a
+  column on the board and ticks somebody onto a project. A tracker that asks permission before
+  letting you file a bug is one people route around. Their own password is theirs, on `/account`.
+- **An admin also** manages projects, the roster, anybody's password, and who else is an admin.
+
+**Settings is admin-only, page and all** — a member gets a 403, not a page of controls with the
+controls taken out. `/account` is the whole of what is theirs. The navbar's *Team* entry opens the
+project team drawer, which is daily work and stays for everybody; because its no-script fallback is
+Settings, it is marked `.nav-link-js` for members and appears only once scripting has confirmed it
+will work. A link that 403s is worse than no link.
+
+So the BRD's per-role *lifecycle* rules — "a developer should not directly close a bug", "only
+authorized QA users can raise bugs" — are still deliberately not enforced. The lifecycle is fully
+modelled and every column is a row somebody can rename; what is not built is a matrix of who may
+move a bug where. A table of checkboxes nobody can hold in their head ends up with everything
+ticked, and this is a tool for one company.
+
+Still open from the BRD: the rest of user management (§6), and the future-enhancement list in §19.
 
 ## Signing in
 
@@ -91,30 +128,73 @@ password can sign in; a member without one is only a name that appears on bugs, 
 roster. There is deliberately no second table for accounts — it would have split one person across
 two rows and left every screen asking which half to draw.
 
-Give somebody a password under **Settings → Team**: each card folds open to a field that sets one,
-and to **Remove sign-in**, which takes the account away and leaves the person on the roster. The
-add-member form takes an optional password too. Minimum eight characters. What is stored is the
-hash and only the hash — there is no way to read a password back, only to replace it.
+**Settings → Team is two screens, not one page.** The first is the roster, read as a list — a row
+per person: their name and address on one line, their role, and whether they are still on the team.
+A badge marks the exceptions (*Admin*, *Hidden*) and plain text the rule, because the only reason to
+look down those columns is to find the rows that differ. Every cell holds a single line, so the rows
+share a baseline all the way down. Each row carries one control, *Manage*, and the whole row is that
+link.
 
-The accounts in `application.properties` still exist, as the way a first person gets in on an empty
-database:
+Nothing on it links to the board. Somebody's bugs are the board's question and the board answers it
+well; a filter link out of an administration page is a trapdoor out of the thing you came to do.
+
+**The second is one person's account, and it replaces the roster rather than opening above it.** It
+is a list of actions and nothing else: a label, the control that changes it, and no paragraph in
+between — password, sign-in, role, on the team, remove. One column for the labels and one for the
+controls, so every button on the screen starts at the same x. Administering an account is one thing
+at a time; what was here before drew an editor above the table, an add form permanently open below
+it and the mail settings under that, and every click landed you back at the top of a page with four
+things on it.
+
+The explanations that used to sit under each button are here in the README instead, where they can
+be read once rather than every time.
+
+It is a link and a query param (`?tab=team&member=<id>`) rather than a popover in the row: it is
+linkable, it survives scripting being off, and `.table-wrap` scrolls horizontally and clips anything
+that opens out of a cell. Passwords are a minimum of eight characters. What is stored is the hash
+and only the hash — there is no way to read a password back, only to replace it. Making somebody an
+admin needs a sign-in first, so that button is disabled until they have a password rather than
+letting you find the refusal out by pressing it.
+
+**Adding somebody is a popover off the roster's head** — name, address and an optional password,
+which is three fields rather than a panel that sits open under the table for ever. A `<details>`,
+like every other popover here, so it works with JavaScript off.
+
+**Deactivate** keeps every bug somebody raised or was assigned exactly as it is; they simply stop
+being offered for new ones and can no longer sign in. **Remove** is offered only for a name with no
+history behind it, such as a typo — for anybody else the row is simply not there, because a control
+that can never be pressed is a control to leave out.
+
+**Your own password is yours.** *Your account* in the top-right menu (`/account`) changes it, and is
+the one password path that asks for the current one first — an admin setting somebody's password
+cannot know the old one, the owner can, and asking is what stops a walked-away-from session being
+enough to lock its owner out. Needing an admin to rotate your own password is how passwords stop
+being rotated.
+
+**The last admin cannot be taken away.** Demoting, hiding, removing or clearing the password of the
+only admin who can still sign in is refused, because only an admin can appoint one and nothing
+inside the app could undo it.
+
+**Accounts are rows in `team_members` and nowhere else.** `SecurityConfig` reads that table and has
+no other source — there is no configured account, no in-memory user and no fallback. An address with
+no row, or a row with no `password_hash`, cannot sign in. People are added and given passwords on
+**Settings → Team**, and roles are set there too.
+
+The one thing that cannot work that way is the *first* admin: only an admin may add a member, so an
+empty database is a locked door. Two values in `.env` are the key, and they are unset out of the box:
 
 ```properties
-bugtracking.security.accounts[0].email=nishana@firsteconomy.com
-bugtracking.security.accounts[0].password=Pass@2026
+BOOTSTRAP_ADMIN_EMAIL=you@example.com
+BOOTSTRAP_ADMIN_PASSWORD=<pick one>
 ```
 
-`AccountSeeder` copies each of those onto the matching team member on startup, filling a blank and
-never overwriting a hash that is already there — so a password changed in Settings sticks, which a
-property never could. Once everyone has one, those blocks can be deleted.
+On the next start `BootstrapAdmin` makes that address an administrator with that password — hashed,
+written into the table. It never overwrites a hash that is already there, and it stops looking
+entirely the moment one active admin has a password, so a password changed in Settings is never
+undone by a restart. Clear both from `.env` once you are in; nothing reads them again.
 
-Clicking **Welcome back** on the sign-in page fills the form with the next account in that list and
-names whoever it belongs to, so switching between people takes a click rather than a retype. That
-writes the passwords into the page's HTML, so it is off with one line:
-
-```properties
-bugtracking.security.quick-fill=false
-```
+`.env` is gitignored, which is the point: no password is ever written into `application.properties`,
+and the sign-in page has nothing on it to fill in.
 
 You sign in with the **email**, but the name shown in the top bar and recorded against your work is
 the **display name from the team table** ("Nishana R"), looked up by that email. Comments, status
@@ -139,7 +219,7 @@ Sign out with the ⏻ button in the top bar.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│ ⬤ Godrej ▾ │ Board Documents Team │   🗑  🔔  ☾  ⬤ Nishana ▾ │
+│ ⬤ Godrej ▾ │ Home Documents Team  │   🗑  🔔  ☾  ⬤ Nishana ▾ │
 │ └── the project is the switcher, in the spot a logo would be   │
 ├────────────────────────────────────────────────────────────────┤
 │ 🔍 search   [⚌ Filters ②]         [Board|List|Stats]  + New    │
@@ -155,6 +235,15 @@ Sign out with the ⏻ button in the top bar.
 
 **One navbar, one topbar, then the work.** There is no sidebar. The navbar carries the project, the
 three sections and you; the topbar carries what narrows the board and where to go.
+
+**Home remembers which view you were in.** The first navbar entry is *Home*, not *Board* — the board
+is one of three ways to read the same bugs, and naming the way in after one of them made the other
+two feel like somewhere you had wandered off to. It is a plain link to `/bugs`, and a URL with no
+`?view=` on it means *the way you were last reading these*: pick the list once and Home comes back
+to the list, as does switching project and searching, on this visit and the next. The session holds
+it, so it survives a walk off to Settings. Anything that means the board specifically says so — the
+Stats numbers link to `?view=board`, because "2 urgent" is about those two bugs and not about how you
+like to read them.
 
 **The project name is the switcher, and it is the first thing in the navbar** — the slot the app's
 own name used to hold. One app does not need to say what it is on every screen; which project you
@@ -196,7 +285,9 @@ all day for something you do once a project.
 **A card is a title and four facts:** whether it carries files, whether anybody has said anything,
 and its severity and environment as words in their own colour. The id, the exact date and the
 4-bar meter are a click away on the bug itself — on a card they were noise between the reader and
-the title. Up to three faces and a **+3**. **⋯ in the corner moves it** to another column without
+the title. The two counts are drawn the same way — a paperclip and a number, a speech bubble and a
+number — because they are the same kind of thing; "3 attachments" in prose beside an icon-and-number
+comment count made one line of a card argue with itself. Up to three faces and a **+3**. **⋯ in the corner moves it** to another column without
 dragging, which is the route that works on a phone and from a keyboard; the list opens inside the
 card, because the column scrolls and a popover out of it would be clipped.
 
@@ -212,6 +303,31 @@ the ordinary delete form rather than fetching — that route answers with the fl
 **Undo**, which is the whole reason dropping a bug on a bin is a safe thing to be able to do by
 accident.
 
+**The list is a table you can work in, not just read.** *Board | List | Stats* is the same bugs three
+ways, and the list is the one that reads down a column:
+
+- **The headings sort, and a second click turns the order round.** The orders were always there —
+  the service has answered `?sort=` for as long as the list has existed — but the only way to reach
+  them was a column of the Filters panel called *Order*, which is not where anybody looks for it.
+  Title, Status, Due, Reported and Severity are links; *Reported* starts marked, because newest
+  first is the order the list is in until you say otherwise. Assigned and Raised by stay plain:
+  neither has an order behind it, and a heading that looks clickable and is not is worse than one
+  that does not. The Order menu is still there and still works, and ticks the order a heading set.
+- **Status is a picker, not a label.** Moving a bug is the commonest thing anybody does to one, and
+  a list that could only state the status was a list you left — out to the bug and back — to change
+  it. It offers the columns of *that row's own project*, so a cross-project list
+  (`?assignee=me`) offers each row the right board, and the change lands back on the same list with
+  its filters and its order still on. It saves on change; with JavaScript off a *Move* button
+  beside it submits the same form.
+- **The whole row opens the bug.** The title is still a real link, so ⌘-click, middle-click and
+  JavaScript-off are unchanged — this only widens the target, and a click that lands on a control
+  is left to the control.
+- **Severity reads as words, on the right**, next to the 4-bar meter and above the colour rail down
+  the row's left edge. Colour on its own is not a legend: nothing on the row said which end of the
+  scale red was.
+- **Copy as Markdown is a row action**, in its own column at the end, rather than trailing the title
+  where it read as part of the sentence it was sitting in.
+
 **A project with no bugs still shows its board.** The columns are the first thing a new project
 needs to see — the process it is going to work through, and the menus that rename it — so an
 illustration in their place hid the wrong thing. With nothing to scroll they share the full width
@@ -220,13 +336,16 @@ empty column says *Empty* and stops there; it used to explain how a bug gets int
 per column, six times over.
 
 **Board, list or stats.** The board is one column per status and you drag a card between them; the
-list is the same bugs as a table; **Stats** is the same project answered as numbers — where it
-stands, the split by column, severity and environment, who is on the team and what each of them is
-carrying, and what has happened lately. Every figure there is a link to the bugs behind it, and
-those links land you back on the board. The filters are hidden on Stats on purpose: those are the
-project's totals, and a half-applied filter would make them quietly answer a different question
-than the one they name. Either way a card is clickable anywhere on it, not just its title. The
-columns themselves belong to the project and are yours to change — see
+list is the same bugs as a table; **Stats** is the same project answered as numbers, and only the
+two that are worth a page: how many bugs are sitting in each column, and how many are due inside
+the next week, month and three months. The due windows count open bugs only, they nest — anything
+due this week is also inside the month and the quarter — and anything already late is counted in
+all three, because work that has slipped is still work that is owed. Each column links to the bugs
+behind it and lands you back on the board; the due rows do not, because the board cannot be
+filtered to a date. The filters are hidden on Stats on purpose: those are the project's totals, and
+a half-applied filter would make them quietly answer a different question than the one they name.
+Either way a card is clickable anywhere on it, not just its title. The columns themselves belong to
+the project and are yours to change — see
 [The board's columns](#the-boards-columns).
 
 **What a card tells you without being opened:** its id, the severity meter (1–4 bars), a ⊘ if it is
@@ -248,16 +367,18 @@ the bars apart. Contrast against the surface passes in both themes.
 ## Projects
 
 **Project is required** on every bug and is picked from a `projects` table — the same pattern as the
-team list. Four are seeded (Mahindra Mutual Fund, Godrej, Color Shine, Orpat) **into an empty table
-only**: once there is a single project row, `ProjectSeeder` does nothing. It used to fill in
-whichever of the four was missing on every boot, which meant a project removed in Settings came
-back at the next restart — the delete worked and the seeder undid it. A list of examples is a
-starting point, not rows the app insists on, so a name added to that list now only ever reaches a
-database with no projects; add it in Settings instead, which is the same table.
+team list. None are seeded — the table starts empty and every project in it was added in the app,
+under **Settings → Projects**. There is no list of example names anywhere in the source, so nothing
+can reappear after you delete it.
 
 Manage them under **Settings → Projects**: add, hide (stops being offered, existing bugs
 untouched), or remove (only for a project with no bugs). Raising a bug from inside a project
 pre-selects it. `/projects` still redirects there, so old links keep working.
+
+**Adding one is a popover off the table's head**, the same shape as *Add member* on the Team tab —
+you add a project every few months and read the list every time you come here, so the form is not
+sitting open above it by default. Inside it, who works on the project is a **searchable** list of
+the roster: a company is twenty rows, and reading twenty is slower than typing three letters.
 
 **The switcher lists projects, and nothing but projects.** It used to add back any project name a
 bug happened to carry, so that a bug filed against something never created here still had a board
@@ -314,9 +435,34 @@ the history — which *is* collapsed, being reference rather than the job.
 
 **Edit and Delete** sit together in the top right, where actions on the whole bug belong.
 
-Images attach and then **show**: a thumbnail on the bug, opening in a lightbox over the page rather
+Images attach and then **show**: a thumbnail on the bug, opening in a viewer over the page rather
 than swallowing the tab. Any attachment can be removed, and that is recorded in the history like
 every other change.
+
+### The attachment viewer
+
+A screenshot is usually the whole bug report, and the thing you need out of it is eight pixels of a
+stack trace. So the thumbnail opens a viewer, not a bigger picture:
+
+- **The rest of the evidence is beside it.** ← and → step through the set, a filmstrip along the
+  bottom jumps straight to one, and the bar counts where you are. Comparing the screenshot before
+  the fix with the one after is an arrow key rather than two round trips.
+- **The set is what it says it is.** Everything on the report is one gallery; a comment's own files
+  are a gallery of their own, so opening a screenshot somebody replied with does not walk you off
+  into the report's.
+- **A picture zooms.** The **+** / **−** buttons, the scroll wheel, `+` `-` and `0`, or a
+  double-click — into whatever is under the pointer, not into the middle and away from the thing you
+  were looking at. Past the edge of the window it drags to pan, and the percentage in the bar is a
+  button that fits it back.
+- **A clip plays** with the browser's own controls, which are better at being a video player than
+  anything here would be, plus **space** for play/pause. It stops the moment the overlay closes,
+  rather than talking over a page you have shut. Screen recordings still play inline on the bug as
+  well; the ⤢ in the corner of one is what opens it big.
+- **Escape** closes, and so does a click beside the picture — but never a click *on* it: on a phone
+  the first tap to look closer used to throw the thing away.
+
+None of it is load-bearing. Every thumbnail is still a real link to the file, so with JavaScript off
+a click is the attachment in a new tab, exactly as it was before there was a viewer.
 
 ## Supporting docs
 
@@ -450,10 +596,20 @@ shipped before: same six keys, same six labels, same six colours. One edit anywh
 it is somebody's, and it is left alone entirely. Only the label, the colour and the order are
 touched; `status_key` never is, so no bug moves.
 
-**Where.** A column's own **⋯ menu** on the board renames it, repaints it, moves it left or right
-and removes it, and the dashed tile at the end of the board adds one. `/settings?tab=board` is the
-same set of columns with the two settings that are not quick decisions — see below. Dragging a
-column's head reorders the board; the arrows in its menu do the same thing without scripting.
+**Where.** A column's own **⋯ menu** on the board is the whole editor: it renames the column, says
+whether its bugs count as finished, picks who is told when a bug lands in it, moves it left or
+right, and removes it. The dashed tile at the end of the board adds one. Dragging a column's head
+reorders the board; the arrows in its menu do the same thing without scripting.
+
+Settings has **no Board tab**. There was one, holding the same controls in a place nobody is
+standing when they notice a column is wrong — you are on the board when that happens, so the board
+is where they live.
+
+**Fold a column away.** The `«` beside a column's heading collapses it to a 46px strip with its name
+running up the side and its count still on it; the same button opens it again. Seven columns is a
+board you scroll, four columns and three strips is a board you read. Nothing about a bug changes and
+nothing is posted — it is a view, so it is remembered in that browser and **per project**, and with
+JavaScript off the button is not rendered at all and every column is open.
 
 **Renaming is free.** A bug stores the column's *key*, which is fixed when the column is created and
 never rewritten, so a rename changes the wording and nothing else — no bug moves, and the history
@@ -471,10 +627,19 @@ restored later does not come back into a column that no longer exists. The last 
 cannot be removed; there would be nowhere for a bug to be. Moving a bug to a project whose board has
 no such column lands it in that board's first column.
 
-**Colours are chosen, not typed.** A column picks one of eight tokens the stylesheet owns
+**Colours are chosen, not typed.** A column picks one of ten tokens the stylesheet owns
 (`ColumnColour`), because the board only reads as a journey — cool while it waits, warm when it
 needs a person, green when it is done — while every column is on the same scale. A free hex field is
-how that would die.
+how that would die. A column keeps the token it was created with; there is no picker, because the
+colour is not drawn on the board itself — it paints the status badge in the list view and the bars
+on Stats.
+
+**Where the colour is seen:** a 2px rule under the column's heading on the board, mixed down so a
+row of them reads as a track through the process rather than as a row of highlighters. That is the
+one piece of colour on the board's chrome, and it is why the picker matters — two columns painted
+the same are two columns that look the same, which is the one thing the rule is there to stop. The
+cards below carry *severity* as colour; the heading carries status. Two colour systems on one
+surface would cancel each other out, so the column has no tint of its own.
 
 > **How this used to work.** Statuses were a Java enum, so the six that shipped were the six you
 > got. `BoardColumnSeed` turns them into rows on first startup — same names, same order, same
@@ -492,6 +657,53 @@ how that would die.
 > `GET /api/bugs/options` returns statuses as a map of project to that project's columns, each given
 > as the key a bug stores alongside the wording a person reads — a script setting a status has to
 > know which board it is writing to.
+
+## Due dates
+
+**Optional, and staying optional.** Most bugs never get one. A *required* due date is a field
+people fill in with a guess to get past the form, and a board where every card carries a made-up
+date is a board where no date means anything — so it is blank unless somebody meant it.
+
+A **date, not a timestamp**: "by Friday" is what anybody actually means, and an hour on it would be
+a precision nobody sets and everybody has to read past.
+
+**Where it shows.** Quietly on the board card, in the list's *Due* column, and on the bug's own
+rail — all three from **one fragment** (`fragments :: due`), so a date can never read as urgent on
+one screen and calm on the next. No icon and no filled pill: on a 230px card, beside a paperclip
+count and a comment count, a clock glyph and a coloured capsule were two more decorations competing
+with the title. A word and a colour say it on their own — *Due 12 Sep*, *Today*, *Late 1 Sep* — and
+the word is there as well as the colour because red alone is not something everybody can see.
+
+It earns colour in exactly two states, because those are the only two anybody can act on:
+
+| | |
+|---|---|
+| **Due today** | warm — the same orange the severity scale uses for *needs a person*, because today is the day it needs one |
+| **Past due, and still open work** | a small red pill. Small on purpose: a full badge would out-shout the title, which is the thing you are scanning a column for |
+
+**"Late" is a question for the board, not for the date.** A bug closed last month that was due last
+week is *done* — painting it red would say somebody should act when nobody should. So every screen
+asks `BoardColumns.late(bug)`, which is `pastDue` **and** the column it is sitting in still counting
+as work in hand. `Bug.isPastDue()` answers only about the date and is deliberately named so, and
+the same rule reaches the Markdown copy and the notification email, which append *(overdue)* under
+exactly the same condition.
+
+**Sort by it** from the list's *Due* heading, or *Due soonest* in the Order menu. Bugs with no due
+date sort **last**, not first: a bug nobody put a date on is not the most urgent thing on the board,
+which is what nulls-first would claim. Clicking the heading again turns the order round — latest
+first — and the undated ones are *still* last, because no date is not a date at either end of the
+range.
+
+**Set it without opening the edit form.** The bug's rail has a date box, **Save** and — only when
+there is one to remove — **Clear**, posting to `/bugs/{id}/due`. Going through the edit form to
+change one date means re-submitting the title, the report and every dropdown, any of which could
+carry a stale value from the moment the form was opened; that is the same reason status, assignees
+and the blocker each have a path of their own. It is a plain form, so it works with scripting off.
+The field is still on the raise and edit forms too, which is where a date gets set as the bug is
+written up.
+
+Changing one is recorded in the history like everything else, and reads as a sentence — *set it due
+30 Sep 2026*, *moved the due date from … to …*, *cleared the due date, which was …*.
 
 ## Deleting, and undoing it
 
@@ -535,9 +747,27 @@ it, rather than leaving a bell that opens a page which is not there.
 ### Replies, and comments you can change
 
 `bug_comments` grew `parent_id` (the comment being answered, null for one that opens a thread) and
-`edited_at` (null until somebody changes the words). One level of nesting only — a reply to a reply
-is filed against the same parent. `V5__comment_threads.sql` adds both and an index on `parent_id`,
-which every render of a bug page groups by.
+`edited_at` (null until somebody changes the words). `parent_id` is the comment actually answered,
+at any depth — a reply can be replied to, and so can that. It used to be flattened to the top of
+its thread, which made the third message in an exchange look like another answer to the first.
+`V5__comment_threads.sql` adds both and an index on `parent_id`, which every render of a bug page
+groups by. No migration was needed to un-flatten it: the column already held exactly this.
+
+### Fenced code, in a report or a comment
+
+Anything between ``` ``` ``` fences is drawn as a real block: monospaced, **never wrapped**,
+scrolling inside itself, with **Copy** and — when the contents parse as JSON — **Format**, which
+indents it in place and toggles back. A developer pasting a response body onto a bug is pasting
+evidence, and evidence rendered as a paragraph, wrapped and with its indentation collapsed, is
+evidence nobody can check.
+
+Nothing is stored differently. The fences are in the text the way the author typed them, the server
+keeps them verbatim, the Markdown copy already left them alone, and with JavaScript off they are
+visible as ``` ``` ``` — the same information. It is a rendering, not a format.
+
+The **Code** button beside the paperclip (and under the report box on the raise form) wraps the
+selection in a fence, pretty-printing it on the way if it is JSON. Typing the fences by hand works
+exactly as it always did, which is what happens with scripting off.
 
 ### Files on a comment
 
@@ -548,6 +778,24 @@ the same route serving it and the same lightbox opening it; all that differs is 
 `bug_id` stays NOT NULL either way, so deleting a bug still takes every file with it without
 walking the thread first. `V4__comment_attachments.sql` adds the column and an index on it, because
 every render of a bug page asks this table twice.
+
+### Screen recordings
+
+A clip is the same evidence a screenshot is, so it is **played where a screenshot is shown** —
+inline on the report and under the comment it was said in, not listed as a file to go and fetch.
+`mp4`, `webm`, `ogv` and `mov` get a player; `mkv` and `avi` are accepted and handed over as
+downloads, because a browser will not play them and a black box with a broken play button is worse
+than a link.
+
+Video has a **ceiling of its own** — 64 MB against 8 MB for everything else
+(`bugtracking.attachments.max-video-size-bytes`). Eight megabytes is about twenty seconds of a
+screen recording, while a *screenshot* arriving at 60 MB is somebody uploading the wrong thing, and
+the narrower limit is what tells them so.
+
+The serving route answers **Range requests** — Spring does that itself for a
+`ResponseEntity<Resource>`, but only if nothing has already declared a `Content-Length`, so it sets
+none. Without that a browser gets the whole file back for every seek, and Safari will not start the
+video at all.
 
 ### One note on `[hidden]`
 
@@ -570,23 +818,25 @@ permitted for column", and `ddl-auto=update` will not widen a type that already 
 ## Team
 
 **Reported By** and the assignee list are filled from a `team_members` table rather than typed by
-hand — so names are spelled one way and filtering by assignee actually works. The 18
-members are seeded **into an empty table only**, for the same reason as the projects: filling in
-whoever was missing on every boot meant somebody removed from the team reappeared at the next
-restart. A name added to `TeamMemberSeeder` therefore only reaches a database with nobody in it.
+hand — so names are spelled one way and filtering by assignee actually works. Nobody is seeded: the
+table starts empty and every person in it was added in the app, by an admin. It is also the accounts
+table — see [Accounts](#signing-in) — so a row with a password can sign in and a row without
+one is only a name that appears on bugs.
 
 Manage them under **Settings → Team** (`/team` redirects there), or in the **team drawer** on the
 board, which carries the same forms with a way back to the board you opened it from:
 
 | Action | What it does |
 |---|---|
-| Add | Name + email, and optionally a password. A repeat email renames that person rather than making a second one. |
-| Set a password | The card folds open to a field for one — at least 8 characters. That is what turns a name into an account. |
+| Add | Name + email, and optionally a password — a popover off the roster's head. A repeat email renames that person rather than making a second one. |
+| Set a password | A field on their own screen — at least 8 characters. That is what turns a name into an account. |
 | Remove sign-in | Takes the account away; the person stays on the roster and on every bug they are named on. |
-| Hide | Stops offering them in the dropdowns, and stops them signing in. Every bug they raised or were assigned is untouched. |
+| Make an admin | Only once they can sign in: a badge on somebody with no password would do nothing but mislead the roster, so the button is disabled and says why. |
+| Deactivate | Stops offering them in the dropdowns, and stops them signing in. Every bug they raised or were assigned is untouched. |
 | Remove | Only offered for someone named on **no** bug — for a typo or a mistaken entry. Anyone with history must be hidden instead, so their bugs keep making sense. |
 
-The "On bugs" column counts the bugs naming each person and links to them.
+Everything but *Add* lives on that one person's screen, reached from their row — one action per
+row, and no row for an action that is not available.
 
 Bugs store the person's **name** as text, not a foreign key. That keeps bugs raised before this
 table existed readable, and means renaming or hiding somebody never rewrites history. If a bug
@@ -638,12 +888,36 @@ and docs is one quiet line that opens, because most bugs never get one and a ful
 buttons above the comments said otherwise. History is still there, as a shut fold at the foot of
 the rail.
 
-**Comments are a thread.** Oldest first, and every comment can be replied to — one level of
-nesting and no more, because a reply to a reply is filed against the same parent, which keeps an
-exchange a run under the thing it is about rather than a staircase off the right-hand edge. Your
-own comments carry **Edit** and **Delete**; the server checks that you wrote it on the way in,
-because hiding a button is a courtesy rather than a rule. Deleting one takes its replies and every
-file on any of them, bytes on disk included.
+**Comments are a thread, and so are replies.** Oldest first, and every comment can be replied to —
+including a reply, and a reply to that. `parent_id` holds whatever was actually answered, at any
+depth.
+
+**The drawing is flat: one comment, and everything said under it as one run, indented once.** A
+tree drawn as a tree is a staircase off the right-hand edge of the column, and an indent that has
+to stop somewhere leaves the page explaining two things at once — how deep this is, and how deep it
+is allowed to look. So the depth lives in the data and the run reads in the order it was said.
+
+**Reply opens the box already tagging everybody in that exchange**, with the caret after them.
+Answering the comment that opened a run tags its author; answering somebody who was themselves
+answering tags **both** — `@Ajay @Nishana R ` — so replying into a conversation keeps the people in
+it looped in rather than quietly narrowing it to two. The chain is deduplicated, so two people
+going back and forth stay two names however long they go on, and you are never in your own list.
+
+Who answered whom is carried by those mentions, in the words, where the answer is. It was a small ↳
+arrow beside the name, which is one more mark to learn to read and told nobody anything; a mention
+is one every reader already knows, and it *notifies the people* like any other. Written by the
+server, so they are there with scripting off — `app.js` only moves the caret past them.
+
+Posting lands you on **the comment you just wrote** (`#c{id}`), which briefly lights up. The count
+beside the heading is everything said, not just what opened a thread.
+
+Your own comments carry **Edit** and **Delete**; the server checks that you wrote it on the way in,
+because hiding a button is a courtesy rather than a rule. Deleting one takes **everything under
+it**, however deep, and every file on any of them, bytes on disk included — a grandchild left
+behind would point at a parent that is gone, which is a comment no page can ever draw again.
+
+**The @ menu works in every box that takes a comment**, the reply and edit boxes included. It used
+to be bound to the one at the top of the section, which is the box you never reply from.
 
 **Thumbnails show the whole picture.** Every preview — on the report, in a comment — is
 `object-fit: contain` on its own ground at a 4:3 tile. `cover` crops a full-page screenshot to a
@@ -697,7 +971,7 @@ JavaScript off follows; with scripting on, a page you reached from this site goe
 
 ### Chrome
 
-There is **one navbar and no sidebar**. It carries the project switcher, then Board, Documents and
+There is **one navbar and no sidebar**. It carries the project switcher, then Home, Documents and
 Team, then the trash, the notification bell, the theme button and who you are signed in as. Your
 name holds the account and nothing else — **Settings** and **Sign out**. It used to repeat the
 section links and carry *Assigned to me* and *Raised by me* as well; the sections never leave the
@@ -810,23 +1084,26 @@ bugtracking\
                  Comment.java, BugHistory.java,
                  Attachment.java, Notification.java              the things hanging off a bug
                  SupportingDoc.java, DocType.java                pages and sheets on a bug
-                 TeamMember.java                                 the people dropdowns
+                 TeamMember.java, MemberRole.java                 the people dropdowns, and who may administer
     service\     CommentService, BugHistoryService,
                  AttachmentService, NotificationService,
                  TeamMemberService, SupportingDocService
+                 EmailService.java        the same notifications, by SMTP
     controller\  SupportingDocController.java  the doc editor and its saves
-                 SettingsController.java  /settings - projects + team on one page
+                 SettingsController.java  /settings - projects, team, board and email, a tab each
                  TeamController.java      one person's page; the roster redirects
+                 AccountController.java   /account - your own password, and only yours
                  ProjectController.java   project actions; the list redirects
                  TeamApiController.java   /api/team
-    config\      SampleDataLoader.java   seeds example bugs
-                 ProjectSeeder.java      the projects a brand new database starts with
-                 AttachmentProperties.java  upload dir, size and type rules
+    config\      AttachmentProperties.java  upload dir, size and type rules
                  ProjectColumnMigration.java  carries client values into project
                  FieldDefaultsBackfill.java  same for environment
                  AssigneeMigration.java      one assignee -> the assignees list
-                 TeamMemberSeeder.java   the team a brand new database starts with
                  SchemaUpgrade.java      widens legacy H2 ENUM columns to VARCHAR
+                 BootstrapAdmin.java     the first admin, from .env, only when nobody can sign in
+                 AccountPrincipal.java   who is signed in: name, id, email, role
+                 EmailProperties.java    from, base URL, subject prefix, the switch
+                 MailConfig.java         the small pool email is sent on
                  S3Properties.java       bucket, region, endpoint, keys
                  S3Config.java           builds the S3 client, only when enabled
                  SupabaseConnectionCheck.java  names any missing Supabase setting
@@ -837,10 +1114,12 @@ bugtracking\
     application-supabase.properties  Postgres settings for the "supabase" profile
     templates\   layout.html             navbar and icon sprite
                  fragments.html          the notification bell popover
-                 login.html, settings.html, notifications.html, team-member.html
+                 login.html, settings.html, notifications.html, account.html
                  bugs\list.html, bugs\form.html, bugs\detail.html, bugs\doc.html
+                 email\notification.html the one message this app sends
     static\css\  style.css               design tokens + components
-    static\js\   app.js                  theme, menus, mentions, relative times
+    static\js\   app.js                  theme, menus, mentions, relative times,
+                                         folding a column, rendering ``` blocks
                  doc-editor.js           the doc editor: Markdown preview, the sheet, autosave
 ```
 
@@ -854,13 +1133,15 @@ WebDriver tests. The ids survive redesigns and feature work — they are part of
 
 - **Auth:** `login-form`, `email`, `password`, `login-button`, `login-error`, `login-notice`, `logout-button`
 - **Nav:** `raise-bug-link`, `notifications-link`, `view-all-notifications`, `theme-toggle`,
-  `current-user`, `user-menu`, `board-link`, `docs-link`, `settings-link` (labelled *Team*; it
-  opens the team drawer), `project-switcher`, `switcher-btn`, `switcher-menu`, `switcher-filter`,
+  `current-user`, `user-menu`, `board-link` (labelled *Home*; the id is unchanged), `docs-link`,
+  `settings-link` (labelled *Team*; it opens the team drawer), `project-switcher`, `switcher-btn`, `switcher-menu`, `switcher-filter`,
   `board-title`, `flash-message`
 - **List:** `bug-table`, `filter-form`, `filter-keyword`, `filter-all` (the one menu that now holds
   assignee, reporter, severity, environment, status and order — it replaced `filter-severity`,
   `filter-environment`, `filter-status`, `filter-sort` and `filter-people`), `clear-filters`,
-  `no-bugs`, `view-board`, `view-list`, `view-stats`
+  `no-bugs`, `view-board`, `view-list`, `view-stats`. Each row carries `status-{id}` — the status
+  `<select>` that moves that bug without leaving the list — and the row itself carries `data-href`,
+  which is what makes the whole row clickable
 - **Drawers:** `team-drawer`, `team-drawer-body`, `team-drawer-add` (the **+** popover),
   `drawer-member-name`, `drawer-member-email`, `drawer-member-password`, `drawer-add-member`,
   `save-project-team`, `docs-drawer`, `docs-drawer-body`, `docs-drawer-full`. Both drawers close on
@@ -881,7 +1162,8 @@ WebDriver tests. The ids survive redesigns and feature work — they are part of
 - **Trash:** `trash-link`, `trash-count`, `trash-table`, `no-trash`, `restore-{id}`, `purge-{id}`,
   `undo-delete`. `trash-count` is `.sr-only` now — the navbar says full or empty by drawing a
   different bin, not by wearing a red badge; nothing in there is waiting to be acted on
-- **Detail:** `bug-title`, `bug-severity`, `bug-status`, `bug-environment`, `back-to-board`,
+- **Detail:** `bug-title`, `bug-severity`, `bug-status`, `bug-environment`, `due-form`, `due-date`,
+  `save-due`, `clear-due` (`clear-due` is absent when the bug has no due date), `back-to-board`,
   `bug-project`, `status-menu`, `assign-form`, `assignee-picker`, `save-assignees`, `assign-to-me`,
   `assignee-filter`, `block-form`, `block-picker`, `block-none`, `edit-bug`, `delete-bug`,
   `comment-form`, `comment-text`, `comment-files`, `add-comment`, `comment-list`, `attachments`,
@@ -889,8 +1171,29 @@ WebDriver tests. The ids survive redesigns and feature work — they are part of
   `block-select` is gone — Blocked by is a picker of submit buttons now, not a `<select>`, so each
   option can carry the severity meter and status dot a native `<option>` cannot
 - **Notifications:** `notification-list`, `notification-count`, `mark-all-read`, `no-notifications`
-- **Settings:** `tab-projects`, `tab-team`, `project-form`, `project-name`, `add-project`,
-  `project-table`, `team-form`, `member-name`, `member-email`, `add-member`
+- **Settings** (admin-only — a member gets 403 on the page itself): `tab-projects`, `tab-team`,
+  `project-form`, `project-name`, `add-project`, `add-project-pop`, `new-team-filter`,
+  `new-team-list`, `project-table`. There is no `tab-board` (a board's columns are edited on the
+  board) and no `tab-mail` (nothing about mail is set in the app)
+- **Settings → Team**, the roster: `team-table` (each row carries `data-href` to that person's
+  screen), `manage-{id}`, `no-members` (only when the roster is empty), and the add popover —
+  `add-member-pop`, `team-form`, `member-name`, `member-email`, `member-password`, `add-member`
+- **Settings → Team**, one person (`?tab=team&member={id}`) — a list of `.act-row` forms and
+  nothing else: `member-editor`, `member-done`, `member-password-form`, `member-password-new`,
+  `member-clear-password` (absent when they have no password), `member-role` (disabled when they
+  cannot sign in), `member-active`, `member-remove` (absent when they are named on a bug)
+- **Your account** (`/account`): `password-form`, `current-password`, `new-password`,
+  `confirm-password`, `change-password`. Each field has an eye button beside it —
+  `button[data-reveal="<field id>"]`, **hidden until `app.js` reveals it**, so a test with
+  scripting off will not find one. Clicking it flips that field between `password` and `text`
+  and leaves the other two alone; `toggle-password` on the sign-in page is the same control
+- **Board columns:** the ⋯ menu's form carries `rename-{id}`, `done-{id}` and `notify-{id}`; each
+  column carries `data-column` (its id) and `data-status` (the key a bug
+  stores); the fold button is `.kcol-fold` with `data-fold="<status key>"` and is **hidden until
+  `app.js` reveals it**, so a test that runs with scripting off will not find it
+
+`dueDate` on the raise and edit forms is an `<input type="date">`: send it **ISO**
+(`2026-09-30`), which is what the browser's own picker produces, and an empty string clears it.
 
 `reportedBy` and `blockedBy` (on the raise form) are `<select>` elements, not text inputs — drive
 them with `new Select(...)`. On the bug page, Blocked by is `block-picker`: open the `<details>` and
@@ -910,6 +1213,54 @@ Two things to handle in a test:
 - the delete button opens a JS `confirm()` dialog — `driver.switchTo().alert().accept()`
 - `project` is a `<select>`, so drive it with `new Select(driver.findElement(By.id("project")))`,
   and remember it is **required** — submitting without it re-renders the form with an error
+
+## Email
+
+Notifications ring the bell in the app and, when SMTP is configured, are **emailed to the same
+person**. That is the whole rule: `NotificationService` decides who hears what — including the "you
+did it yourself" and "you were told this a moment ago" guards — and `EmailService` only carries the
+decision out. There is deliberately no second, parallel set of rules about who gets mail. If a
+change ought to email somebody it does not notify, the *notification* is what should be added.
+
+**Off until it is configured.** Two switches, because they fail differently: `bugtracking.mail.enabled`
+is this app's, `spring.mail.host` is the server's. With either missing nothing is built, no
+connection is opened, and the app behaves exactly as it did before any of this existed.
+
+Fill in `.env` (see `.env.example` for every key and what it means):
+
+```properties
+MAIL_ENABLED=true
+MAIL_FROM=bugs@firsteconomy.com
+APP_BASE_URL=https://bugs.example.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=bugs@firsteconomy.com
+SMTP_PASSWORD=<an app password, not an account password>
+```
+
+**The startup log says what state it is in** — "Off", "On, but no SMTP host is set", or "Sending as
+… through …" — on the `Email:` line beside `Database:` and `Attachments:`, because all three are
+decided by `.env` and nothing else. There is no Settings tab for it: whether mail leaves the
+building is not something the app can change, so a screen for it was a tab holding one button.
+
+Three things make it safe to leave switched on:
+
+- **After the commit, never inside it.** A message about a change that then rolled back cannot be
+  recalled, so the send is registered as an after-commit hook and skipped if the transaction fails.
+- **It cannot break a save.** Sending happens on a small pool of its own (not the shared executor —
+  an SMTP connection can take seconds to time out) and every failure is caught and logged. A dead
+  mail server means the bell was the only thing that rang; it does not make raising a bug fail.
+- **Nothing is guessed.** A notification is addressed to a display *name*, so the address is looked
+  up on the roster. Nobody by that name, more than one person by that name, somebody hidden, or
+  somebody with no address on file — all four say nothing rather than guess.
+
+`APP_BASE_URL` is not derived from the request, deliberately: an email is built after the response
+has gone, often on another thread, and a link built from "localhost" is a link that works for
+exactly one reader.
+
+The message carries the whole rail — status, severity, environment, project, module, who raised it,
+who is on it, what is blocking it, the counts, the timestamps — and the report itself, in HTML and
+as plain text. `bugtracking.mail.include-details=false` cuts it back to the title and the link.
 
 ## Supabase and S3
 

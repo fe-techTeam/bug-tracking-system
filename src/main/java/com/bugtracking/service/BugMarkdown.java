@@ -41,6 +41,10 @@ public class BugMarkdown {
     private static final DateTimeFormatter STAMP =
             DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
 
+    /** A due date is a day, so it is written as one — no hour nobody set. */
+    private static final DateTimeFormatter DUE =
+            DateTimeFormatter.ofPattern("dd MMM yyyy");
+
     private final BugService bugs;
     private final BoardColumnService board;
     private final CommentService comments;
@@ -117,6 +121,12 @@ public class BugMarkdown {
             }
         }
 
+        // Whether it is late is the board's question, not the date's — a bug in
+        // a finished column is done, whatever the date said. Worth carrying:
+        // this document is usually pasted to somebody being asked to pick the
+        // bug up, and "overdue" is the first thing they should know.
+        fact(out, "Due", bug.getDueDate() == null ? null
+                : DUE.format(bug.getDueDate()) + (columns.late(bug) ? " (overdue)" : ""));
         fact(out, "Raised", stamp(bug.getCreatedAt()));
         fact(out, "Last updated", stamp(bug.getUpdatedAt()));
         out.append('\n');

@@ -216,7 +216,9 @@
             var card = e.target.closest && e.target.closest(".kcard");
             if (!card) return;
             if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-            if (e.target.closest("a, button, input, select, textarea, label")) return;
+            // details covers the card's own menu whole — its summary is not a
+            // <button>, so without it opening the menu also opened the bug.
+            if (e.target.closest("a, button, input, select, textarea, label, details")) return;
 
             // Selecting text inside a card should not navigate away from it.
             var selection = window.getSelection();
@@ -265,6 +267,11 @@
         kanban.addEventListener("dragstart", function (e) {
             var card = e.target.closest(".kcard");
             if (!card) return;
+            // Pressing an option in the card's menu is not picking the card up.
+            // draggable="false" on the <details> says so too, but engines differ
+            // on how far down that reaches, and a card dragged out from under an
+            // open menu leaves the menu behind.
+            if (e.target.closest(".kcard-menu")) { e.preventDefault(); return; }
             dragged = card;
             from = card.closest(".kcol-body");
             e.dataTransfer.effectAllowed = "move";
@@ -345,6 +352,32 @@
                     flash("Could not move BUG-" + id + " — the change was not saved.");
                 });
             });
+        });
+    })();
+
+    /* ---------- the whole list row is the link its title is ----------
+       The same widening the board's cards got, and the same rules: the title
+       stays a real <a>, so a modified click, a middle click and JavaScript off
+       all behave exactly as they did, and a click that lands on a control is
+       left to the control. That last part is what lets a row hold a status
+       picker and a copy button and still be clickable — without it, changing a
+       status would navigate away from the list mid-change.
+
+       Delegated on the document rather than bound to the bug list: the roster
+       in Settings is the same shape — a row that stands for a page — and a
+       second copy of this would be a second set of rules for the same gesture. */
+    (function () {
+        document.addEventListener("click", function (e) {
+            var row = e.target.closest && e.target.closest("tr[data-href]");
+            if (!row) return;
+            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            if (e.target.closest("a, button, input, select, textarea, label, option")) return;
+
+            // Selecting a title to copy it should not open the bug.
+            var selection = window.getSelection();
+            if (selection && String(selection).length > 0) return;
+
+            window.location.href = row.getAttribute("data-href");
         });
     })();
 
@@ -529,6 +562,98 @@
         }
     })();
 
+    /* ---------- folding a column out of the way ----------
+       Seven columns is a board you scroll; four columns and three folded strips
+       is a board you read. Nothing about a bug changes and nothing is posted —
+       it is a view, so it is remembered in this browser and per project: the
+       columns you fold on one board are not the ones you fold on the next.
+
+       The buttons are rendered hidden and revealed here. With script off there
+       is nothing behind them, and a control that does nothing is worse than no
+       control; the board still shows every column, which is the state this
+       starts from anyway. */
+    (function () {
+        var kanban = document.getElementById("kanban");
+        if (!kanban) return;
+        var buttons = kanban.querySelectorAll(".kcol-fold");
+        if (!buttons.length) return;
+
+        var KEY = "bugtracking.board.folded";
+        var project = kanban.getAttribute("data-project") || "*";
+
+        /* Every board's folded columns, keyed by project. Anything unreadable
+           is treated as nothing folded rather than thrown: this is a
+           convenience, and a bad value in localStorage must not be able to
+           stop the board drawing. */
+        function all() {
+            try {
+                var held = JSON.parse(read(KEY) || "{}");
+                return held && typeof held === "object" ? held : {};
+            } catch (e) { return {}; }
+        }
+
+        function folded() {
+            var here = all()[project];
+            return Object.prototype.toString.call(here) === "[object Array]" ? here : [];
+        }
+
+        function remember(list) {
+            var map = all();
+            if (list.length) { map[project] = list; } else { delete map[project]; }
+            store(KEY, JSON.stringify(map));
+        }
+
+        function name(col) {
+            var head = col.querySelector("h3");
+            return head ? head.textContent.trim() : "this column";
+        }
+
+        function label(button, col, isFolded) {
+            button.title = (isFolded ? "Unfold " : "Fold ") + name(col);
+            button.setAttribute("aria-label", isFolded
+                ? "Unfold the " + name(col) + " column"
+                : "Fold the " + name(col) + " column away");
+            button.setAttribute("aria-expanded", isFolded ? "false" : "true");
+        }
+
+        function paint(col, button, isFolded) {
+            col.classList.toggle("is-collapsed", isFolded);
+            label(button, col, isFolded);
+        }
+
+        /* Applied before the buttons are shown, so a board that opens with
+           three columns folded never flashes them open first. This runs from a
+           synchronous script at the end of <body>, which is before the first
+           paint. */
+        var open = folded();
+        Array.prototype.forEach.call(buttons, function (button) {
+            var col = button.closest(".kcol");
+            if (!col) return;
+            paint(col, button, open.indexOf(button.getAttribute("data-fold")) >= 0);
+            button.hidden = false;
+        });
+
+        kanban.addEventListener("click", function (e) {
+            var button = e.target.closest && e.target.closest(".kcol-fold");
+            if (!button) return;
+            var col = button.closest(".kcol");
+            if (!col) return;
+
+            var key = button.getAttribute("data-fold");
+            var list = folded();
+            var at = list.indexOf(key);
+            var isFolded = at < 0;
+            if (isFolded) { list.push(key); } else { list.splice(at, 1); }
+
+            remember(list);
+            paint(col, button, isFolded);
+            /* The strip is 46px wide and the button inside it is the thing that
+               was just pressed, so keeping focus on it is what lets a keyboard
+               fold and unfold without hunting. */
+            button.focus();
+        });
+    })();
+
     /* ---------- the raise/edit form: the status list follows the project ----------
        Columns belong to a project, so changing the project changes which ones
        exist. Every project's are on the select as data-columns. Nothing depends
@@ -575,6 +700,210 @@
        the comment form on a bug, the editor form on a project page or sheet.
        One implementation, because "who did they tag" is the same question
        wherever the "@" was typed. */
+    /* ---------- fenced code, in a report and in the thread ----------
+       A developer pasting a response body onto a bug is pasting evidence, and
+       evidence rendered as a paragraph — wrapped, proportional, its indentation
+       collapsed — is evidence nobody can check. So ``` fences in text that is
+       already on the page become real blocks: monospaced, never wrapped,
+       scrolling inside themselves, with Copy and, when the contents parse,
+       Format.
+
+       Nothing is stored differently and nothing new is posted. The fences are
+       in the text the way the author typed them, the server keeps them
+       verbatim, BugMarkdown already leaves them alone, and with script off they
+       are visible as ``` — which carries the same information. This is a
+       rendering, not a format.
+
+       It runs before the mentions pass below on purpose: that pass walks text
+       nodes and skips anything inside CODE or PRE, so a "@name" in a snippet
+       must already be in a snippet by the time it looks. */
+    (function () {
+        var MIN_FENCE = /^\s*```(\w*)\s*$/;
+        var CLOSE_FENCE = /^\s*```\s*$/;
+
+        /* The text as JSON, indented, or null when it is not JSON. Only ever
+           tried on something that opens with a brace or a bracket: JSON.parse
+           accepts "12" and "null" as well, and offering to reformat a stack
+           trace's first line is worse than offering nothing. */
+        function asJson(text) {
+            var trimmed = text.trim();
+            if (!trimmed || "{[".indexOf(trimmed.charAt(0)) < 0) return null;
+            try {
+                return JSON.stringify(JSON.parse(trimmed), null, 2);
+            } catch (e) { return null; }
+        }
+
+        /* Splits text into runs of prose and fenced blocks. An opening fence
+           with nothing closing it is left as text — somebody mid-sentence about
+           three backticks has not opened a block. */
+        function segments(text) {
+            var lines = String(text).replace(/\r\n?/g, "\n").split("\n");
+            var out = [];
+            var prose = [];
+            var i = 0;
+
+            while (i < lines.length) {
+                var open = MIN_FENCE.exec(lines[i]);
+                if (!open) { prose.push(lines[i++]); continue; }
+
+                var end = -1;
+                for (var j = i + 1; j < lines.length; j++) {
+                    if (CLOSE_FENCE.test(lines[j])) { end = j; break; }
+                }
+                if (end < 0) { prose.push(lines[i++]); continue; }
+
+                out.push({ text: prose.join("\n") });
+                prose = [];
+                out.push({ code: lines.slice(i + 1, end).join("\n"), lang: open[1] || "" });
+                i = end + 1;
+            }
+            out.push({ text: prose.join("\n") });
+            return out;
+        }
+
+        function button(text, title) {
+            var el = document.createElement("button");
+            el.type = "button";
+            el.className = "code-act";
+            el.textContent = text;
+            el.title = title;
+            return el;
+        }
+
+        function block(code, lang) {
+            var pretty = asJson(code);
+            var figure = document.createElement("figure");
+            figure.className = "code-block";
+
+            var head = document.createElement("figcaption");
+            head.className = "code-head";
+
+            var kind = document.createElement("span");
+            kind.className = "code-lang";
+            // What it says it is, else what it turns out to be, else nothing
+            // more specific than "code".
+            kind.textContent = lang || (pretty ? "json" : "code");
+            head.appendChild(kind);
+
+            var gap = document.createElement("span");
+            gap.className = "spacer";
+            head.appendChild(gap);
+
+            var pre = document.createElement("pre");
+            var body = document.createElement("code");
+            body.textContent = code;                  // text, never HTML
+            pre.appendChild(body);
+
+            // Only when indenting it would actually change something: a block
+            // somebody already formatted needs no button offering to.
+            if (pretty !== null && pretty !== code.trim()) {
+                var format = button("Format", "Indent this JSON");
+                format.setAttribute("aria-pressed", "false");
+                format.addEventListener("click", function () {
+                    var on = format.getAttribute("aria-pressed") === "true";
+                    body.textContent = on ? code : pretty;
+                    format.setAttribute("aria-pressed", on ? "false" : "true");
+                    format.textContent = on ? "Format" : "Original";
+                    say(on ? "Showing it as it was written" : "Indented");
+                });
+                head.appendChild(format);
+            }
+
+            var copy = button("Copy", "Copy this block");
+            copy.addEventListener("click", function () {
+                var copier = (window.BT && window.BT.copyText)
+                    || function (text) { return navigator.clipboard.writeText(text); };
+                copier(body.textContent).then(function () {
+                    copy.textContent = "Copied";
+                    say("Copied");
+                    setTimeout(function () { copy.textContent = "Copy"; }, 1400);
+                }).catch(function () {
+                    copy.textContent = "Press ⌘C";
+                    setTimeout(function () { copy.textContent = "Copy"; }, 1800);
+                });
+            });
+            head.appendChild(copy);
+
+            figure.appendChild(head);
+            figure.appendChild(pre);
+            return figure;
+        }
+
+        /* A <p> cannot legally hold a <figure>, and a browser handed one closes
+           the paragraph early and leaves the rest of the comment outside it. So
+           the paragraph becomes a <div> wearing the same classes, which is what
+           every rule that styled it was matching on anyway. */
+        function render(el) {
+            var text = el.textContent;
+            if (!text || text.indexOf("```") < 0) return;
+
+            var parts = segments(text);
+            if (!parts.some(function (part) { return part.code !== undefined; })) return;
+
+            var box = document.createElement("div");
+            box.className = el.className;
+            parts.forEach(function (part) {
+                if (part.code !== undefined) {
+                    box.appendChild(block(part.code, part.lang));
+                    return;
+                }
+                // The container keeps white-space: pre-wrap, so the newlines
+                // that hugged a fence would otherwise show as blank lines
+                // around the block.
+                var prose = part.text.replace(/^\n+/, "").replace(/\n+$/, "");
+                if (prose) box.appendChild(document.createTextNode(prose));
+            });
+            el.parentNode.replaceChild(box, el);
+        }
+
+        document.querySelectorAll(".report-sec > .pre, .comment-text").forEach(render);
+
+        /* ---- writing one ----
+           Wraps the selection in a fence, and indents it on the way if it is
+           JSON — which is what somebody pasting into a bug usually has. The
+           button is hidden in the markup and revealed here; typing the fences
+           by hand works exactly as it did and is what happens with script off. */
+        function wrap(box) {
+            var start = box.selectionStart;
+            var end = box.selectionEnd;
+            var chosen = box.value.slice(start, end);
+            var pretty = asJson(chosen);
+            var body = (pretty === null ? chosen : pretty).replace(/^\n+/, "").replace(/\n+$/, "");
+
+            var before = box.value.slice(0, start);
+            var after = box.value.slice(end);
+            // A fence only opens a block at the start of a line.
+            if (before && !/\n$/.test(before)) before += "\n";
+            if (after && !/^\n/.test(after)) after = "\n" + after;
+
+            var lang = pretty === null ? "" : "json";
+            var fenced = "```" + lang + "\n" + body + "\n```";
+            box.value = before + fenced + after;
+
+            // Inside an empty block, ready to type; after a filled one.
+            var caret = body
+                ? (before + fenced).length
+                : before.length + 4 + lang.length;
+            box.focus();
+            box.setSelectionRange(caret, caret);
+            // So anything counting characters or auto-growing the box hears it.
+            box.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        document.querySelectorAll("[data-code-insert]").forEach(function (button) {
+            if (document.getElementById(button.getAttribute("data-code-insert"))) {
+                button.hidden = false;
+            }
+        });
+
+        document.addEventListener("click", function (e) {
+            var button = e.target.closest && e.target.closest("[data-code-insert]");
+            if (!button) return;
+            var box = document.getElementById(button.getAttribute("data-code-insert"));
+            if (box) wrap(box);
+        });
+    })();
+
     (function () {
         var source = document.querySelector("[data-people]");
         var people = [];
@@ -658,149 +987,281 @@
         window.BT = window.BT || {};
         window.BT.markMentions = markMentions;
 
-        /* ---- writing ---- */
-        var box = document.getElementById("comment-text")
-            || document.querySelector("textarea[data-mentions]");
-        if (!box) return;
+        /* ---- writing ----
+           Every box that takes a comment gets the same menu: the one at the top
+           of the section, and the reply and edit boxes inside the thread, which
+           are marked data-mentions. Tagging somebody is most of what a reply is
+           for, and it used to work only in the box you never replied from. */
+        var boxes = document.querySelectorAll("#comment-text, textarea[data-mentions]");
+        if (!boxes.length) return;
+        Array.prototype.forEach.call(boxes, attach);
 
-        var menu = document.createElement("div");
-        menu.className = "mention-menu";
-        menu.hidden = true;
-        box.parentNode.appendChild(menu);
+        function attach(box) {
 
-        var active = -1;
-        var matches = [];
-
-        function close() {
+            var menu = document.createElement("div");
+            menu.className = "mention-menu";
             menu.hidden = true;
-            menu.textContent = "";
-            active = -1;
-            matches = [];
-        }
+            box.parentNode.appendChild(menu);
 
-        // The "@" being typed right now: the last one with no space after it.
-        function pending() {
-            var upto = box.value.slice(0, box.selectionStart);
-            var at = upto.lastIndexOf("@");
-            if (at < 0) return null;
-            var typed = upto.slice(at + 1);
-            // A mention is at most two words; beyond that they are just writing.
-            if (typed.indexOf("\n") >= 0 || typed.split(" ").length > 2) return null;
-            return { at: at, typed: typed };
-        }
+            var active = -1;
+            var matches = [];
 
-        function render() {
-            var state = pending();
-            if (!state) { close(); return; }
-
-            var needle = state.typed.toLowerCase();
-            matches = people.filter(function (p) {
-                return p.toLowerCase().indexOf(needle) === 0;
-            }).slice(0, 6);
-
-            if (!matches.length) { close(); return; }
-
-            menu.textContent = "";
-            matches.forEach(function (name, index) {
-                var item = document.createElement("button");
-                item.type = "button";
-                item.className = "mention-opt" + (index === 0 ? " is-active" : "");
-                item.textContent = name;
-                item.addEventListener("mousedown", function (e) {
-                    e.preventDefault();             // keep the caret in the textarea
-                    pick(name);
-                });
-                menu.appendChild(item);
-            });
-            active = 0;
-            menu.hidden = false;
-        }
-
-        function highlight() {
-            Array.prototype.forEach.call(menu.children, function (el, i) {
-                el.classList.toggle("is-active", i === active);
-            });
-        }
-
-        function pick(name) {
-            var state = pending();
-            if (!state) { close(); return; }
-            var before = box.value.slice(0, state.at);
-            var after = box.value.slice(box.selectionStart);
-            box.value = before + "@" + name + " " + after;
-            var caret = (before + "@" + name + " ").length;
-            box.setSelectionRange(caret, caret);
-            close();
-            box.focus();
-            // The editor saves on input, and setting .value fires nothing.
-            box.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        box.addEventListener("input", render);
-        box.addEventListener("blur", function () { setTimeout(close, 120); });
-
-        box.addEventListener("keydown", function (e) {
-            if (menu.hidden || !matches.length) return;
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                active = (active + 1) % matches.length;
-                highlight();
-            } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                active = (active - 1 + matches.length) % matches.length;
-                highlight();
-            } else if (e.key === "Enter" || e.key === "Tab") {
-                e.preventDefault();
-                pick(matches[active]);
-            } else if (e.key === "Escape") {
-                e.preventDefault();
-                close();
+            function close() {
+                menu.hidden = true;
+                menu.textContent = "";
+                active = -1;
+                matches = [];
             }
+
+            // The "@" being typed right now: the last one with no space after it.
+            function pending() {
+                var upto = box.value.slice(0, box.selectionStart);
+                var at = upto.lastIndexOf("@");
+                if (at < 0) return null;
+                var typed = upto.slice(at + 1);
+                // A mention is at most two words; beyond that they are just writing.
+                if (typed.indexOf("\n") >= 0 || typed.split(" ").length > 2) return null;
+                return { at: at, typed: typed };
+            }
+
+            function render() {
+                var state = pending();
+                if (!state) { close(); return; }
+
+                var needle = state.typed.toLowerCase();
+                matches = people.filter(function (p) {
+                    return p.toLowerCase().indexOf(needle) === 0;
+                }).slice(0, 6);
+
+                if (!matches.length) { close(); return; }
+
+                menu.textContent = "";
+                matches.forEach(function (name, index) {
+                    var item = document.createElement("button");
+                    item.type = "button";
+                    item.className = "mention-opt" + (index === 0 ? " is-active" : "");
+                    item.textContent = name;
+                    item.addEventListener("mousedown", function (e) {
+                        e.preventDefault();             // keep the caret in the textarea
+                        pick(name);
+                    });
+                    menu.appendChild(item);
+                });
+                active = 0;
+                menu.hidden = false;
+            }
+
+            function highlight() {
+                Array.prototype.forEach.call(menu.children, function (el, i) {
+                    el.classList.toggle("is-active", i === active);
+                });
+            }
+
+            function pick(name) {
+                var state = pending();
+                if (!state) { close(); return; }
+                var before = box.value.slice(0, state.at);
+                var after = box.value.slice(box.selectionStart);
+                box.value = before + "@" + name + " " + after;
+                var caret = (before + "@" + name + " ").length;
+                box.setSelectionRange(caret, caret);
+                close();
+                box.focus();
+                // The editor saves on input, and setting .value fires nothing.
+                box.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+
+            box.addEventListener("input", render);
+            box.addEventListener("blur", function () { setTimeout(close, 120); });
+
+            box.addEventListener("keydown", function (e) {
+                if (menu.hidden || !matches.length) return;
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    active = (active + 1) % matches.length;
+                    highlight();
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    active = (active - 1 + matches.length) % matches.length;
+                    highlight();
+                } else if (e.key === "Enter" || e.key === "Tab") {
+                    e.preventDefault();
+                    pick(matches[active]);
+                } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    close();
+                }
+            });
+        }
+    })();
+
+    /* ---------- opening a reply puts you after the mention ----------
+       The box arrives holding "@Name ", written by the server so it is there
+       with scripting off. All this adds is the caret landing after it rather
+       than at the start, which is the difference between a prefilled field and
+       one you have to click into and arrow past. */
+    (function () {
+        document.addEventListener("click", function (e) {
+            var summary = e.target.closest && e.target.closest(".comment-tool > summary");
+            if (!summary) return;
+            var fold = summary.parentNode;
+            // The click has not toggled it yet, so [open] here means closing.
+            if (fold.hasAttribute("open")) return;
+
+            setTimeout(function () {
+                var box = fold.querySelector("textarea");
+                if (!box) return;
+                box.focus();
+                box.setSelectionRange(box.value.length, box.value.length);
+            }, 0);
         });
     })();
 
-    /* ---------- filtering a picker by name ---------- */
+    /* ---------- filtering a picker by name ----------
+       Any .pick-search narrows the list beside it: the assignee pickers on the
+       raise form and the bug page, and the team on a new project in Settings.
+       Delegated on the class rather than bound to three ids, because it is one
+       gesture — and because the third of them is inside a popover that may not
+       exist when this runs. */
     (function () {
-        var filter = document.getElementById("assignee-filter");
-        var list = document.getElementById("assignee-list");
-        var none = document.getElementById("assignee-none");
-        if (!filter || !list) return;
+        function listFor(box) {
+            var wrap = box.closest(".pick-search");
+            return wrap && wrap.parentNode
+                ? wrap.parentNode.querySelector(".pick-list, .pop-list")
+                : null;
+        }
 
-        filter.addEventListener("input", function () {
-            var q = filter.value.trim().toLowerCase();
+        document.addEventListener("input", function (e) {
+            var box = e.target;
+            if (!box.closest || !box.closest(".pick-search")) return;
+            var list = listFor(box);
+            if (!list) return;
+
+            var q = box.value.trim().toLowerCase();
             var shown = 0;
             list.querySelectorAll(".pick-opt").forEach(function (opt) {
-                var name = (opt.getAttribute("data-name") || "").toLowerCase();
+                var name = (opt.getAttribute("data-name") || opt.textContent || "").toLowerCase();
                 var hit = q === "" || name.indexOf(q) !== -1;
                 opt.hidden = !hit;
                 if (hit) shown++;
             });
+            var none = list.querySelector(".pick-none");
             if (none) none.hidden = shown > 0;
         });
 
         // Typing is for finding, not for submitting the form underneath.
-        filter.addEventListener("keydown", function (e) {
-            if (e.key === "Enter") e.preventDefault();
+        document.addEventListener("keydown", function (e) {
+            if (e.key !== "Enter" || !e.target.closest) return;
+            if (e.target.closest(".pick-search")) e.preventDefault();
         });
     })();
 
-    /* ---------- attachments open over the page, not instead of it ---------- */
+    /* ---------- attachments open in a viewer over the page ----------
+       You are still reading the bug, so the evidence opens over it rather than
+       instead of it. Every thumbnail stays a real link to the file, which is
+       what makes all of this optional: with scripting off a click is still the
+       attachment in a new tab, exactly as it was before there was a viewer.
+
+       What it adds over "the picture, big": the rest of the bug's evidence is
+       beside it, so comparing the screenshot before the fix with the one after
+       is an arrow key rather than two round trips; a picture zooms and pans,
+       because the thing you need to see is usually eight pixels of a stack
+       trace; and a clip plays with its own native controls, which are better at
+       being a video player than anything written here would be. */
     (function () {
         var box = document.getElementById("lightbox");
         var stage = document.getElementById("lightbox-stage");
+        if (!box || !stage) return;
+
         var name = document.getElementById("lightbox-name");
         var openIn = document.getElementById("lightbox-open");
-        if (!box || !stage) return;
+        var count = document.getElementById("lightbox-count");
+        var strip = document.getElementById("lightbox-strip");
+        var prevBtn = document.getElementById("lightbox-prev");
+        var nextBtn = document.getElementById("lightbox-next");
+        var zoomBar = document.getElementById("lightbox-zoom");
+        var zoomLevel = document.getElementById("lightbox-zoom-level");
+
+        var MIN = 1, MAX = 6, STEP = 1.4;
 
         var lastFocus = null;
         var closeTimer = null;
         var prevOverflow = "";
+        var showing = false;
+
+        var items = [];          // the gallery this opening is stepping through
+        var at = -1;
+        var media = null;        // the <img> or <video> currently on the stage
+        var zoom = 1, panX = 0, panY = 0;
+        var drag = null;
+
+        /* ---- what a trigger says about itself ---- */
+        function srcOf(el) { return el.getAttribute("href") || el.getAttribute("data-src") || ""; }
+        function labelOf(el) { return el.getAttribute("data-lightbox") || "Attachment"; }
+        function kindOf(el) { return el.getAttribute("data-lightbox-kind") || "image"; }
+
+        /* The set to step through: everything openable inside the nearest
+           [data-gallery], which is what keeps a comment's screenshots out of the
+           report's. Without one — anywhere that has not said — the trigger is a
+           gallery of one, rather than silently joining every image on the page. */
+        function galleryFor(el) {
+            var scope = el.closest("[data-gallery]");
+            if (!scope) return [el];
+            return Array.prototype.slice.call(scope.querySelectorAll("[data-lightbox]"));
+        }
+
+        /* ---- zoom and pan ---- */
+        function apply() {
+            if (!media) return;
+            media.style.transform = "translate(" + panX + "px, " + panY + "px) scale(" + zoom + ")";
+            media.classList.toggle("is-zoomed", zoom > 1);
+            if (zoomLevel) zoomLevel.textContent = Math.round(zoom * 100) + "%";
+        }
+
+        /* Panned so far that the picture has left the window is a zoom control
+           that has lost the thing it was pointed at. */
+        function clampPan() {
+            if (!media) { panX = panY = 0; return; }
+            var wide = Math.max(0, (media.offsetWidth * zoom - stage.clientWidth) / 2);
+            var tall = Math.max(0, (media.offsetHeight * zoom - stage.clientHeight) / 2);
+            panX = Math.min(wide, Math.max(-wide, panX));
+            panY = Math.min(tall, Math.max(-tall, panY));
+        }
+
+        /* originX/Y are measured from the middle of the stage, so a wheel or a
+           double-click zooms into what is under the pointer rather than into the
+           centre and away from whatever you were looking at. */
+        function zoomTo(next, originX, originY) {
+            if (!media || media.tagName !== "IMG") return;
+            next = Math.min(MAX, Math.max(MIN, next));
+            if (next === zoom) return;
+            var k = next / zoom;
+            panX = (originX || 0) - k * ((originX || 0) - panX);
+            panY = (originY || 0) - k * ((originY || 0) - panY);
+            zoom = next;
+            if (zoom === MIN) { panX = panY = 0; }
+            clampPan();
+            apply();
+        }
+
+        function resetZoom() {
+            zoom = 1; panX = 0; panY = 0;
+            apply();
+        }
+
+        function originFrom(e) {
+            var r = stage.getBoundingClientRect();
+            return [e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)];
+        }
+
+        /* ---- the stage ---- */
 
         /* A 404, or an error page served as HTML with a 200, both arrive here.
-           Either way the stage would sit empty while the bar names the file
-           with confidence; say so instead, and keep a way out of the overlay. */
+           Either way the stage would sit empty while the bar names the file with
+           confidence; say so instead, and keep a way out of the overlay. */
         function failed(href) {
             stage.innerHTML = "";
+            media = null;
             var note = document.createElement("p");
             note.className = "panel panel-pad hint";
             note.textContent = "This file could not be loaded. ";
@@ -813,43 +1274,167 @@
             stage.appendChild(note);
         }
 
-        function open(href, label) {
+        /* Whatever is on the stage stops being a thing the browser is working
+           on: a video left in the DOM keeps its buffer and its sound. */
+        function clearStage() {
+            var playing = stage.querySelector("video");
+            if (playing) { playing.pause(); playing.removeAttribute("src"); playing.load(); }
+            stage.innerHTML = "";
+            media = null;
+        }
+
+        function show(index) {
+            if (index < 0 || index >= items.length) return;
+            at = index;
+            var el = items[at];
+            var href = srcOf(el);
+            var label = labelOf(el);
+
+            clearStage();
+            resetZoom();
+
+            if (kindOf(el) === "video") {
+                var video = document.createElement("video");
+                video.className = "lightbox-media lightbox-video";
+                video.controls = true;
+                video.playsInline = true;
+                video.preload = "metadata";
+                video.setAttribute("aria-label", label);
+                video.onerror = function () { failed(href); };
+                video.src = href;
+                stage.appendChild(video);
+                media = video;
+            } else {
+                var img = document.createElement("img");
+                img.className = "lightbox-media lightbox-img";
+                img.alt = label;
+                img.draggable = false;
+                img.onerror = function () { failed(href); };
+                img.src = href;
+                stage.appendChild(img);
+                media = img;
+            }
+
+            if (zoomBar) zoomBar.hidden = kindOf(el) !== "image";
+            if (name) name.textContent = label;
+            if (openIn) openIn.href = href;
+            if (count) {
+                count.hidden = items.length < 2;
+                count.textContent = (at + 1) + " / " + items.length;
+            }
+            if (prevBtn) prevBtn.hidden = items.length < 2;
+            if (nextBtn) nextBtn.hidden = items.length < 2;
+            markStrip();
+            apply();
+        }
+
+        /* Wraps on purpose: four screenshots read in a circle, and an arrow that
+           stops dead at the end is one you press twice to find that out. */
+        function step(by) {
+            if (items.length < 2) return;
+            show((at + by + items.length) % items.length);
+        }
+
+        /* ---- the filmstrip ---- */
+        function buildStrip() {
+            if (!strip) return;
+            strip.innerHTML = "";
+            strip.hidden = items.length < 2;
+            if (items.length < 2) return;
+
+            items.forEach(function (el, i) {
+                var tile = document.createElement("button");
+                tile.type = "button";
+                tile.className = "lightbox-thumb";
+                tile.setAttribute("data-go", String(i));
+                tile.title = labelOf(el);
+                tile.setAttribute("aria-label", labelOf(el));
+
+                if (kindOf(el) === "video") {
+                    // No frame to show without decoding the file, so say what it
+                    // is rather than pull a video down to draw a strip.
+                    tile.className += " is-clip";
+                    var mark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    mark.setAttribute("class", "i");
+                    mark.setAttribute("aria-hidden", "true");
+                    var use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+                    use.setAttribute("href", "#i-play");
+                    mark.appendChild(use);
+                    tile.appendChild(mark);
+                } else {
+                    var thumb = document.createElement("img");
+                    thumb.src = srcOf(el);
+                    thumb.alt = "";
+                    thumb.loading = "lazy";
+                    tile.appendChild(thumb);
+                }
+                strip.appendChild(tile);
+            });
+        }
+
+        function markStrip() {
+            if (!strip || strip.hidden) return;
+            var tiles = strip.querySelectorAll(".lightbox-thumb");
+            Array.prototype.forEach.call(tiles, function (tile, i) {
+                var here = i === at;
+                tile.classList.toggle("is-here", here);
+                tile.setAttribute("aria-current", here ? "true" : "false");
+                if (here && tile.scrollIntoView) {
+                    tile.scrollIntoView({ block: "nearest", inline: "nearest",
+                                          behavior: calm ? "auto" : "smooth" });
+                }
+            });
+        }
+
+        /* ---- opening and closing ---- */
+        function open(trigger) {
             // A close still fading owns a timer that blanks the stage. Reopening
             // inside those 210ms fired it over the new picture: the overlay went
             // empty with nothing to show for it.
             if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
 
             lastFocus = document.activeElement;
-            stage.innerHTML = "";
-
-            var img = document.createElement("img");
-            img.alt = label || "Attachment";
-            img.onerror = function () { failed(href); };
-            img.src = href;
-            stage.appendChild(img);
-
-            if (name) name.textContent = label || "Attachment";
-            if (openIn) openIn.href = href;
+            items = galleryFor(trigger);
+            buildStrip();
+            show(Math.max(0, items.indexOf(trigger)));
 
             box.hidden = false;
             requestAnimationFrame(function () { box.classList.add("is-open"); });
-            // Whatever was parked here belongs to whoever parked it.
-            prevOverflow = document.body.style.overflow;
-            document.body.style.overflow = "hidden";
+
+            // Whatever was parked here belongs to whoever parked it — and only
+            // the opening that put the overlay up gets to record it. Opening
+            // again over one that is already up would otherwise note down its
+            // own "hidden" as the thing to put back, and closing would leave
+            // the page underneath unscrollable with nothing on top of it.
+            if (!showing) {
+                prevOverflow = document.body.style.overflow;
+                document.body.style.overflow = "hidden";
+                showing = true;
+            }
 
             var closer = document.getElementById("lightbox-close");
             if (closer) closer.focus();
         }
 
         function close() {
-            if (box.hidden) return;
+            // Not box.hidden: it is still false through the fade, and a second
+            // Escape inside those 210ms would run all of this again.
+            if (!showing) return;
+            showing = false;
             box.classList.remove("is-open");
             document.body.style.overflow = prevOverflow;
+
+            // Sound stops when the overlay starts fading, not when it finishes:
+            // a clip still talking over a page you have closed is a bug.
+            var playing = stage.querySelector("video");
+            if (playing) playing.pause();
 
             var finish = function () {
                 closeTimer = null;
                 box.hidden = true;
-                stage.innerHTML = "";       // stop the image decoding in the background
+                clearStage();
+                items = [];
+                at = -1;
             };
             if (calm) { finish(); } else { closeTimer = setTimeout(finish, 210); }
 
@@ -857,14 +1442,29 @@
             lastFocus = null;
         }
 
+        /* ---- what a click means ---- */
         document.addEventListener("click", function (e) {
             if (!e.target.closest) return;
 
             if (e.target.closest("#lightbox-close")) { e.preventDefault(); close(); return; }
+            if (e.target.closest("#lightbox-prev")) { e.preventDefault(); step(-1); return; }
+            if (e.target.closest("#lightbox-next")) { e.preventDefault(); step(1); return; }
+            if (e.target.closest("#lightbox-zoom-in")) { e.preventDefault(); zoomTo(zoom * STEP); return; }
+            if (e.target.closest("#lightbox-zoom-out")) { e.preventDefault(); zoomTo(zoom / STEP); return; }
+            if (e.target.closest("#lightbox-zoom-level")) { e.preventDefault(); resetZoom(); return; }
+
+            var tile = e.target.closest("[data-go]");
+            if (tile && box.contains(tile)) {
+                e.preventDefault();
+                show(parseInt(tile.getAttribute("data-go"), 10));
+                return;
+            }
+
             /* Only the backdrop dismisses. The picture is the reason the overlay
                is open — on a phone the first tap to look closer used to throw it
-               away — so a click has to land beside it, not on it. */
-            if (e.target === box || e.target === stage) {
+               away — so a click has to land beside it, not on it. A zoomed
+               picture is being dragged, not clicked, so it never dismisses. */
+            if ((e.target === box || e.target === stage) && !drag) {
                 e.preventDefault();
                 close();
                 return;
@@ -876,87 +1476,149 @@
             if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
             e.preventDefault();
-            open(shot.href, shot.getAttribute("data-lightbox"));
+            open(shot);
         });
 
+        /* Double-click is the shortcut every picture viewer has: in to look, out
+           to see the whole thing again. */
+        stage.addEventListener("dblclick", function (e) {
+            if (!media || media.tagName !== "IMG") return;
+            e.preventDefault();
+            if (zoom > MIN) { resetZoom(); return; }
+            var o = originFrom(e);
+            zoomTo(2.5, o[0], o[1]);
+        });
+
+        /* The page behind cannot scroll while this is open, so the wheel has
+           nothing else to mean here. */
+        stage.addEventListener("wheel", function (e) {
+            if (!media || media.tagName !== "IMG") return;
+            e.preventDefault();
+            var o = originFrom(e);
+            zoomTo(zoom * (e.deltaY < 0 ? STEP : 1 / STEP), o[0], o[1]);
+        }, { passive: false });
+
+        /* ---- drag to pan, once there is more picture than window ---- */
+        stage.addEventListener("pointerdown", function (e) {
+            if (!media || media.tagName !== "IMG" || zoom <= MIN || e.button !== 0) return;
+            e.preventDefault();
+            drag = { x: e.clientX, y: e.clientY, px: panX, py: panY };
+            media.classList.add("is-dragging");
+            if (stage.setPointerCapture) stage.setPointerCapture(e.pointerId);
+        });
+
+        stage.addEventListener("pointermove", function (e) {
+            if (!drag) return;
+            panX = drag.px + (e.clientX - drag.x);
+            panY = drag.py + (e.clientY - drag.y);
+            clampPan();
+            apply();
+        });
+
+        function endDrag(e) {
+            if (!drag) return;
+            if (stage.releasePointerCapture && e.pointerId != null) {
+                try { stage.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+            }
+            if (media) media.classList.remove("is-dragging");
+            // Cleared after this event finishes, so the click it turns into does
+            // not read as a click on the backdrop and close the overlay.
+            setTimeout(function () { drag = null; }, 0);
+        }
+        stage.addEventListener("pointerup", endDrag);
+        stage.addEventListener("pointercancel", endDrag);
+
+        /* ---- keys ---- */
         document.addEventListener("keydown", function (e) {
             if (box.hidden) return;
+
             if (e.key === "Escape") { close(); return; }
+
+            if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); return; }
+            if (e.key === "ArrowRight") { e.preventDefault(); step(1); return; }
+
+            // Space is play/pause, which is what it is everywhere else a video
+            // is on screen. The native controls own it once one is focused.
+            if ((e.key === " " || e.key === "Spacebar") && media && media.tagName === "VIDEO") {
+                if (document.activeElement === media) return;
+                e.preventDefault();
+                if (!media.paused) { media.pause(); return; }
+                // play() answers with a promise everywhere that matters and with
+                // nothing at all in a few places that still do not; a rejection
+                // is the browser refusing to start it, which the play button on
+                // the controls is the answer to.
+                var started = media.play();
+                if (started && started.catch) { started.catch(function () { /* press play */ }); }
+                return;
+            }
+
+            if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomTo(zoom * STEP); return; }
+            if (e.key === "-" || e.key === "_") { e.preventDefault(); zoomTo(zoom / STEP); return; }
+            if (e.key === "0") { e.preventDefault(); resetZoom(); return; }
+
             if (e.key !== "Tab") return;
 
             /* aria-modal="true" is a promise the page cannot keep on its own:
                nothing behind the overlay is inert, so Tab walked straight out of
                a dialog a screen reader had just announced as modal. */
-            var items = box.querySelectorAll("a[href], button:not([disabled])");
-            if (!items.length) return;
-            var first = items[0];
-            var last = items[items.length - 1];
+            var focusable = box.querySelectorAll("a[href], button:not([disabled]), video[controls]");
+            var reachable = Array.prototype.filter.call(focusable, function (el) {
+                return !el.hidden && el.offsetParent !== null;
+            });
+            if (!reachable.length) return;
+            var first = reachable[0];
+            var last = reachable[reachable.length - 1];
             var here = document.activeElement;
 
             if (!box.contains(here)) { e.preventDefault(); first.focus(); return; }
             if (e.shiftKey && here === first) { e.preventDefault(); last.focus(); }
             else if (!e.shiftKey && here === last) { e.preventDefault(); first.focus(); }
         });
-    })();
 
-    /* ---------- the password field can be unmasked ---------- */
-    (function () {
-        var toggle = document.getElementById("toggle-password");
-        var field = document.getElementById("password");
-        if (!toggle || !field) return;
-
-        toggle.hidden = false;                  // only offered when it can work
-        toggle.addEventListener("click", function () {
-            var shown = field.type === "text";
-            field.type = shown ? "password" : "text";
-            var use = toggle.querySelector("use");
-            if (use) use.setAttribute("href", shown ? "#i-eye" : "#i-eye-off");
-            toggle.title = shown ? "Show password" : "Hide password";
-            toggle.setAttribute("aria-label", toggle.title);
-            field.focus();
+        /* A window that changed size while something was zoomed in leaves the
+           picture panned somewhere it can no longer be. */
+        window.addEventListener("resize", function () {
+            if (box.hidden) return;
+            clampPan();
+            apply();
         });
     })();
 
-    /* ---------- the sign-in heading cycles through the configured accounts ---------- */
+    /* ---------- a password field can be unmasked ----------
+       Every reveal button names the field it uncovers in data-reveal, so one
+       handler serves the single field on the sign-in page and the three on
+       /account. It used to be a pair of hard-coded ids, which is why there was
+       no toggle anywhere else.
+
+       The buttons are rendered hidden and revealed here: with scripting off
+       there is nothing behind them, and the field simply stays masked — which
+       is what it would have done anyway. */
     (function () {
-        var heading = document.getElementById("welcome-heading");
-        var emailField = document.getElementById("email");
-        var passwordField = document.getElementById("password");
-        if (!heading || !emailField || !passwordField) return;
+        var buttons = document.querySelectorAll("[data-reveal]");
+        if (!buttons.length) return;
 
-        var accounts;
-        try { accounts = JSON.parse(heading.getAttribute("data-accounts") || "[]"); }
-        catch (e) { return; }
-        if (!accounts || !accounts.length) return;
-
-        var note = document.getElementById("login-switch-note");
-        var at = -1;
-
-        // Built here, not in the template: with no JS there is nothing to click.
-        var button = document.createElement("button");
-        button.type = "button";
-        button.className = "welcome-switch";
-        button.textContent = heading.textContent.trim();
-        button.title = accounts.length > 1 ? "Fill in the next sign-in" : "Fill in the sign-in";
-        button.setAttribute("aria-label", button.title);
-        heading.textContent = "";
-        heading.appendChild(button);
-
-        button.addEventListener("click", function () {
-            at = (at + 1) % accounts.length;
-            var account = accounts[at];
-            emailField.value = account.email || "";
-            passwordField.value = account.password || "";
-            if (!note) return;
-
-            var who = document.createElement("b");
-            who.textContent = account.name || account.email || "";
-            note.textContent = "Filled in for ";
-            note.appendChild(who);
-            if (accounts.length > 1) {
-                note.appendChild(document.createTextNode(" · " + (at + 1) + " of " + accounts.length));
+        Array.prototype.forEach.call(buttons, function (button) {
+            if (document.getElementById(button.getAttribute("data-reveal"))) {
+                button.hidden = false;          // only offered when it can work
             }
-            note.hidden = false;
+        });
+
+        document.addEventListener("click", function (e) {
+            var button = e.target.closest && e.target.closest("[data-reveal]");
+            if (!button) return;
+            var field = document.getElementById(button.getAttribute("data-reveal"));
+            if (!field) return;
+
+            var shown = field.type === "text";
+            field.type = shown ? "password" : "text";
+            var use = button.querySelector("use");
+            if (use) use.setAttribute("href", shown ? "#i-eye" : "#i-eye-off");
+            // The button is icon-only and its meaning just flipped, so both the
+            // tooltip and the accessible name flip with it.
+            button.title = shown ? "Show password" : "Hide password";
+            button.setAttribute("aria-label", button.title);
+            button.setAttribute("aria-pressed", shown ? "false" : "true");
+            field.focus();
         });
     })();
 
@@ -1104,6 +1766,12 @@
             pad.remove();
             return ok ? Promise.resolve() : Promise.reject(new Error("clipboard refused"));
         }
+
+        /* The code blocks want the same thing, including the non-secure-context
+           fallback above. One implementation: "put this on the clipboard" is
+           the same problem wherever it is asked. */
+        window.BT = window.BT || {};
+        window.BT.copyText = write;
     })();
 
     /* ---------- destructive forms confirm once, from a data attribute ----------

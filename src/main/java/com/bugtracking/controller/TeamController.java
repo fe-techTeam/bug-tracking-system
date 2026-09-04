@@ -1,5 +1,6 @@
 package com.bugtracking.controller;
 
+import com.bugtracking.model.MemberRole;
 import com.bugtracking.model.Project;
 import com.bugtracking.model.TeamMember;
 import com.bugtracking.service.BugService;
@@ -169,6 +170,31 @@ public class TeamController {
         return SafeRedirect.to(back, "redirect:/settings?tab=team");
     }
 
+    /**
+     * Makes somebody an administrator, or takes it back.
+     *
+     * <p>Admin-only, like everything else that posts here — see
+     * {@code SecurityConfig.filterChain}. The refusals that matter (a badge on
+     * somebody who cannot sign in, and demoting the last admin) belong to the
+     * service, because hiding and clearing a password reach the same cliff by
+     * different routes.
+     */
+    @PostMapping("/{id}/role")
+    public String setRole(@PathVariable Long id,
+                          @RequestParam String role,
+                          @RequestParam(required = false) String back,
+                          RedirectAttributes flash) {
+        try {
+            var member = service.setRole(id, MemberRole.of(role));
+            flash.addFlashAttribute("message", member.isAdmin()
+                    ? member.getName() + " can now manage projects, people and passwords."
+                    : member.getName() + " is a member again.");
+        } catch (IllegalArgumentException e) {
+            flash.addFlashAttribute("message", e.getMessage());
+        }
+        return SafeRedirect.to(back, "redirect:/settings?tab=team");
+    }
+
     @PostMapping("/{id}/delete")
     public String remove(@PathVariable Long id,
                          @RequestParam(required = false) String back,
@@ -182,15 +208,27 @@ public class TeamController {
         return SafeRedirect.to(back, "redirect:/settings?tab=team");
     }
 
+    /**
+     * Hides somebody, or brings them back.
+     *
+     * <p>Wrapped like the other three: hiding is one of the ways the last
+     * administrator can be taken away, and the service refuses it. Without the
+     * catch that refusal leaves MVC as a 400 — a page saying "something went
+     * wrong" instead of the sentence explaining what to do about it.
+     */
     @PostMapping("/{id}/active")
     public String setActive(@PathVariable Long id,
                             @RequestParam boolean active,
                             @RequestParam(required = false) String back,
                             RedirectAttributes flash) {
-        var member = service.setActive(id, active);
-        flash.addFlashAttribute("message", active
-                ? member.getName() + " is active again."
-                : member.getName() + " is no longer offered in the dropdowns.");
+        try {
+            var member = service.setActive(id, active);
+            flash.addFlashAttribute("message", active
+                    ? member.getName() + " is active again."
+                    : member.getName() + " is no longer offered in the dropdowns.");
+        } catch (IllegalArgumentException e) {
+            flash.addFlashAttribute("message", e.getMessage());
+        }
         return SafeRedirect.to(back, "redirect:/settings?tab=team");
     }
 }

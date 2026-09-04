@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<!--
+  The one email this app sends, whatever it is about.
+
+  Hex values and inline styles everywhere, which is the opposite of the rule the
+  rest of the templates follow — and deliberate. An email client is not a
+  browser: there are no custom properties, no external stylesheet, and Gmail
+  strips most of a <style> block. Anything that has to survive the trip is
+  written on the element. The palette is the app's own light theme, copied by
+  hand, because an inbox has no theme to follow.
+
+  Tables, too, for the same reason: Outlook still renders with Word's engine and
+  a flex row lands as a stack of full-width blocks.
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${headline}">Bug Tracking</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f5f7;
+             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif;
+             color:#1f2430;">
+
+<!-- What a phone shows under the subject line, and nowhere else. -->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;"
+     th:text="${message}">A one-line summary</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="background:#f4f5f7;padding:24px 12px;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="max-width:600px;background:#ffffff;border:1px solid #e3e6ec;border-radius:12px;
+                          overflow:hidden;">
+
+                <tr>
+                    <td style="padding:18px 22px 14px;border-bottom:1px solid #eef0f4;">
+                        <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+                                    font-weight:650;color:#6b7280;"
+                             th:text="${product}">Bug Tracking</div>
+                        <div style="font-size:17px;font-weight:620;margin-top:4px;color:#111827;"
+                             th:text="${headline}">Assigned to you</div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding:18px 22px 4px;">
+                        <p style="margin:0 0 12px;font-size:14px;line-height:1.5;"
+                           th:if="${recipient != null}">
+                            Hello <span th:text="${recipient}">Nishana R</span>,
+                        </p>
+                        <p style="margin:0 0 14px;font-size:14px;line-height:1.55;color:#374151;"
+                           th:text="${message}">BUG-12 was assigned to you.</p>
+
+                        <p style="margin:0 0 14px;font-size:15px;font-weight:600;line-height:1.4;
+                                  color:#111827;"
+                           th:if="${title != null}" th:text="${title}">BUG-12 — the title</p>
+                    </td>
+                </tr>
+
+                <!-- The rail of the bug page. Only the facts that hold
+                     something: a row reading "Module: —" is a row the reader
+                     has to discard. -->
+                <tr th:if="${!#lists.isEmpty(facts)}">
+                    <td style="padding:0 22px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                               style="border:1px solid #eef0f4;border-radius:10px;background:#fafbfc;">
+                            <tr th:each="f : ${facts}">
+                                <td style="padding:7px 12px;font-size:12.5px;color:#6b7280;
+                                           width:130px;vertical-align:top;white-space:nowrap;"
+                                    th:text="${f[0]}">Status</td>
+                                <td style="padding:7px 12px;font-size:13px;color:#1f2430;
+                                           font-weight:530;vertical-align:top;"
+                                    th:text="${f[1]}">In progress</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr th:if="${description != null}">
+                    <td style="padding:16px 22px 0;">
+                        <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+                                    font-weight:650;color:#6b7280;margin-bottom:6px;">The report</div>
+                        <!-- white-space:pre-wrap keeps the reporter's own line
+                             breaks, which is how the description reads in the
+                             app. th:text escapes it, so a report containing a
+                             tag is a report containing a tag. -->
+                        <div style="font-size:13.5px;line-height:1.55;color:#374151;
+                                    white-space:pre-wrap;word-break:break-word;"
+                             th:text="${description}">Steps to reproduce…</div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding:20px 22px 22px;">
+                        <a th:href="${url}" th:text="${action}"
+                           style="display:inline-block;padding:10px 18px;border-radius:8px;
+                                  background:#2563eb;color:#ffffff;text-decoration:none;
+                                  font-size:13.5px;font-weight:600;">Open the bug</a>
+                        <div style="margin-top:10px;font-size:12px;color:#9ca3af;word-break:break-all;"
+                             th:text="${url}">http://localhost:8085/bugs/12</div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding:12px 22px 16px;border-top:1px solid #eef0f4;
+                               font-size:11.5px;color:#9ca3af;line-height:1.5;">
+                        You are getting this because you were named on it in
+                        <span th:text="${product}">Bug Tracking</span>. The same thing is
+                        waiting in the bell when you next open the board.
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

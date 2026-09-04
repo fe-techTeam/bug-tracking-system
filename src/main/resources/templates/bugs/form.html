@@ -9,10 +9,15 @@
            id="form-back" title="Go back" aria-label="Go back">
             <svg class="i" aria-hidden="true"><use href="#i-arrow-left"/></svg>
             </a>
-        <h1 class="topbar-title"
+        <!-- Not in the bar: the trail beside it already reads "Godrej > New bug",
+             and naming the same thing twice a foot apart is what a breadcrumb is
+             for getting rid of — the bug page next door drops its title for the
+             same reason. Kept as .sr-only rather than deleted, because this form
+             has no other h1 and a page whose outline starts at h3 is a page a
+             screen reader cannot summarise. -->
+        <h1 class="sr-only"
             th:text="${editing} ? 'Edit BUG-' + ${bug.id} : 'Raise a bug'">Raise a bug</h1>
         <div th:replace="~{fragments :: crumbs(${ {
-                 {'Board', '/bugs'},
                  {bug.project ?: 'No project', '/bugs?project=' + (bug.project ?: '')},
                  {editing ? 'BUG-' + bug.id : 'New bug', editing ? '/bugs/' + bug.id : null},
                  {editing ? 'Edit' : null, null} } })}"></div>
@@ -66,6 +71,22 @@
                     <span class="field-error" th:if="${#fields.hasErrors('description')}"
                           th:errors="*{description}">Description error</span>
                 </label>
+                <!-- The same control the comment box has: select a pasted
+                     response body, press this, and it is fenced — and indented,
+                     if it is JSON. Revealed by app.js; the fences can always be
+                     typed by hand instead. -->
+                <div class="detail-tools">
+                    <button type="button" class="btn btn-sm btn-ghost code-insert" hidden
+                            data-code-insert="description"
+                            title="Wrap the selection in a code block"
+                            aria-label="Wrap the selection in a code block">
+                        <svg class="i" aria-hidden="true"><use href="#i-code"/></svg>
+                        <span>Code block</span>
+                    </button>
+                    <span class="hint">
+                        Anything between ``` fences keeps its own formatting on the bug.
+                    </span>
+                </div>
             </div>
 
             <!-- ---------- evidence ---------- -->
@@ -169,7 +190,7 @@
                                     <span class="avatar avatar-sm" th:attr="data-avatar=${p}" aria-hidden="true"></span>
                                     <span th:text="${p == me} ? ${p} + ' (me)' : ${p}">Vatsal Motiani</span>
                                 </label>
-                                <p class="pop-empty" id="assignee-none" hidden>Nobody by that name.</p>
+                                <p class="pop-empty pick-none" id="assignee-none" hidden>Nobody by that name.</p>
                             </div>
                             <p class="pop-empty" th:if="${#lists.isEmpty(people)}">
                                 Nobody on this project yet.
@@ -202,6 +223,21 @@
                     </select>
                     <span class="field-error" th:if="${#fields.hasErrors('environment')}"
                           th:errors="*{environment}">Environment error</span>
+                </label>
+
+                <!-- Optional, and it stays optional: a required due date is one
+                     people fill in with a guess to get past the form, and a
+                     board where every card carries a made-up date is a board
+                     where no date means anything. A native date input, so the
+                     phone gets its own picker and the value arrives as ISO. -->
+                <label style="margin-top:12px">
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-clock"/></svg>
+                        Due <em class="muted">optional</em>
+                    </span>
+                    <input type="date" th:field="*{dueDate}" id="dueDate">
+                    <span class="field-error" th:if="${#fields.hasErrors('dueDate')}"
+                          th:errors="*{dueDate}">Due date error</span>
                 </label>
             </div>
 

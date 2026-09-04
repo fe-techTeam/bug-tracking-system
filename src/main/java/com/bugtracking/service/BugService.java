@@ -9,6 +9,7 @@ import com.bugtracking.repository.BugRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -24,6 +25,10 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class BugService {
+
+    /** How a due date reads in the history trail. Locale-fixed, like every other stamp. */
+    private static final java.time.format.DateTimeFormatter DUE_STAMP =
+            java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH);
 
     private final BugRepository repository;
     private final BoardColumnService columns;
@@ -138,9 +143,28 @@ public class BugService {
         long open = scope.stream().filter(board::openWork).count();
         long maxStatus = byStatus.values().stream().mapToLong(Long::longValue).max().orElse(0);
         long unassigned = scope.stream().filter(b -> b.getAssignees().isEmpty()).count();
+        // What is owed, read forward from today. Asked of open work only — a
+        // finished bug that carried a date is not something left to plan for —
+        // and cumulative, so a bug due on Thursday is inside all three windows.
+        // Anything already past due is inside every one of them too: work that
+        // is late is still work that is owed, and dropping it would let a
+        // slipping project read as an empty week.
+        LocalDate today = LocalDate.now();
+        long dueWeek = dueBy(scope, board, today.plusWeeks(1));
+        long dueMonth = dueBy(scope, board, today.plusMonths(1));
+        long dueQuarter = dueBy(scope, board, today.plusMonths(3));
 
         return new Dashboard(scopeName, scope.size(), byStatus, bySeverity, byEnvironment,
-                urgent, open, maxStatus, unassigned, scope.stream().map(Bug::getId).toList());
+                urgent, open, maxStatus, unassigned, dueWeek, dueMonth, dueQuarter,
+                scope.stream().map(Bug::getId).toList());
+    }
+
+    /** Open bugs in scope carrying a due date no later than {@code limit}. */
+    private static long dueBy(List<Bug> scope, BoardColumns board, LocalDate limit) {
+        return scope.stream()
+                .filter(board::openWork)
+                .filter(bug -> bug.getDueDate() != null && !bug.getDueDate().isAfter(limit))
+                .count();
     }
 
     /** A live bug. A trashed one reads as gone, because that is what it is. */
@@ -201,6 +225,9 @@ public class BugService {
                 board.label(changes.getProject(), changes.getStatus()), actor);
         history.recordIfChanged(id, "project", existing.getProject(), changes.getProject(), actor);
         history.recordIfChanged(id, "module", existing.getModule(), changes.getModule(), actor);
+        // Written out rather than stored as the ISO value: the trail is read by
+        // people, and "12 Sep 2026" is the date they set.
+        history.recordIfChanged(id, "due", due(existing.getDueDate()), due(changes.getDueDate()), actor);
         history.recordIfChanged(id, "assigned", existing.getAssigneesLabel(),
                 changes.getAssigneesLabel(), actor);
         history.recordIfChanged(id, "blocked", blockerLabel(existing.getBlockedBy()),
@@ -216,6 +243,7 @@ public class BugService {
         existing.setStatus(changes.getStatus());
         existing.setProject(changes.getProject());
         existing.setModule(changes.getModule());
+        existing.setDueDate(changes.getDueDate());
         existing.setReportedBy(changes.getReportedBy());
         existing.setAssignees(changes.getAssignees());
         existing.setBlockedBy(validBlocker(id, changes.getBlockedBy()));
@@ -278,6 +306,27 @@ public class BugService {
         history.record(id, "status", board.label(bug.getProject(), before), board.label(saved), actor);
         notifyStatusChange(saved, board, Set.of());
         return saved;
+    }
+
+    /**
+     * Sets or clears the due date on its own, without touching anything else.
+     *
+     * <p>The edit form can do this too, but going through it to change one date
+     * means re-submitting the title, the report and every dropdown — and any of
+     * those could carry a stale value from the moment the form was opened. This
+     * is the same reason status, assignees and the blocker each have a path of
+     * their own.
+     *
+     * <p>A null date clears it, which is what an empty date input sends.
+     */
+    public Bug setDueDate(Long id, java.time.LocalDate dueDate, String actor) {
+        Bug bug = findById(id);
+        if (Objects.equals(bug.getDueDate(), dueDate)) {
+            return bug;
+        }
+        history.recordIfChanged(id, "due", due(bug.getDueDate()), due(dueDate), actor);
+        bug.setDueDate(dueDate);
+        return repository.save(bug);
     }
 
     /** Single-name assign, kept for the JSON API and anything scripted. */
@@ -552,28 +601,68 @@ public class BugService {
      * would sort alphabetically (Critical, High, Low, Medium) rather than by how
      * bad it is; a comparator over the enum gets it right, and this app's board
      * is small enough that it costs nothing.
+     *
+     * <p>A leading {@code -} turns any of these round, so the list view's column
+     * headings can flip on a second click: {@code title} is A&ndash;Z and
+     * {@code -title} is Z&ndash;A. {@code newest} and {@code oldest} are each
+     * other's opposite already and both stay, because they are what the Order
+     * menu and every link written before this understood.
+     *
+     * <p>An unknown name sorts nothing rather than throwing — a sort is a way of
+     * reading a list, and a typed URL should not be able to make the list itself
+     * unreachable.
      */
     private List<Bug> sorted(List<Bug> bugs, String sort) {
-        if (sort == null || sort.isBlank() || "newest".equals(sort)) {
+        String key = sort == null ? "" : sort.trim();
+        boolean flipped = key.startsWith("-");
+        if (flipped) {
+            key = key.substring(1);
+        }
+        if (key.isEmpty() || ("newest".equals(key) && !flipped)) {
             return bugs;                                  // the query already did this
         }
-        List<Bug> out = new ArrayList<>(bugs);
-        switch (sort) {
-            case "oldest" -> out.sort(Comparator.comparing(Bug::getCreatedAt));
-            case "updated" -> out.sort(Comparator.comparing(Bug::getUpdatedAt).reversed());
-            case "severity" -> out.sort(Comparator.comparing(Bug::getSeverity)
-                    .thenComparing(Bug::getCreatedAt, Comparator.reverseOrder()));
+
+        // Level on the column that was clicked, newest first: the order the
+        // list has whenever nobody has asked for another one.
+        Comparator<java.time.LocalDateTime> raised = Comparator.reverseOrder();
+        Comparator<Bug> order = switch (key) {
+            case "newest" -> Comparator.comparing(Bug::getCreatedAt, raised);
+            case "oldest" -> Comparator.comparing(Bug::getCreatedAt);
+            case "updated" -> Comparator.comparing(Bug::getUpdatedAt).reversed();
+            case "severity" -> Comparator.comparing(Bug::getSeverity)
+                    .thenComparing(Bug::getCreatedAt, raised);
             case "status" -> {
                 // By where the column sits on its board, not by the key: sorting
                 // on the stored string would put Closed before In Progress.
                 BoardColumns board = columns.snapshot();
-                out.sort(Comparator.comparingInt((Bug b) -> board.step(b.getProject(), b.getStatus()))
-                        .thenComparing(Bug::getCreatedAt, Comparator.reverseOrder()));
+                yield Comparator.comparingInt((Bug b) -> board.step(b.getProject(), b.getStatus()))
+                        .thenComparing(Bug::getCreatedAt, raised);
             }
-            case "title" -> out.sort(Comparator.comparing(Bug::getTitle, String.CASE_INSENSITIVE_ORDER));
-            default -> { /* unknown sort: leave the newest-first order alone */ }
+            // Soonest first, and the ones with no due date last rather than
+            // first — a bug nobody put a date on is not the most urgent thing
+            // on the board, which is what nulls-first would claim. Turned round
+            // it is latest first and the undated ones are *still* last: no date
+            // is not a date at either end of the range, so it never leads.
+            case "due" -> Comparator.comparing(Bug::getDueDate,
+                            Comparator.nullsLast(flipped ? Comparator.<LocalDate>reverseOrder()
+                                                         : Comparator.<LocalDate>naturalOrder()))
+                    .thenComparing(Bug::getCreatedAt, raised);
+            case "title" -> Comparator.comparing(Bug::getTitle, String.CASE_INSENSITIVE_ORDER);
+            default -> null;
+        };
+        if (order == null) {
+            return bugs;                                  // unknown sort: newest first, as before
         }
+
+        List<Bug> out = new ArrayList<>(bugs);
+        // "due" has already turned itself round, inside the nulls-last wrapper.
+        out.sort(flipped && !"due".equals(key) ? order.reversed() : order);
         return out;
+    }
+
+    /** A due date as the history trail should read it, or null for "not set". */
+    private static String due(java.time.LocalDate date) {
+        return date == null ? null : DUE_STAMP.format(date);
     }
 
     /** Lets "12", "#12" and "BUG-12" in the search box find bug 12. */

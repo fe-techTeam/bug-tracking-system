@@ -174,16 +174,27 @@
                         <!-- Sorting is not filtering, so it never counts towards the
                              badge — but it is a way of reading the same list, and the
                              list view is the only place it applies. -->
-                        <div class="fmenu-col" th:if="${view == 'list'}">
+                        <div class="fmenu-col" th:if="${view == 'list'}"
+                             th:with="order=${sort == null} ? 'newest'
+                                            : (${#strings.startsWith(sort, '-')} ? ${#strings.substring(sort, 1)} : ${sort})">
                             <p class="fmenu-head">Order</p>
-                            <a class="fmenu-opt" th:each="opt : ${ {'newest','oldest','updated','severity','title'} }"
+                            <!-- Ticked on the order, not on its direction: the
+                                 headings turn each of these round and write a
+                                 "-" in front of it, and a menu that then showed
+                                 nothing ticked would claim the list was in no
+                                 order at all. "Board order" is the one the menu
+                                 never offered even though the service has always
+                                 answered it. -->
+                            <a class="fmenu-opt" th:each="opt : ${ {'newest','oldest','updated','due','severity','status','title'} }"
                                th:href="@{${'/bugs' + q.with('sort', opt)}}"
-                               th:classappend="${opt == (sort != null ? sort : 'newest')} ? 'is-active' : ''">
+                               th:classappend="${opt == order} ? 'is-active' : ''">
                                 <svg class="i tick" aria-hidden="true"><use href="#i-check"/></svg>
                                 <span th:switch="${opt}">
                                     <span th:case="'oldest'">Oldest first</span>
                                     <span th:case="'updated'">Recently updated</span>
+                                    <span th:case="'due'">Due soonest</span>
                                     <span th:case="'severity'">Severity, worst first</span>
+                                    <span th:case="'status'">Board order</span>
                                     <span th:case="'title'">Title A–Z</span>
                                     <span th:case="*">Newest first</span>
                                 </span>
@@ -204,7 +215,14 @@
 
         <div class="topbar-actions">
             <div class="seg" role="group" aria-label="View">
-                <a th:href="@{${'/bugs' + q.without('view')}}"
+                <!-- Board says ?view=board rather than dropping the parameter.
+                     A /bugs URL with no view on it means "the way I was last
+                     reading these", which is what makes Home one link — so
+                     leaving it off here asked for the view you are trying to
+                     leave, and the button did nothing from Stats or List. It
+                     is the one view whose name is also the default, and that
+                     is exactly why it has to say it. -->
+                <a th:href="@{${'/bugs' + q.with('view', 'board')}}"
                    th:classappend="${view == 'board'} ? 'is-active' : ''" id="view-board">
                     <svg class="i" aria-hidden="true"><use href="#i-columns"/></svg>
                     <span>Board</span>
@@ -282,90 +300,34 @@
     </div>
 
     <!-- ============ the numbers, as a view of their own ============ -->
-    <!-- This used to be a drawer that folded down over the board from a strip of
-         three counts in the bar. Three counts is not a dashboard and a drawer is
-         not somewhere you read one, so it became the third view: the same board,
-         answered as totals. Every number here is a link to the bugs behind it,
-         and those links leave the view for the board — a filter applied to a
-         page of totals would silently change the question. -->
+    <!-- Two questions, and nothing else on the page. This started as a drawer
+         of three counts, became five panels and then four — tiles, a progress
+         bar, a severity split and a feed of what happened lately. Every one of
+         those was already readable somewhere better: severity is a filter one
+         click away in the bar, the feed is each bug's own timeline, and a
+         percentage finished is a number you can only act on by looking at the
+         columns anyway. What people actually open Stats to ask is where the
+         work is sitting and how much of it is owed soon, so that is all that
+         is left.
+
+         The columns link to the bugs behind them, and the link leaves for the
+         board: a filter applied to a page of totals would silently change the
+         question. The due windows do not link — the board has no due filter to
+         send them to, and a row that navigates somewhere unable to show the
+         bugs it just counted is worse than a row that sits still. -->
     <div class="content" th:if="${view == 'stats' and !noProjects}" id="stats-view">
         <div class="stack">
-
-            <!-- ---------- where the project stands ---------- -->
-            <div class="panel">
-                <div class="panel-head">
-                    <h2 th:text="${selectedProject} ?: 'Every project'">Godrej</h2>
-                    <span class="count-pill"
-                          th:text="${dashboard.total} + (${dashboard.total == 1} ? ' bug' : ' bugs')">24 bugs</span>
-                </div>
-                <div class="panel-pad">
-                    <!-- Four numbers, not five. "Total" was the count already in
-                         the pill beside the heading, said twice on one screen. -->
-                    <div class="kpi-row kpi-row-wide">
-                        <div class="kpi" style="--i:0; --c: var(--st-IN_PROGRESS)">
-                            <span class="kpi-value num" th:attr="data-count=${dashboard.open}"
-                                  th:text="${dashboard.open}">9</span>
-                            <span class="kpi-label">Still open</span>
-                        </div>
-                        <!-- Critical and High, still in a column this project does
-                             not count as finished. The link goes to those bugs. -->
-                        <a class="kpi" style="--i:1; --c: var(--sev-CRITICAL)"
-                           th:href="@{${'/bugs' + q.board('severity', 'CRITICAL')}}"
-                           th:classappend="${dashboard.urgent > 0} ? 'is-hot' : ''">
-                            <span class="kpi-value num" th:attr="data-count=${dashboard.urgent}"
-                                  th:text="${dashboard.urgent}">2</span>
-                            <span class="kpi-label">
-                                <span class="dot" th:classappend="${dashboard.urgent > 0} ? 'is-live' : ''"></span>
-                                Urgent
-                            </span>
-                        </a>
-                        <!-- Everything in a column this project counts as finished.
-                             Asking for a column called "Closed" by name stopped
-                             working the moment columns became renameable. -->
-                        <div class="kpi" style="--i:2; --c: var(--col-GREEN)">
-                            <span class="kpi-value num" th:attr="data-count=${dashboard.done()}"
-                                  th:text="${dashboard.done()}">13</span>
-                            <span class="kpi-label">Done</span>
-                        </div>
-                        <div class="kpi" style="--i:3; --c: var(--muted)">
-                            <span class="kpi-value num" th:attr="data-count=${dashboard.unassigned}"
-                                  th:text="${dashboard.unassigned}">4</span>
-                            <span class="kpi-label">Unassigned</span>
-                        </div>
-                    </div>
-
-                    <!-- One sentence of plain English under the tiles, because a
-                         row of numbers is not yet a reading of them. -->
-                    <div class="progress" th:if="${dashboard.total > 0}">
-                        <div class="progress-track" role="img"
-                             th:attr="aria-label=${dashboard.donePercent()} + '% done'">
-                            <i th:style="'--w:' + ${dashboard.donePercent()} + '%'"></i>
-                        </div>
-                        <p class="hint">
-                            <b class="num" th:text="${dashboard.donePercent()} + '%'">54%</b>
-                            finished — <span class="num" th:text="${dashboard.open}">9</span> still in hand.
-                        </p>
-                    </div>
-                    <p class="hint" th:if="${dashboard.total == 0}">
-                        Nothing raised here yet, so there is nothing to count.
-                    </p>
-                </div>
-            </div>
-
-            <!-- ---------- the two splits worth reading ----------
-                 This page used to carry five panels: by column, by severity, by
-                 environment, the team, and what happened lately. Environment is
-                 three values you can already filter to in one click, and the
-                 team is what the team drawer is for — both were a panel each
-                 for a fact nobody came here to read. What is left is where the
-                 work is sitting and how bad it is, side by side.
-
-                 The stacked distribution bar that used to sit above the column
-                 rows went too: it said exactly what the rows underneath it say,
-                 in a form you cannot read a number off. -->
             <div class="two-col">
+
+                <!-- ---------- where the work is sitting ---------- -->
                 <div class="panel">
-                    <div class="panel-head"><h2>By column</h2></div>
+                    <div class="panel-head">
+                        <h2>By column</h2>
+                        <!-- The project this counts is named by the switcher in
+                             the sidebar, on this page as on every other one. -->
+                        <span class="count-pill"
+                              th:text="${dashboard.total} + (${dashboard.total == 1} ? ' bug' : ' bugs')">24 bugs</span>
+                    </div>
                     <div class="panel-pad">
                         <div class="heat">
                             <a class="heat-card" th:each="c,st : ${boardColumns}"
@@ -385,58 +347,62 @@
                         <p class="hint" th:if="${#lists.isEmpty(boardColumns)}">
                             This board has no columns yet.
                         </p>
+                        <p class="hint" th:if="${dashboard.total == 0 and !#lists.isEmpty(boardColumns)}">
+                            Nothing raised here yet, so there is nothing to count.
+                        </p>
                     </div>
                 </div>
 
-                <!-- ---------- severity: rule 2, heat, and rule 3, a count ---------- -->
+                <!-- ---------- what is owed, and by when ----------
+                     Three windows on one list rather than three separate
+                     buckets: a bug due on Thursday is inside all three, so the
+                     counts only ever grow across the rows. Painted on the
+                     severity scale on purpose — rule 2 is that heat means
+                     pressing, and nearer is exactly that. -->
                 <div class="panel">
-                    <div class="panel-head"><h2>By severity</h2></div>
+                    <div class="panel-head"><h2>Due</h2></div>
                     <div class="panel-pad">
-                        <div class="heat">
-                            <a class="heat-card" th:each="sev,st : ${severities}"
-                               th:href="@{${'/bugs' + q.board('severity', sev)}}"
-                               th:style="'--i:' + ${st.index} + '; --c: var(--sev-' + ${sev} + ')'">
+                        <div class="heat heat-due">
+                            <span class="heat-card is-flat" style="--i:0; --c: var(--sev-CRITICAL)">
                                 <span class="heat-name">
-                                    <span class="meter" th:classappend="'sev-' + ${sev}" aria-hidden="true">
-                                        <i></i><i></i><i></i><i></i>
-                                    </span>
-                                    <span th:text="${sev.label}">Critical</span>
+                                    <span class="dot dot-lg"></span>
+                                    <span>This week</span>
                                 </span>
                                 <span class="heat-track">
-                                    <i th:style="'--w:' + ${#numbers.formatDecimal(dashboard.percent(dashboard.bySeverity.get(sev.label)), 1, 2, 'POINT')} + '%'"></i>
+                                    <i th:style="'--w:' + ${#numbers.formatDecimal(dashboard.dueShare(dashboard.dueWeek), 1, 2, 'POINT')} + '%'"></i>
                                 </span>
-                                <span class="heat-value num"
-                                      th:text="${dashboard.bySeverity.get(sev.label)}">2</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ---------- what has been happening ---------- -->
-            <div class="panel" th:if="${!#lists.isEmpty(activity)}">
-                <div class="panel-head"><h2>Lately</h2></div>
-                <div class="panel-pad">
-                    <ol class="feed">
-                        <li class="feed-row" th:each="h,st : ${activity}" th:style="'--i:' + ${st.index}">
-                            <span class="avatar avatar-sm" th:attr="data-avatar=${h.actor}" aria-hidden="true"></span>
-                            <span class="feed-text">
-                                <b th:text="${h.actor}">Nishana R</b>
-                                <!-- The action is one word from a fixed set —
-                                     "status", "assigned", "comment". A tag rather
-                                     than prose, because wrapping each of the
-                                     fourteen in a sentence would be fourteen
-                                     translations of a log line. -->
-                                <span class="tag" th:text="${h.action}">status</span>
-                                <a class="bug-link" th:href="@{/bugs/{id}(id=${h.bugId})}"
-                                   th:text="'BUG-' + ${h.bugId}">BUG-12</a>
-                                <span class="muted" th:if="${h.newValue != null}"
-                                      th:text="'→ ' + ${h.newValue}">→ Fixed</span>
+                                <span class="heat-value num" th:text="${dashboard.dueWeek}">3</span>
                             </span>
-                            <span class="when" th:attr="data-time=${h.changedAt}"
-                                  th:text="${#temporals.format(h.changedAt, 'dd MMM, HH:mm')}">01 Jan</span>
-                        </li>
-                    </ol>
+                            <span class="heat-card is-flat" style="--i:1; --c: var(--sev-MEDIUM)">
+                                <span class="heat-name">
+                                    <span class="dot dot-lg"></span>
+                                    <span>This month</span>
+                                </span>
+                                <span class="heat-track">
+                                    <i th:style="'--w:' + ${#numbers.formatDecimal(dashboard.dueShare(dashboard.dueMonth), 1, 2, 'POINT')} + '%'"></i>
+                                </span>
+                                <span class="heat-value num" th:text="${dashboard.dueMonth}">8</span>
+                            </span>
+                            <span class="heat-card is-flat" style="--i:2; --c: var(--sev-LOW)">
+                                <span class="heat-name">
+                                    <span class="dot dot-lg"></span>
+                                    <span>3 months</span>
+                                </span>
+                                <span class="heat-track">
+                                    <i th:style="'--w:' + ${#numbers.formatDecimal(dashboard.dueShare(dashboard.dueQuarter), 1, 2, 'POINT')} + '%'"></i>
+                                </span>
+                                <span class="heat-value num" th:text="${dashboard.dueQuarter}">14</span>
+                            </span>
+                        </div>
+                        <p class="hint" th:if="${dashboard.dueQuarter > 0}">
+                            Open bugs carrying a due date inside each window, counted from
+                            today. Anything already late is inside all three — work that has
+                            slipped is still work that is owed.
+                        </p>
+                        <p class="hint" th:if="${dashboard.dueQuarter == 0}">
+                            Nothing open here is dated for the next three months.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -505,16 +471,38 @@
                     </summary>
 
                     <div class="fmenu-pop to-right kcol-pop">
-                        <!-- Rename. The key every bug in here stores is not the
-                             name, so this changes the wording and nothing else. -->
-                        <form method="post" th:action="@{/columns/{id}(id=${col.key.id})}" class="kcol-rename">
-                            <input type="hidden" name="from" value="board">
-                            <label class="sr-only" th:for="'rename-' + ${col.key.id}">Column name</label>
-                            <input type="text" name="label" th:id="'rename-' + ${col.key.id}"
-                                   th:value="${col.key.label}" required maxlength="40"
-                                   autocomplete="off" autocapitalize="words" autocorrect="off"
-                                   spellcheck="false" enterkeyhint="done">
-                            <button type="submit" class="btn btn-sm btn-primary">Rename</button>
+                        <!-- Everything about one column, saved together. The key
+                             every bug in here stores is not the name, so the top
+                             field changes the wording and nothing else.
+
+                             The other two used to live in a fuller editor behind
+                             Settings, which was the same controls in a place
+                             nobody was standing when they noticed a column was
+                             wrong. They are here now, and Settings has no Board
+                             tab at all. -->
+                        <form method="post" th:action="@{/columns/{id}(id=${col.key.id})}" class="kcol-edit">
+                            <label class="kcol-rename">
+                                <span class="sr-only">Column name</span>
+                                <input type="text" name="label" th:id="'rename-' + ${col.key.id}"
+                                       th:value="${col.key.label}" required maxlength="40"
+                                       autocomplete="off" autocapitalize="words" autocorrect="off"
+                                       spellcheck="false" enterkeyhint="done">
+                            </label>
+                            <label>
+                                <span>Bugs here are</span>
+                                <select name="done" th:id="'done-' + ${col.key.id}">
+                                    <option value="false" th:selected="${!col.key.doneState}">still work in hand</option>
+                                    <option value="true" th:selected="${col.key.doneState}">finished</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>Tell, when a bug lands here</span>
+                                <select name="notify" th:id="'notify-' + ${col.key.id}">
+                                    <option th:each="n : ${notifyModes}" th:value="${n}"
+                                            th:text="${n.label}" th:selected="${n == col.key.notify}">Nobody</option>
+                                </select>
+                            </label>
+                            <button type="submit" class="btn btn-sm btn-primary btn-block">Save column</button>
                         </form>
 
                         <!-- Colour. One swatch per token in the palette, so the
@@ -529,7 +517,6 @@
                         <!-- The no-JavaScript half of reordering. -->
                         <div class="kcol-moves">
                             <form method="post" th:action="@{/columns/{id}/move(id=${col.key.id})}" class="inline-form">
-                                <input type="hidden" name="from" value="board">
                                 <input type="hidden" name="direction" value="left">
                                 <button type="submit" class="btn btn-sm btn-ghost" data-move="left"
                                         th:disabled="${cs.first}"
@@ -539,7 +526,6 @@
                                 </button>
                             </form>
                             <form method="post" th:action="@{/columns/{id}/move(id=${col.key.id})}" class="inline-form">
-                                <input type="hidden" name="from" value="board">
                                 <input type="hidden" name="direction" value="right">
                                 <button type="submit" class="btn btn-sm btn-ghost" data-move="right"
                                         th:disabled="${cs.last}"
@@ -553,17 +539,14 @@
                         <div class="fmenu-sep"></div>
 
                         <!-- Removing a column still has to say where its bugs go, but the
-                             board no longer asks: they follow the board's own order to the
+                             board does not ask: they follow the board's own order to the
                              first other column, and the confirm names it before anything
-                             moves. Settings -> Board keeps the full chooser for the times
-                             that default is not the one you want.
-                             The last column will not delete: a board needs one. -->
+                             moves. The last column will not delete: a board needs one. -->
                         <form method="post" th:action="@{/columns/{id}/delete(id=${col.key.id})}"
                               class="kcol-remove" th:if="${#lists.size(boardColumns) > 1}"
                               th:with="target=${boardColumns.?[id != __${col.key.id}__][0]},
                                        held=${#lists.size(col.value)}"
                               th:attr="onsubmit=|return confirm('Remove the ${col.key.label} column?${held == 0 ? '' : ' Its ' + held + (held == 1 ? ' bug moves to ' : ' bugs move to ') + target.label + '.'}');|">
-                            <input type="hidden" name="from" value="board">
                             <input type="hidden" name="moveTo" th:if="${held > 0}" th:value="${target.id}">
                             <button type="submit" class="btn btn-sm btn-danger btn-block"
                                     th:attr="aria-label='Remove the ' + ${col.key.label} + ' column'">
@@ -572,6 +555,17 @@
                         </form>
                     </div>
                 </details>
+
+                <!-- Fold this column into a strip. Rendered hidden and revealed
+                     by app.js: it is a view convenience with no server route
+                     behind it, and a button that does nothing with JavaScript
+                     off is worse than no button at all. -->
+                <button type="button" class="kcol-fold" hidden
+                        th:attr="data-fold=${col.key.statusKey},
+                                 aria-label='Fold the ' + ${col.key.label} + ' column away',
+                                 title='Fold ' + ${col.key.label}">
+                    <svg class="i" aria-hidden="true"><use href="#i-chevrons-left"/></svg>
+                </button>
             </header>
 
             <!-- data-done is how the drag handler knows what to leave out of the
@@ -600,14 +594,28 @@
                        th:text="${bug.title}"
                        th:attr="aria-label='BUG-' + ${bug.id} + ': ' + ${bug.title}">Sign-in swallows the first click</a>
 
-                    <p class="kcard-note" th:if="${files != null or said != null or blocker != null}">
-                        <span th:if="${files != null}"
-                              th:text="${files} + (${files == 1} ? ' attachment' : ' attachments')">3 attachments</span>
+                    <p class="kcard-note"
+                       th:if="${files != null or said != null or blocker != null or bug.dueDate != null}">
+                        <!-- A count, drawn the way the comment count beside it
+                             already is: the glyph says what it counts, so the
+                             row reads as marks on a card rather than as a
+                             sentence about it. "3 attachments" was the only
+                             prose left in a line of icons. -->
+                        <span class="kcard-files" th:if="${files != null}">
+                            <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                            <span class="num" th:text="${files}">3</span>
+                            <span class="sr-only"
+                                  th:text="${files == 1} ? 'attachment' : 'attachments'">attachments</span>
+                        </span>
                         <span class="kcard-said" th:if="${said != null}">
                             <svg class="i" aria-hidden="true"><use href="#i-message"/></svg>
                             <span class="num" th:text="${said}">2</span>
                             <span class="sr-only" th:text="${said == 1} ? 'comment' : 'comments'">comments</span>
                         </span>
+                        <!-- Last in the row: the counts describe what is on the
+                             card, the date is about the work itself. -->
+                        <span th:replace="~{fragments :: due(${bug}, ${cols}, true)}"></span>
+
                         <!-- Only while the blocker is still open: a bug waiting
                              on something already fixed is not blocked. -->
                         <span class="blocked-mark" th:if="${blocker != null and cols.openWork(blocker)}"
@@ -642,6 +650,74 @@
                         </span>
                     </div>
 
+                    <!-- The two things anybody does to a bug without opening it.
+                         The summary is absolute, in the corner, so it costs the
+                         card no height; what it opens is an ordinary block at the
+                         foot of the card, because .kcol-body scrolls and a
+                         popover out of it would be clipped by the column.
+
+                         .fmenu alongside, so it inherits one-open-at-a-time and
+                         click-away from the filter menus. Every option is a real
+                         submit button to a route that already existed, so this
+                         works with scripting off — which matters more here than
+                         anywhere: dragging a card is a mouse's trick, and a
+                         phone and a keyboard have never had one. -->
+                    <details class="fmenu kcard-menu" draggable="false">
+                        <summary th:attr="aria-label='Actions for BUG-' + ${bug.id},
+                                          title='Actions for BUG-' + ${bug.id}">
+                            <span class="kcard-menu-btn">
+                                <svg class="i" aria-hidden="true"><use href="#i-more"/></svg>
+                            </span>
+                        </summary>
+
+                        <div class="kcard-menu-pop">
+                            <p class="fmenu-head">Move to</p>
+
+                            <!-- One form and a button per column, not a form per
+                                 column: a submit button carries its own name and
+                                 value, so the status the route reads is simply
+                                 the one that was pressed.
+
+                                 cols.of(bug.project), not the board's own
+                                 columns — a cross-project view (?assignee=me)
+                                 must offer each card the columns of its own
+                                 project, the way the list's picker does. -->
+                            <form method="post" class="kcard-menu-list"
+                                  th:action="@{/bugs/{id}/status(id=${bug.id})}">
+                                <input type="hidden" name="actor" class="actor-field">
+                                <!-- Land back on this board, filters and order still on. -->
+                                <input type="hidden" name="from" th:value="${'/bugs' + q.query()}">
+                                <button type="submit" class="kcard-menu-opt" name="status"
+                                        th:each="c : ${cols.of(bug.project)}"
+                                        th:value="${c.statusKey}"
+                                        th:disabled="${c.statusKey == bug.status}"
+                                        th:style="'--c:' + ${c.token}"
+                                        th:attr="aria-label='Move BUG-' + ${bug.id} + ' to ' + ${c.label}">
+                                    <span class="kcard-menu-dot" aria-hidden="true"></span>
+                                    <span th:text="${c.label}">In progress</span>
+                                </button>
+                            </form>
+
+                            <div class="fmenu-sep"></div>
+
+                            <!-- data-confirm rather than an inline onsubmit: the
+                                 same reason the attachment rows use it, and app.js
+                                 asks before the form goes. The bug is recoverable
+                                 from the trash, and the toast that lands offers
+                                 the undo. -->
+                            <form method="post"
+                                  th:action="@{/bugs/{id}/delete(id=${bug.id})}"
+                                  th:attr="data-confirm='Move BUG-' + ${bug.id} + ' to the trash?'">
+                                <input type="hidden" name="actor" class="actor-field">
+                                <button type="submit" class="kcard-menu-opt kcard-menu-danger"
+                                        th:attr="aria-label='Move BUG-' + ${bug.id} + ' to the trash'">
+                                    <svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>
+                                    <span>Move to trash</span>
+                                </button>
+                            </form>
+                        </div>
+                    </details>
+
                 </article>
 
                 <!-- Two words. It used to explain how a bug gets into a column,
@@ -667,7 +743,6 @@
 
                 <div class="fmenu-pop kcol-pop">
                     <form method="post" th:action="@{/columns}" class="kcol-add">
-                        <input type="hidden" name="from" value="board">
                         <input type="hidden" name="project" th:value="${selectedProject}">
 
                         <label>
@@ -692,7 +767,7 @@
                         </button>
                         <p class="hint">
                             It joins the end of the board. Who gets told when a bug lands here
-                            is set in <a th:href="@{/settings(tab='board', project=${selectedProject})}">Settings</a>.
+                            is in the column's own menu once it is there.
                         </p>
                     </form>
                 </div>
@@ -723,30 +798,48 @@
 
         <div class="panel table-wrap" th:unless="${#lists.isEmpty(bugs)}">
             <table class="bug-table" id="bug-table">
+                <!-- The headings sort. The orders were always there — the
+                     service has answered ?sort= since the list did — but the
+                     only way to reach them was a column of a filter menu called
+                     "Order", which is not where anybody looks for it: a table
+                     you can read down is a table you expect to click the top
+                     of. Assigned and Raised by stay plain, because neither has
+                     a server-side order behind it and a heading that looks
+                     clickable and is not is worse than one that does not. -->
                 <thead>
                 <tr>
-                    <th><span class="sr-only">Severity</span></th>
+                    <!-- The rail: a colour, not a column. Severity has words of
+                         its own on the right now. -->
+                    <th class="rail-h"></th>
                     <th>Bug</th>
-                    <th class="grow">Title</th>
-                    <th>Status</th>
+                    <th th:replace="~{fragments :: sortHead('title', '-title', 'Title', 'grow')}"></th>
+                    <th th:replace="~{fragments :: sortHead('status', '-status', 'Status', '')}"></th>
                     <th>Assigned</th>
                     <th>Raised by</th>
-                    <th>Reported</th>
+                    <th th:replace="~{fragments :: sortHead('due', '-due', 'Due', '')}"></th>
+                    <th th:replace="~{fragments :: sortHead('oldest', 'newest', 'Reported', '')}"></th>
+                    <th th:replace="~{fragments :: sortHead('severity', '-severity', 'Severity', 'sev')}"></th>
+                    <th class="row-act"><span class="sr-only">Actions</span></th>
                 </tr>
                 </thead>
                 <tbody>
                 <!-- data-label is the mobile contract: under 780px the row becomes a
                      card and the CSS prints each label from it, so the value must be
-                     the column's own heading, word for word. The rail is the one
-                     exception — it is a colour bar, not a column, so it carries the
-                     severity as words instead. -->
+                     the column's own heading, word for word.
+
+                     data-href makes the whole row the link its title already is.
+                     The title stays a real <a>, so this only widens the target:
+                     ⌘-click, middle-click and JavaScript-off all still work, and
+                     app.js leaves a click that lands on a control alone — which
+                     is what lets the status picker and the copy button live in a
+                     row you can click. -->
                 <tr th:each="bug,rs : ${bugs}"
-                    th:attr="data-severity=${bug.severity.label}"
+                    th:attr="data-href=@{/bugs/{id}(id=${bug.id})}"
                     th:style="'--i:' + ${rs.index} + '; --c: var(--sev-' + ${bug.severity} + ')'">
 
-                    <td class="rail">
-                        <span class="sr-only" th:text="${bug.severity.label} + ' severity'">High severity</span>
-                    </td>
+                    <!-- A colour, not a column: how bad this is has words of its
+                         own on the right. -->
+                    <td class="rail"></td>
                     <td class="bug-id" data-label="Bug" th:text="'BUG-' + ${bug.id}">BUG-1</td>
 
                     <td class="grow" data-label="Title"
@@ -759,26 +852,43 @@
                         </span>
                         <a class="bug-link" th:href="@{/bugs/{id}(id=${bug.id})}"
                            th:text="${bug.title}">Bug title</a>
-
-                        <a class="icon-btn icon-btn-sm copy-md copy-md-quiet"
-                           th:href="@{/bugs/{id}/markdown(id=${bug.id})}"
-                           th:attr="data-copy-md='BUG-' + ${bug.id},
-                                    aria-label='Copy BUG-' + ${bug.id} + ' as Markdown'"
-                           th:title="'Copy BUG-' + ${bug.id} + ' as Markdown'">
-                            <span class="copy-md-flare" aria-hidden="true"></span>
-                            <span class="copy-md-mark" aria-hidden="true">
-                                <svg class="i copy-md-from"><use href="#i-copy"/></svg>
-                                <svg class="i copy-md-to"><use href="#i-check"/></svg>
-                            </span>
-                        </a>
                     </td>
 
                     <td data-label="Status">
-                        <!-- The bug stores a column key; what it says and what
-                             colour it is belong to that column, on that bug's
-                             own project's board. -->
-                        <span class="badge" th:style="'--c:' + ${cols.token(bug)}"
-                              th:text="${cols.label(bug)}">Open</span>
+                        <!-- Editable here, not only on the bug's own page.
+                             Moving a bug is the commonest thing anybody does to
+                             one, and a list that could only state the status
+                             was a list you left — twice, out to the bug and
+                             back — to change it.
+
+                             cols.of(bug.project), not boardColumns: the list
+                             is a project's board most of the time but not
+                             always, and a cross-project view (?assignee=me)
+                             must offer each row the columns of its own
+                             project. The bug stores a column key; what it says
+                             and what colour it is belong to that column.
+
+                             data-autosubmit saves on change. The button beside
+                             it is .js-off, so with scripting off the form is
+                             still submitted the ordinary way — the picker is
+                             never the only way to move a bug. -->
+                        <form method="post" class="status-inline"
+                              th:action="@{/bugs/{id}/status(id=${bug.id})}"
+                              th:style="'--c:' + ${cols.token(bug)}">
+                            <input type="hidden" name="actor" class="actor-field">
+                            <!-- Land back on this list, with its filters and
+                                 its order still on. -->
+                            <input type="hidden" name="from" th:value="${'/bugs' + q.query()}">
+                            <label class="sr-only" th:for="'status-' + ${bug.id}"
+                                   th:text="'Status of BUG-' + ${bug.id}">Status</label>
+                            <select class="status-select" name="status" data-autosubmit
+                                    th:id="'status-' + ${bug.id}">
+                                <option th:each="c : ${cols.of(bug.project)}"
+                                        th:value="${c.statusKey}" th:text="${c.label}"
+                                        th:selected="${c.statusKey == bug.status}">Open</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm js-off status-go">Move</button>
+                        </form>
                     </td>
 
                     <td data-label="Assigned">
@@ -798,9 +908,44 @@
                         <span class="muted" th:unless="${bug.reportedBy}">—</span>
                     </td>
 
+                    <td data-label="Due">
+                        <span th:replace="~{fragments :: due(${bug}, ${cols}, false)}"></span>
+                        <span class="muted" th:if="${bug.dueDate == null}">—</span>
+                    </td>
+
                     <td data-label="Reported">
                         <span class="when" th:attr="data-time=${bug.createdAt}"
                               th:text="${#temporals.format(bug.createdAt, 'dd MMM yyyy, HH:mm')}">01 Jan 2026</span>
+                    </td>
+
+                    <!-- How bad, in words. The rail down the left edge says it in
+                         colour and the meter counts it, but neither is a legend:
+                         nothing on the row told you which end of the scale red
+                         was. Both marks and the word, together, which is the
+                         same thing the severity filter shows. -->
+                    <td class="sev" data-label="Severity">
+                        <span class="sev-cell" th:classappend="'sev-' + ${bug.severity}">
+                            <span class="meter" th:classappend="'sev-' + ${bug.severity}" aria-hidden="true">
+                                <i></i><i></i><i></i><i></i>
+                            </span>
+                            <span th:text="${bug.severity.label}">High</span>
+                        </span>
+                    </td>
+
+                    <!-- A row action, at the end of the row where the actions
+                         are, rather than trailing the title it is not about. -->
+                    <td class="row-act">
+                        <a class="icon-btn icon-btn-sm copy-md copy-md-quiet"
+                           th:href="@{/bugs/{id}/markdown(id=${bug.id})}"
+                           th:attr="data-copy-md='BUG-' + ${bug.id},
+                                    aria-label='Copy BUG-' + ${bug.id} + ' as Markdown'"
+                           th:title="'Copy BUG-' + ${bug.id} + ' as Markdown'">
+                            <span class="copy-md-flare" aria-hidden="true"></span>
+                            <span class="copy-md-mark" aria-hidden="true">
+                                <svg class="i copy-md-from"><use href="#i-copy"/></svg>
+                                <svg class="i copy-md-to"><use href="#i-check"/></svg>
+                            </span>
+                        </a>
                     </td>
                 </tr>
                 </tbody>

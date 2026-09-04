@@ -66,10 +66,10 @@ Layers go **controller → service → repository → database**, under
 Data fixes and seeders are `CommandLineRunner` beans ordered with
 `@Order(Ordered.HIGHEST_PRECEDENCE + n)`. The chain is: `SchemaUpgrade` (widen legacy H2
 ENUM columns) → `StatusMigration` → `ProjectColumnMigration` → `LegacyReportMerge` →
-`AssigneeMigration` → seeders (`ProjectSeeder`, `TeamMemberSeeder`, `AccountSeeder`,
-`FieldDefaultsBackfill`) → `BoardColumnSeed` → `BoardColumnRestyle`. Each is idempotent and
-runs on every start; a new one must be ordered against these and safe to re-run. On Postgres
-the equivalent work lives in the migrations, so most of these find nothing to do there.
+`AssigneeMigration` → `FieldDefaultsBackfill` / `BootstrapAdmin` → `BoardColumnSeed` →
+`BoardColumnRestyle`. Each is idempotent and runs on every start; a new one must be ordered
+against these and safe to re-run. On Postgres the equivalent work lives in the migrations,
+so most of these find nothing to do there.
 
 ### Rules that the code depends on
 
@@ -80,12 +80,25 @@ the equivalent work lives in the migrations, so most of these find nothing to do
   must not rewrite it. Live facts (a project's team) are real relations.
 - **Status is a board column name**, not an enum: each project owns its `board_columns` rows
   and a bug's status is whichever column it sits in.
-- **`team_members` is the users table.** A row with `password_hash` can sign in; one without
-  is only a name that appears on bugs. `AccountSeeder` copies the accounts in
-  `application.properties` onto matching members without overwriting an existing hash.
+- **`team_members` is the users table, and the only one.** A row with `password_hash` can
+  sign in; one without is only a name that appears on bugs. There is no configured account,
+  no seeded person, no project and no example bug anywhere in the source — everything in this
+  app was created in this app, so never add a seeder or a properties-file login to make
+  something appear. The single exception is `BootstrapAdmin`, which writes the *first* admin
+  from two `.env` values and does nothing once one active admin has a password; sign-in
+  itself never reads it.
+- **A row carries a `role` — ADMIN or MEMBER, and the line is drawn around the setup, not
+  the work.** Raising, moving, commenting and assigning stay open to everyone; the roster,
+  passwords, roles and projects are an admin's. A new write route that administers something
+  needs a line in `SecurityConfig.filterChain`, and the control that posts to it needs
+  `sec:authorize` so nobody is shown a button that 403s.
 - **Security:** everything is behind login except `/login`, static files, `/error` and
   `/api/**`. The API is deliberately open and CSRF-exempt; HTML forms need `th:action` to
   get their CSRF token.
+- **Email mirrors the bell; it never decides anything.** `NotificationService` says who hears
+  what and `EmailService` carries it out, after the transaction commits and on its own
+  thread. If a change should email somebody it does not notify, add the *notification*.
+  Nothing is sent unless both `bugtracking.mail.enabled` and `spring.mail.host` are set.
 - **Credentials live in `.env`**, gitignored and imported by `application.properties`.
   Never write one into a properties file or a migration.
 

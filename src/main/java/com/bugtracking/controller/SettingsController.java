@@ -1,11 +1,8 @@
 package com.bugtracking.controller;
 
-import com.bugtracking.model.ColumnColour;
-import com.bugtracking.model.ColumnNotify;
-import com.bugtracking.service.BoardColumnService;
+import com.bugtracking.model.TeamMember;
 import com.bugtracking.service.ProjectService;
 import com.bugtracking.service.TeamMemberService;
-import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,38 +10,50 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
- * Projects, team and board columns on one page.
+ * Projects and team — one console, one tab each.
  *
- * <p>All three are administration rather than daily work — you set a project
- * up once and then live on the board — so they sit behind Settings and the
- * navbar stays short. The forms still post to {@code /projects}, {@code /team}
- * and {@code /columns}; only where you land afterwards changed.
+ * <p>Both are administration rather than daily work — you set a project up once
+ * and then live on the board — so they sit behind Settings and the navbar stays
+ * short. The forms still post to {@code /projects} and {@code /team}; only
+ * where you land afterwards changed.
+ *
+ * <p>There is no Board tab. A board's columns are edited on the board itself,
+ * from the menu on each column head, which is where you are standing when you
+ * notice one is wrong — a second full editor behind Settings was the same
+ * controls in a place nobody was.
+ *
+ * <p>There is no Email tab either. Whether notifications also leave the
+ * building is decided by {@code .env} and nothing else — see {@code
+ * EmailService} — and a screen whose only control sent a test message was a tab
+ * to hold one button.
+ *
+ * <p>A tab shows one thing at a time, and each is a table with its adding done
+ * in a popover off the head rather than in a form sitting open above it. The
+ * Team tab goes further and is two screens: the roster, or — when {@code
+ * member} names somebody — that person's account <em>instead of</em> the
+ * roster.
  */
 @Controller
 @RequestMapping("/settings")
 public class SettingsController {
 
-    private static final Set<String> TABS = Set.of("projects", "team", "board");
+    private static final Set<String> TABS = Set.of("projects", "team");
 
     private final ProjectService projects;
     private final TeamMemberService team;
-    private final BoardColumnService columns;
 
-    public SettingsController(ProjectService projects, TeamMemberService team,
-                              BoardColumnService columns) {
+    public SettingsController(ProjectService projects, TeamMemberService team) {
         this.projects = projects;
         this.team = team;
-        this.columns = columns;
     }
 
     @GetMapping
     public String settings(@RequestParam(required = false) String tab,
                            @RequestParam(required = false) String project,
-                           HttpSession session,
+                           @RequestParam(required = false) Long member,
                            Model model) {
         // A query param rather than script, so the tabs survive JS being off.
         String active = tab != null && TABS.contains(tab) ? tab : "projects";
@@ -64,33 +73,19 @@ public class SettingsController {
         model.addAttribute("editingProject", "projects".equals(active) && project != null
                 ? projects.findByName(project).orElse(null)
                 : null);
-        model.addAttribute("members", team.all());
-        model.addAttribute("memberUsage", team.usageByMemberId());
+        List<TeamMember> roster = team.all();
+        model.addAttribute("members", roster);
+        // Whose account is open, if anybody's. A query param rather than a
+        // popover in the row: it is linkable, it works with scripting off, and
+        // .table-wrap scrolls horizontally so anything opening out of a cell is
+        // clipped by that scrollport anyway. When it is set the template draws
+        // that person instead of the table — one screen, one job.
+        model.addAttribute("editingMember", "team".equals(active) && member != null
+                ? roster.stream().filter(m -> member.equals(m.getId())).findFirst().orElse(null)
+                : null);
+        // Only what the Remove control depends on: a member named on a bug is
+        // deactivated rather than removed, so their history keeps making sense.
         model.addAttribute("workload", team.workloadByMemberId());
-
-        // Columns belong to one project at a time, so the Board tab edits one
-        // board: the project named in the URL, else the one you were last
-        // looking at, else the first there is.
-        String board = boardProject(project, session);
-        model.addAttribute("boardProject", board);
-        model.addAttribute("boardNames", projects.sidebarCounts().keySet());
-        model.addAttribute("boardColumns", board == null ? List.of() : columns.forProject(board));
-        model.addAttribute("columnUsage", board == null ? Map.<Long, Long>of() : columns.usageIn(board));
-        model.addAttribute("colours", ColumnColour.values());
-        model.addAttribute("notifyModes", ColumnNotify.values());
         return "settings";
-    }
-
-    /** Which board the Board tab is editing. */
-    private String boardProject(String asked, HttpSession session) {
-        var names = projects.sidebarCounts().keySet();
-        if (asked != null && !asked.isBlank() && names.contains(asked.trim())) {
-            return asked.trim();
-        }
-        Object remembered = session.getAttribute(GlobalModelAttributes.PROJECT_KEY);
-        if (remembered instanceof String name && names.contains(name)) {
-            return name;
-        }
-        return names.stream().findFirst().orElse(null);
     }
 }

@@ -114,6 +114,20 @@ The load-bearing ones:
 | `data-time="<iso>"` | JS rewrites to "3 hours ago", keeps the exact stamp as `title` |
 | `th:style="'--i:' + ${rs.index}"` on a repeated row | staggers the entry animation |
 
+## Form fields
+
+The base input rule **enumerates types by name** —
+`input[type=text], input[type=search], input[type=email], input[type=password], input[type=date],
+select, textarea` — so a field of any type not on that list gets **no theming at all**: browser
+border, browser font, browser height, sitting next to controls that have all three. Adding an
+`input[type=number]` or `[type=time]` means adding it to that selector *and* to the 16px
+coarse-pointer rule at the bottom, or iOS zooms into it and never zooms back out.
+
+`:root` carries **`color-scheme: light`**, flipped to `dark` in both dark blocks. That is what makes
+the browser draw its *own* chrome the right way round — the calendar popup out of a date field, a
+native scrollbar, the autofill background. Nothing in this stylesheet can reach those, so a new
+theme block that forgets it ships a white sheet dropping out of a dark page.
+
 ## Icons
 
 One SVG sprite at the top of `layout.html`. Reference, never inline a new path in a page:

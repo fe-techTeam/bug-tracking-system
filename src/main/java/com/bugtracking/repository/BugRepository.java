@@ -61,6 +61,7 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
                        WHERE ab.id = b.id AND LOWER(a) = LOWER(CAST(:assignee AS string))))
               AND (:reporter IS NULL OR LOWER(b.reportedBy) = LOWER(CAST(:reporter AS string)))
               AND (:viaGuest IS NULL OR b.viaGuest = :viaGuest)
+              AND (:viaPublic IS NULL OR b.viaPublic = :viaPublic)
               AND (:label IS NULL OR EXISTS (
                        SELECT l FROM Bug lb JOIN lb.labels l
                        WHERE lb.id = b.id AND LOWER(l) = LOWER(CAST(:label AS string))))
@@ -83,6 +84,7 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
                      @Param("assignee") String assignee,
                      @Param("reporter") String reporter,
                      @Param("viaGuest") Boolean viaGuest,
+                     @Param("viaPublic") Boolean viaPublic,
                      @Param("label") String label,
                      @Param("keyword") String keyword,
                      @Param("keywordId") Long keywordId);

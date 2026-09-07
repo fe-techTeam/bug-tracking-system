@@ -142,6 +142,15 @@
                                 <span class="opt-count num" th:if="${guestRaised > 0}"
                                       th:text="${guestRaised}">4</span>
                             </a>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('source', 'public')}}"
+                               th:classappend="${source == 'public'} ? 'is-active' : ''">
+                                <span class="public-mark" aria-hidden="true">
+                                    <svg class="i"><use href="#i-link"/></svg>
+                                </span>
+                                <span>The public link</span>
+                                <span class="opt-count num" th:if="${publicRaised > 0}"
+                                      th:text="${publicRaised}">2</span>
+                            </a>
                             <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('source', 'team')}}"
                                th:classappend="${source == 'team'} ? 'is-active' : ''">
                                 <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
@@ -396,7 +405,10 @@
             <span class="guest-mark" aria-hidden="true" th:if="${source == 'guest'}">
                 <svg class="i"><use href="#i-guest"/></svg>
             </span>
-            <span>from <b th:text="${source == 'guest'} ? 'a client' : 'the team'">a client</b></span>
+            <span class="public-mark" aria-hidden="true" th:if="${source == 'public'}">
+                <svg class="i"><use href="#i-link"/></svg>
+            </span>
+            <span>from <b th:text="${source == 'guest'} ? 'a client' : (${source == 'public'} ? 'the public link' : 'the team')">a client</b></span>
             <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
         </a>
 
@@ -745,6 +757,7 @@
                         <span th:replace="~{fragments :: due(${bug}, ${cols}, true)}"></span>
 
                         <span th:replace="~{fragments :: guestMark(${bug})}"></span>
+                        <span th:replace="~{fragments :: externalMark(${bug})}"></span>
 
                         <!-- Only while the blocker is still open: a bug waiting
                              on something already fixed is not blocked. -->
@@ -1042,6 +1055,7 @@
                             <span class="avatar avatar-sm" th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
                             <span class="client-name" th:text="${bug.reportedBy}">qa-team</span>
                             <span th:replace="~{fragments :: guestMark(${bug})}"></span>
+                            <span th:replace="~{fragments :: externalMark(${bug})}"></span>
                         </span>
                         <span class="muted" th:unless="${bug.reportedBy}">—</span>
                     </td>

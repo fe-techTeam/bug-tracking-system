@@ -386,6 +386,13 @@
     <span class="sr-only">Raised by a client</span>
 </span>
 
+<!-- The same mark for the other outside: no account at all, just the public link. -->
+<span th:fragment="externalMark(bug)" class="public-mark" th:if="${bug.viaPublic}"
+      title="Raised from the public link">
+    <svg class="i" aria-hidden="true"><use href="#i-link"/></svg>
+    <span class="sr-only">Raised from the public link</span>
+</span>
+
 <!-- A sortable heading on the bug list.
 
      Two order names, not one: every sort here has an opposite, and which one is

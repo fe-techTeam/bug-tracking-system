@@ -103,7 +103,7 @@ public class BugController {
                        @RequestParam(required = false) Environment environment,
                        @RequestParam(required = false) String assignee,
                        @RequestParam(required = false) String reporter,
-                       // "guest" or "team", or absent for both. A String rather
+                       // "guest", "public" or "team", or absent for all. A String rather
                        // than a Boolean because a bare ?source= in a bookmark
                        // should mean "no filter", and Spring binds that to false.
                        @RequestParam(required = false) String source,
@@ -152,9 +152,9 @@ public class BugController {
 
         // The dashboard describes the project; the board answers the filters.
         Dashboard dashboard = service.dashboard(project);
-        Boolean fromClient = sourceFilter(source);
         List<Bug> bugs = service.findAll(project, status, severity,
-                environment, assignee, reporter, fromClient, label, due, keyword, sort);
+                environment, assignee, reporter, guestFilter(source), publicFilter(source),
+                label, due, keyword, sort);
 
         // The board this project actually runs, in the order it runs it.
         List<BoardColumn> boardColumns = board.forProject(project);
@@ -205,6 +205,7 @@ public class BugController {
         // beside the filter — off the dashboard's scope, so it does not move
         // when another filter does.
         model.addAttribute("guestRaised", service.guestRaisedIn(project));
+        model.addAttribute("publicRaised", service.publicRaisedIn(project));
         model.addAttribute("label", label);
         model.addAttribute("labels", service.labelsIn(project));
         model.addAttribute("due", due);
@@ -459,16 +460,27 @@ public class BugController {
     /**
      * Turns {@code ?source=} into the three-valued answer the query wants.
      *
-     * <p>Anything that is not one of the two words is no filter at all, so a
+     * <p>Anything that is not one of the words is no filter at all, so a
      * mistyped bookmark shows the whole board rather than an empty one.
      */
-    private static Boolean sourceFilter(String source) {
-        String asked = source == null ? "" : source.trim().toLowerCase(java.util.Locale.ROOT);
-        return switch (asked) {
+    private static Boolean guestFilter(String source) {
+        return switch (normalisedSource(source)) {
             case "guest" -> Boolean.TRUE;
             case "team" -> Boolean.FALSE;
             default -> null;
         };
+    }
+
+    private static Boolean publicFilter(String source) {
+        return switch (normalisedSource(source)) {
+            case "public" -> Boolean.TRUE;
+            case "team" -> Boolean.FALSE;
+            default -> null;
+        };
+    }
+
+    private static String normalisedSource(String source) {
+        return source == null ? "" : source.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     /**

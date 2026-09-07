@@ -107,7 +107,7 @@ public class BugApiController {
                           @RequestParam(required = false) String keyword,
                           @RequestParam(required = false) String sort) {
         return service.findAll(project, status, severity, environment,
-                assignee, reporter, null, label, due, keyword, sort);
+                assignee, reporter, null, null, label, due, keyword, sort);
     }
 
     @GetMapping("/labels")
@@ -128,7 +128,7 @@ public class BugApiController {
                                             @RequestParam(required = false) String keyword,
                                             @RequestParam(required = false) String sort) {
         List<Bug> bugs = service.findAll(project, status, severity, environment,
-                assignee, reporter, null, label, due, keyword, sort);
+                assignee, reporter, null, null, label, due, keyword, sort);
         String scope = project == null || project.isBlank() ? "all" : project.replaceAll("[^A-Za-z0-9-]+", "-");
         String name = "bugs-" + scope + "-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + ".csv";
         return ResponseEntity.ok()

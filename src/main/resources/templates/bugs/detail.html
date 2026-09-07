@@ -699,7 +699,14 @@
                                       th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
                                 <span th:text="${bug.reportedBy} ?: '—'">Reporter</span>
                                 <span th:replace="~{fragments :: guestMark(${bug})}"></span>
+                                <span th:replace="~{fragments :: externalMark(${bug})}"></span>
                             </dd>
+                        </div>
+                        <!-- The only way back to a reporter with no account here. -->
+                        <div class="rail-fact" th:if="${bug.viaPublic and bug.reporterEmail != null}">
+                            <dt>Reply to</dt>
+                            <dd><a class="rail-mail" th:href="'mailto:' + ${bug.reporterEmail}"
+                                   th:text="${bug.reporterEmail}">priya@example.com</a></dd>
                         </div>
                         <div class="rail-fact">
                             <dt>Raised</dt>

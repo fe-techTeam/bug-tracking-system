@@ -66,7 +66,7 @@ public class BugService {
                              Environment environment, String assignee, String reporter,
                              String keyword, String sort) {
         return findAll(project, status, severity, environment, assignee, reporter,
-                null, null, null, keyword, sort);
+                null, null, null, null, keyword, sort);
     }
 
     /**
@@ -77,10 +77,11 @@ public class BugService {
     @Transactional(readOnly = true)
     public List<Bug> findAll(String project, String status, Severity severity,
                              Environment environment, String assignee, String reporter,
-                             Boolean viaGuest, String label, String due, String keyword, String sort) {
+                             Boolean viaGuest, Boolean viaPublic, String label, String due,
+                             String keyword, String sort) {
         String trimmed = blankToNull(keyword);
         List<Bug> found = repository.search(blankToNull(project), status, severity,
-                environment, blankToNull(assignee), blankToNull(reporter), viaGuest,
+                environment, blankToNull(assignee), blankToNull(reporter), viaGuest, viaPublic,
                 blankToNull(label),
                 trimmed, idIn(trimmed));
         return sorted(dueFiltered(found, blankToNull(due)), sort);
@@ -112,6 +113,15 @@ public class BugService {
         return scope == null
                 ? repository.countByViaGuestTrueAndDeletedAtIsNull()
                 : repository.countByProjectIgnoreCaseAndViaGuestTrueAndDeletedAtIsNull(scope);
+    }
+
+    /** How many of a project's live bugs came in through the public link. */
+    @Transactional(readOnly = true)
+    public long publicRaisedIn(String project) {
+        String scope = blankToNull(project);
+        return scope == null
+                ? repository.countByViaPublicTrueAndDeletedAtIsNull()
+                : repository.countByProjectIgnoreCaseAndViaPublicTrueAndDeletedAtIsNull(scope);
     }
 
     @Transactional(readOnly = true)

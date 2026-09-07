@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
+      th:fragment="page(title, content)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' · ' + ${project.name}">Report a bug</title>
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400..600&display=swap">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+
+    <!-- Applied before first paint, so a dark theme never flashes white. -->
+    <script>
+        (function () {
+            var root = document.documentElement;
+            root.classList.add("js");
+            try {
+                var t = localStorage.getItem("bugtracking.theme");
+                if (t === "light" || t === "dark") root.setAttribute("data-theme", t);
+            } catch (e) { /* private mode: fall back to the system theme */ }
+        })();
+    </script>
+</head>
+<body class="portal-page">
+
+<!-- The portal's shell with the account taken out of it. A client at least has
+     a name here; whoever holds this link has none, so there is no avatar, no
+     "signed in as" and nothing to sign out of. What is left - the project's
+     name, the theme switch and the report - is the whole page, and there is
+     nothing on it that could accidentally be left visible to a stranger.
+
+     The icons it needs, since it is outside the sprite in layout.html. -->
+<svg width="0" height="0" class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24">
+        <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>
+    </symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24">
+        <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.18 5.18l-9.2 9.2a1.83 1.83 0 0 1-2.59-2.6l8.49-8.48"/>
+    </symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>
+        <path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/>
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24">
+        <path d="M3 3v18h18"/><path d="M7 15v3"/><path d="M12 9v9"/><path d="M17 5v13"/>
+    </symbol>
+    <symbol id="i-board" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
+        <rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
+    </symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+    </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/>
+        <path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/>
+        <path d="m19.1 4.9-1.4 1.4"/>
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+</svg>
+
+<div class="portal-shell">
+
+    <header class="portal-bar">
+        <!-- A span, not a link: there is no page above this one to go to. -->
+        <span class="brand portal-brand">
+            <span class="brand-mark" aria-hidden="true">B</span>
+            <span class="portal-brand-text">
+                <b th:text="${project.name}">Godrej</b>
+                <em>report a bug</em>
+            </span>
+        </span>
+
+        <div class="portal-bar-actions">
+            <!-- One icon, not two: app.js swaps this use[href] between
+                 #i-moon and #i-sun and rewrites the label with it. -->
+            <button type="button" class="icon-btn" id="theme-toggle"
+                    title="Switch theme" aria-label="Switch theme">
+                <svg class="i" aria-hidden="true"><use href="#i-moon"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="portal-main">
+        <p class="portal-flash" th:if="${message}" th:text="${message}" role="status">Done.</p>
+
+        <div th:replace="${content}">Page</div>
+    </main>
+
+    <footer class="portal-foot">
+        <span>What you send here reaches the people working on
+            <b th:text="${project.name}">Godrej</b>. Only they see your email.</span>
+    </footer>
+</div>
+
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>

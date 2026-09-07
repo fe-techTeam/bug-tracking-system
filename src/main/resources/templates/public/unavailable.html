@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Link not valid · Bug Tracking</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<!-- Outside public/layout on purpose: that shell is built around the project,
+     and the one thing that has gone wrong here is that the link named none. -->
+<body class="portal-page">
+<div class="portal-shell">
+    <main class="portal-main">
+        <div class="portal-empty">
+            <h1>This link does not work</h1>
+            <p th:text="${message}">This link is not valid any more. Ask the team for a fresh one.</p>
+        </div>
+    </main>
+</div>
+</body>
+</html>

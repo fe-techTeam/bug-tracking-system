@@ -95,6 +95,12 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/login", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                    // The public intake form. The token in the URL is the whole
+                    // grant, and PublicIntakeService is what checks it: an
+                    // unknown or hidden project's link answers 404, never a
+                    // redirect to a sign-in page a stranger has no account for.
+                    // Nothing under /public reads a session or names a person.
+                    .requestMatchers("/public/**").permitAll()
                     // The error page has to be reachable by whoever hit the
                     // error, signed in or not - a 404 on a stylesheet is served
                     // to an anonymous request, and answering it with a redirect

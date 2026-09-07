@@ -2,6 +2,7 @@ package com.bugtracking.service;
 
 import com.bugtracking.model.BoardColumn;
 import com.bugtracking.model.Bug;
+import com.bugtracking.model.BugSource;
 import com.bugtracking.model.ColumnNotify;
 import com.bugtracking.model.Environment;
 import com.bugtracking.model.Severity;
@@ -244,6 +245,7 @@ public class BugService {
         // this board becomes the board's first column rather than a bug that
         // renders nowhere.
         bug.setStatus(columns.keyOn(bug.getProject(), bug.getStatus()));
+        bug.setSource(sourceOf(bug));
 
         Bug saved = repository.save(bug);
         BoardColumns board = columns.snapshot();
@@ -308,6 +310,7 @@ public class BugService {
         existing.setAssignees(changes.getAssignees());
         existing.setLabels(changes.getLabels());
         existing.setBlockedBy(validBlocker(id, changes.getBlockedBy()));
+        existing.setSource(sourceOf(existing));
 
         Bug saved = repository.save(existing);
         String by = BugHistoryService.actor(actor);
@@ -332,6 +335,13 @@ public class BugService {
             notifyStatusChange(saved, board, told);
         }
         return saved;
+    }
+
+    // Derived rather than taken: the JSON API binds whatever it is handed, and a
+    // source disagreeing with the flags would show one thing and count another.
+    private BugSource sourceOf(Bug bug) {
+        return bug.isViaPublic() ? BugSource.EXTERNAL
+                : bug.isViaGuest() ? BugSource.CLIENT : BugSource.INTERNAL;
     }
 
     public Bug changeStatus(Long id, String status) {

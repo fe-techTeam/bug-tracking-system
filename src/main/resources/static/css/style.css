@@ -5997,8 +5997,8 @@ a.tm-name:hover { color: var(--accent); }
    filter reads at a glance rather than by comparing two 11px outlines. */
 .fmenu-opt.is-active .source-mark,
 .chip .source-mark { --c: var(--accent); }
-.fmenu-opt.is-active .src-CLIENT svg.i,
-.chip .src-CLIENT svg.i { fill: currentColor; }
+.fmenu-opt.is-active .source-mark svg.i,
+.chip .source-mark svg.i { fill: currentColor; }
 
 /* The board's filter menu columns are sized to their longest name; this one
    holds a few short ones and would otherwise take a person's width. */

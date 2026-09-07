@@ -898,9 +898,10 @@ mistake this exists to prevent.
 
 ### The mark, and the filter
 
-A bug that came in from outside carries a small ◇ beside its reporter — on the board card, in the
-list's *Raised by* column, and on the bug's own rail. The board's **Filters → Came from** narrows to
-*A client* or *The team*.
+Every bug records where it came from, and one mark draws all three answers: two people for the team,
+a ◇ for a client, a globe for the public link. It sits on the board card, in the list's own **Source**
+column and on the bug's rail, so the answer is always in the same place. The board's
+**Filters → Came from** narrows to *A client*, *The public link* or *The team*.
 
 Clients never appear in an assignee picker, a people filter or an `@` mention: `TeamMemberService`
 filters them out by role, so they cannot be given work. Revoking access is the **Revoke** button on
@@ -918,6 +919,7 @@ The UI leans on visual cues rather than text alone:
 | Stacked bar on the dashboard | the shape of the whole queue by status |
 | Coloured initials | a project or a person — the same name always gets the same colour |
 | Environment tag | QA is neutral, UAT violet, Production red — a production bug should look scarier |
+| Source mark | where the bug came from — grey people the team, teal ◇ a client, amber globe the public link |
 | Timeline rail | the history trail, colour-coded by the kind of change |
 | Doc tile colour | what a document *is*, on its own axis rather than a status: indigo page, cyan sheet, amber folder, slate file, blue link |
 

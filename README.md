@@ -220,7 +220,10 @@ Sign out with the ⏻ button in the top bar.
   inside; it stopped being survivable when [client access](#client-access) started handing people
   outside the company a session on this origin. It is `hasRole("USER")` now — so the app's own two
   `fetch` calls keep working on the session cookie, a client is refused, and a script has to sign in
-  first. CSRF applies to it too, so those two calls send the token from `layout.html`'s meta tag.
+  first. CSRF applies to it too, so those two calls send the token from `layout.html`'s meta tag. The
+  one exception is `/api/public/**`, matched ahead of it: the public intake API is `permitAll` and
+  CSRF-exempt, because an external app holds no session here and the project's public token is the
+  whole grant.
 - **Selenium tests need a sign-in step first.** New ids: `login-form`, `email`, `password`,
   `login-button`, `login-error`, `logout-button`. Every other id is unchanged.
 
@@ -1103,6 +1106,19 @@ Useful if you ever want to raise bugs from a script or a failing test.
 | GET | `/api/bugs/{id}/docs` | the supporting docs on a bug, without their bodies |
 | GET | `/api/bugs/{id}/docs/{docId}` | one document, `content` included — Markdown for a page, `{"cols":n,"rows":[…]}` for a sheet |
 | GET | `/api/bugs/notifications` | the 50 most recent notifications |
+| POST | `/api/public/{token}/bugs` | file a bug from outside, no sign-in: `multipart/form-data`, the project's public token is the whole grant |
+
+`POST /api/public/{token}/bugs` is the only route here that answers an unauthenticated request, and
+the only one exempt from CSRF. It takes the intake form's fields as multipart parts, with `files`
+repeated for attachments, and answers **201** `{"bugId":42,"rejected":null}`, **400** with either
+`errors` per field or one `error`, **404** for a token nobody recognises, or **429** if that address
+has filed too often.
+
+```bash
+curl -F reporterName=Priya -F reporterEmail=priya@example.com -F title="Broken" \
+     -F description="It is" -F severity=HIGH -F environment=PRODUCTION -F files=@shot.png \
+     http://localhost:8085/api/public/<token>/bugs
+```
 
 Filters on `GET /api/bugs`: `project`, `status`, `severity`, `environment`, `assignee`, `keyword`,
 `sort`. All optional.

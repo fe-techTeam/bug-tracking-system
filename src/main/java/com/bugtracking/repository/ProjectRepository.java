@@ -18,6 +18,8 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     boolean existsByNameIgnoreCase(String name);
 
+    Optional<Project> findByPublicTokenAndActiveTrue(String publicToken);
+
     /*
      * The team is lazy and the app runs with open-in-view=false, so anything
      * that draws it has to say so while the transaction is still open. These

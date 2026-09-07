@@ -199,6 +199,14 @@ public class Bug {
     @Column(name = "via_guest", nullable = false)
     private boolean viaGuest = false;
 
+    /** Separate from viaGuest: there is no client account behind a public report to share anything with. */
+    @Column(name = "via_public", nullable = false)
+    private boolean viaPublic = false;
+
+    @Size(max = 200)
+    @Column(name = "reporter_email", length = 200)
+    private String reporterEmail;
+
     /**
      * When this bug was moved to the trash, or null while it is live.
      *
@@ -490,5 +498,21 @@ public class Bug {
 
     public void setViaGuest(boolean viaGuest) {
         this.viaGuest = viaGuest;
+    }
+
+    public boolean isViaPublic() {
+        return viaPublic;
+    }
+
+    public void setViaPublic(boolean viaPublic) {
+        this.viaPublic = viaPublic;
+    }
+
+    public String getReporterEmail() {
+        return reporterEmail;
+    }
+
+    public void setReporterEmail(String reporterEmail) {
+        this.reporterEmail = reporterEmail;
     }
 }

@@ -119,6 +119,10 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
 
     long countByProjectIgnoreCaseAndViaGuestTrueAndDeletedAtIsNull(String project);
 
+    long countByViaPublicTrueAndDeletedAtIsNull();
+
+    long countByProjectIgnoreCaseAndViaPublicTrueAndDeletedAtIsNull(String project);
+
     long countByStatusAndDeletedAtIsNull(String status);
 
     long countBySeverityAndDeletedAtIsNull(Severity severity);

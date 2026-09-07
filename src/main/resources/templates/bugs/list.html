@@ -30,7 +30,9 @@
                                     + (selectedSeverity != null ? 1 : 0)
                                     + (selectedEnvironment != null ? 1 : 0)
                                     + (selectedStatus != null ? 1 : 0)
-                                    + (source != null ? 1 : 0)}">
+                                    + (source != null ? 1 : 0)
+                                    + (label != null and !label.isBlank() ? 1 : 0)
+                                    + (due != null and !due.isBlank() ? 1 : 0)}">
             <form class="search-wrap" method="get" th:action="@{/bugs}" id="filter-form">
                 <input type="hidden" name="project" th:if="${selectedProject != null}" th:value="${selectedProject}">
                 <input type="hidden" name="view" th:if="${view != 'board'}" th:value="${view}">
@@ -40,6 +42,8 @@
                 <input type="hidden" name="assignee" th:if="${assignee != null}" th:value="${assignee}">
                 <input type="hidden" name="reporter" th:if="${reporter != null}" th:value="${reporter}">
                 <input type="hidden" name="source" th:if="${source != null}" th:value="${source}">
+                <input type="hidden" name="label" th:if="${label != null}" th:value="${label}">
+                <input type="hidden" name="due" th:if="${due != null}" th:value="${due}">
                 <input type="hidden" name="sort" th:if="${sort != null}" th:value="${sort}">
                 <label class="sr-only" for="filter-keyword">Search</label>
                 <!-- The magnifier was decoration; now it is the submit button. Typing
@@ -181,6 +185,40 @@
                             </a>
                         </div>
 
+                        <div class="fmenu-col" th:unless="${#lists.isEmpty(labels)}">
+                            <p class="fmenu-head">Label</p>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.without('label')}}"
+                               th:classappend="${label == null} ? 'is-active' : ''">
+                                <svg class="i tick" aria-hidden="true"><use href="#i-check"/></svg>
+                                <span>Any label</span><span class="opt-count"></span>
+                            </a>
+                            <a class="fmenu-opt" th:each="l : ${labels}"
+                               th:href="@{${'/bugs' + q.toggle('label', l)}}"
+                               th:classappend="${#strings.equalsIgnoreCase(l, label)} ? 'is-active' : ''">
+                                <span class="pill pill-label" th:text="${l}">login</span>
+                                <span class="opt-count"></span>
+                            </a>
+                        </div>
+
+                        <div class="fmenu-col">
+                            <p class="fmenu-head">Due</p>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.without('due')}}"
+                               th:classappend="${due == null} ? 'is-active' : ''">
+                                <svg class="i tick" aria-hidden="true"><use href="#i-check"/></svg>
+                                <span>Any time</span><span class="opt-count"></span>
+                            </a>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('due', 'overdue')}}"
+                               th:classappend="${due == 'overdue'} ? 'is-active' : ''">
+                                <span class="dot dot-lg is-late"></span>
+                                <span>Overdue</span><span class="opt-count"></span>
+                            </a>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('due', 'week')}}"
+                               th:classappend="${due == 'week'} ? 'is-active' : ''">
+                                <span class="dot dot-lg is-week"></span>
+                                <span>Due this week</span><span class="opt-count"></span>
+                            </a>
+                        </div>
+
                         <!-- Status is a column on the board, so it is only a filter in the list. -->
                         <div class="fmenu-col" th:if="${view == 'list'}">
                             <p class="fmenu-head">Status</p>
@@ -240,6 +278,25 @@
                     </div>
                 </div>
             </details>
+
+            <details class="fmenu" id="save-filter" th:if="${filtered}">
+                <summary>
+                    <span class="fmenu-btn">
+                        <svg class="i" aria-hidden="true"><use href="#i-bookmark"/></svg>
+                        <span>Save</span>
+                    </span>
+                </summary>
+                <form class="fmenu-pop save-filter-pop" method="post" th:action="@{/filters}">
+                    <input type="hidden" name="query" th:value="${q.query()}">
+                    <input type="hidden" name="project" th:value="${selectedProject}">
+                    <label>
+                        <span>Name this view</span>
+                        <input type="text" name="name" maxlength="60" required placeholder="e.g. My open highs">
+                    </label>
+                    <label class="check"><input type="checkbox" name="allProjects" value="true"> <span>All projects</span></label>
+                    <button type="submit" class="btn btn-sm btn-primary">Save filter</button>
+                </form>
+            </details>
         </div>
 
         <div class="topbar-actions">
@@ -268,6 +325,12 @@
                 </a>
             </div>
 
+            <a class="btn btn-ghost btn-sm" id="export-csv" th:if="${view == 'list'}"
+               th:href="@{${'/api/bugs/export.csv' + q.without('view')}}" download>
+                <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>
+                <span>Export CSV</span>
+            </a>
+
             <a class="btn btn-primary" id="raise-bug-link"
                th:href="@{/bugs/new(project=${selectedProject})}">
                 <svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>
@@ -275,6 +338,17 @@
             </a>
         </div>
     </header>
+
+    <!-- The shortcuts everyone keeps coming back to, whether or not the board is filtered right now. -->
+    <div class="chips chips-saved" th:unless="${#lists.isEmpty(savedFilters)}" id="saved-filters">
+        <span class="chips-label">Saved</span>
+        <a class="chip" th:each="f : ${savedFilters}"
+           th:href="@{${'/bugs?' + (selectedProject != null ? 'project=' + #uris.escapeQueryParam(selectedProject) + '&' : '') + (view != 'board' ? 'view=' + view + '&' : '') + f.query}}"
+           th:title="${f.project} ?: 'All projects'">
+            <svg class="i" aria-hidden="true" style="width:11px;height:11px"><use href="#i-bookmark"/></svg>
+            <b th:text="${f.name}">My open highs</b>
+        </a>
+    </div>
 
     <!-- What is currently narrowing the board, spelled out and removable. -->
     <div class="chips" th:if="${filtered}" id="filter-chips">
@@ -326,6 +400,20 @@
             <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
         </a>
 
+        <a class="chip" th:if="${label != null and !label.isBlank()}"
+           th:href="@{${'/bugs' + q.without('label')}}">
+            <span>label <b th:text="${label}">login</b></span>
+            <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
+        </a>
+
+        <a class="chip" th:if="${due != null and !due.isBlank()}"
+           th:classappend="${due == 'overdue'} ? 'is-late' : ''"
+           th:href="@{${'/bugs' + q.without('due')}}">
+            <span class="dot"></span>
+            <b th:text="${due == 'overdue'} ? 'Overdue' : 'Due this week'">Overdue</b>
+            <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
+        </a>
+
         <a class="chip" th:if="${selectedStatus != null}"
            th:style="'--c:' + ${cols.token(selectedProject, selectedStatus)}"
            th:href="@{${'/bugs' + q.without('status')}}">
@@ -350,9 +438,10 @@
 
          The columns link to the bugs behind them, and the link leaves for the
          board: a filter applied to a page of totals would silently change the
-         question. The due windows do not link — the board has no due filter to
-         send them to, and a row that navigates somewhere unable to show the
-         bugs it just counted is worse than a row that sits still. -->
+         question. The due windows do not link — the board's due filter knows
+         "overdue" and "this week", not a month or a quarter, and a row that
+         navigates somewhere unable to show the bugs it just counted is worse
+         than a row that sits still. -->
     <div class="content" th:if="${view == 'stats' and !noProjects}" id="stats-view">
         <div class="stack">
             <div class="two-col">
@@ -676,6 +765,7 @@
                         <span class="pill" th:if="${bug.environment}"
                               th:classappend="'env-' + ${bug.environment}"
                               th:text="${bug.environment.label}">QA</span>
+                        <span class="pill pill-label" th:each="l : ${bug.labels}" th:text="${l}">login</span>
 
                         <span class="spacer"></span>
 
@@ -855,6 +945,7 @@
                     <th>Bug</th>
                     <th th:replace="~{fragments :: sortHead('title', '-title', 'Title', 'grow')}"></th>
                     <th th:replace="~{fragments :: sortHead('status', '-status', 'Status', '')}"></th>
+                    <th>Labels</th>
                     <th>Assigned</th>
                     <th>Raised by</th>
                     <th th:replace="~{fragments :: sortHead('due', '-due', 'Due', '')}"></th>
@@ -930,6 +1021,11 @@
                             </select>
                             <button type="submit" class="btn btn-sm js-off status-go">Move</button>
                         </form>
+                    </td>
+
+                    <td data-label="Labels">
+                        <span class="pill pill-label" th:each="l : ${bug.labels}" th:text="${l}">login</span>
+                        <span class="muted" th:if="${#lists.isEmpty(bug.labels)}">—</span>
                     </td>
 
                     <td data-label="Assigned">

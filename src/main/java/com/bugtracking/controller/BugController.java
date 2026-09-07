@@ -17,6 +17,7 @@ import com.bugtracking.service.BugService;
 import com.bugtracking.service.CommentService;
 import com.bugtracking.service.Dashboard;
 import com.bugtracking.service.ProjectService;
+import com.bugtracking.service.SavedFilterService;
 import com.bugtracking.service.SupportingDocService;
 import com.bugtracking.service.TeamMemberService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -71,6 +72,7 @@ public class BugController {
     private final TeamMemberService team;
     private final SupportingDocService docs;
     private final BugMarkdown markdown;
+    private final SavedFilterService savedFilters;
 
     public BugController(BugService service,
                          BoardColumnService board,
@@ -80,7 +82,8 @@ public class BugController {
                          BugHistoryService history,
                          TeamMemberService team,
                          SupportingDocService docs,
-                         BugMarkdown markdown) {
+                         BugMarkdown markdown,
+                         SavedFilterService savedFilters) {
         this.service = service;
         this.board = board;
         this.projects = projects;
@@ -90,6 +93,7 @@ public class BugController {
         this.team = team;
         this.docs = docs;
         this.markdown = markdown;
+        this.savedFilters = savedFilters;
     }
 
     @GetMapping
@@ -103,6 +107,8 @@ public class BugController {
                        // than a Boolean because a bare ?source= in a bookmark
                        // should mean "no filter", and Spring binds that to false.
                        @RequestParam(required = false) String source,
+                       @RequestParam(required = false) String label,
+                       @RequestParam(required = false) String due,
                        @RequestParam(required = false) String keyword,
                        @RequestParam(required = false) String sort,
                        @RequestParam(required = false) String view,
@@ -115,7 +121,7 @@ public class BugController {
         // /bugs?assignee=X still means what it says.
         boolean noFilters = isBlank(status) && severity == null
                 && environment == null && isBlank(assignee) && isBlank(reporter)
-                && isBlank(source) && isBlank(keyword) && isBlank(sort);
+                && isBlank(source) && isBlank(label) && isBlank(due) && isBlank(keyword) && isBlank(sort);
         if (isBlank(project) && noFilters) {
             String landing = landingProject(session);
             if (landing != null) {
@@ -148,7 +154,7 @@ public class BugController {
         Dashboard dashboard = service.dashboard(project);
         Boolean fromClient = sourceFilter(source);
         List<Bug> bugs = service.findAll(project, status, severity,
-                environment, assignee, reporter, fromClient, keyword, sort);
+                environment, assignee, reporter, fromClient, label, due, keyword, sort);
 
         // The board this project actually runs, in the order it runs it.
         List<BoardColumn> boardColumns = board.forProject(project);
@@ -199,6 +205,10 @@ public class BugController {
         // beside the filter — off the dashboard's scope, so it does not move
         // when another filter does.
         model.addAttribute("guestRaised", service.guestRaisedIn(project));
+        model.addAttribute("label", label);
+        model.addAttribute("labels", service.labelsIn(project));
+        model.addAttribute("due", due);
+        model.addAttribute("savedFilters", savedFilters.forProject(project));
         model.addAttribute("keyword", keyword);
         model.addAttribute("sort", sort);
         model.addAttribute("view", mode);
@@ -211,6 +221,8 @@ public class BugController {
                 .put("source", source)
                 .put("assignee", assignee)
                 .put("reporter", reporter)
+                .put("label", label)
+                .put("due", due)
                 .put("keyword", keyword)
                 .put("sort", sort)
                 .put("view", "board".equals(mode) ? null : mode)
@@ -882,6 +894,7 @@ public class BugController {
         model.addAttribute("boardColumns", board.forProject(bug.getProject()));
         model.addAttribute("columnsJson", columnsJson(projectOptions));
         model.addAttribute("people", peopleFor(bug));
+        model.addAttribute("labels", service.labelsIn(bug.getProject()));
         model.addAttribute("selectedProject", bug.getProject());
         model.addAttribute("blockerOptions", service.blockerOptions(bug.getId(), bug.getProject()));
     }

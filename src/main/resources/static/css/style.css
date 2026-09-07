@@ -1150,6 +1150,9 @@ select {
     background: var(--surface-pop);
 }
 
+.save-filter-pop { display: grid; gap: 8px; min-width: 240px; padding: 10px; }
+.save-filter-pop label.check { flex-direction: row; align-items: center; gap: 6px; font-weight: 500; }
+
 /* The faces that used to sit in the bar are gone: they were three of the
    team, a "···" for the rest, and no way to tell from the bar whether any of
    them was on. The whole roster is a section of the Filters menu now, where an
@@ -1766,6 +1769,14 @@ select {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.pill-label { --c: var(--accent); font-weight: 520; }
+a.pill-label { text-decoration: none; }
+a.pill-label:hover { background: color-mix(in oklab, var(--c) 22%, transparent); }
+.label-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.chip.is-late, .dot.is-late { --c: var(--danger); }
+.dot.is-week { --c: var(--sev-HIGH); }
 
 /* ---------- the card's own menu ----------
    The two things anybody does to a bug without opening it: move it along, or

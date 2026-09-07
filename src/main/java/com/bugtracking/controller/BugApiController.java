@@ -10,6 +10,7 @@ import com.bugtracking.model.Severity;
 import com.bugtracking.model.SupportingDoc;
 import com.bugtracking.service.AttachmentService;
 import com.bugtracking.service.BoardColumnService;
+import com.bugtracking.service.BugCsv;
 import com.bugtracking.service.BugHistoryService;
 import com.bugtracking.service.BugService;
 import com.bugtracking.service.CommentService;
@@ -17,7 +18,9 @@ import com.bugtracking.service.NotificationService;
 import com.bugtracking.service.ProjectService;
 import com.bugtracking.service.SupportingDocService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +33,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,10 +102,39 @@ public class BugApiController {
                           @RequestParam(required = false) Environment environment,
                           @RequestParam(required = false) String assignee,
                           @RequestParam(required = false) String reporter,
+                          @RequestParam(required = false) String label,
+                          @RequestParam(required = false) String due,
                           @RequestParam(required = false) String keyword,
                           @RequestParam(required = false) String sort) {
         return service.findAll(project, status, severity, environment,
-                assignee, reporter, keyword, sort);
+                assignee, reporter, null, label, due, keyword, sort);
+    }
+
+    @GetMapping("/labels")
+    public List<String> labels(@RequestParam(required = false) String project) {
+        return service.labelsIn(project);
+    }
+
+    // Spring 6 does not match a .csv suffix on the collection path, hence the extra segment.
+    @GetMapping(value = "/export.csv", produces = "text/csv;charset=UTF-8")
+    public ResponseEntity<String> exportCsv(@RequestParam(required = false) String project,
+                                            @RequestParam(required = false) String status,
+                                            @RequestParam(required = false) Severity severity,
+                                            @RequestParam(required = false) Environment environment,
+                                            @RequestParam(required = false) String assignee,
+                                            @RequestParam(required = false) String reporter,
+                                            @RequestParam(required = false) String label,
+                                            @RequestParam(required = false) String due,
+                                            @RequestParam(required = false) String keyword,
+                                            @RequestParam(required = false) String sort) {
+        List<Bug> bugs = service.findAll(project, status, severity, environment,
+                assignee, reporter, null, label, due, keyword, sort);
+        String scope = project == null || project.isBlank() ? "all" : project.replaceAll("[^A-Za-z0-9-]+", "-");
+        String name = "bugs-" + scope + "-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + ".csv";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .body(BugCsv.render(bugs, columns.snapshot()));
     }
 
     @GetMapping("/{id}")

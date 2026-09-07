@@ -677,6 +677,13 @@
                             <dt>Module</dt>
                             <dd><span th:text="${bug.module} ?: '—'">Module</span></dd>
                         </div>
+                        <div class="rail-fact" th:unless="${#lists.isEmpty(bug.labels)}">
+                            <dt>Labels</dt>
+                            <dd class="label-chips">
+                                <a class="pill pill-label" th:each="l : ${bug.labels}"
+                                   th:href="@{/bugs(label=${l})}" th:text="${l}">login</a>
+                            </dd>
+                        </div>
                         <div class="rail-fact">
                             <dt>Project</dt>
                             <dd id="bug-project">

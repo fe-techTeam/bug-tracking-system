@@ -117,6 +117,11 @@ public class TeamMember {
     @Column(name = "guest_project_id")
     private Long guestProjectId;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 16)
+    private ThemePreference theme = ThemePreference.SYSTEM;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -211,6 +216,14 @@ public class TeamMember {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public ThemePreference getTheme() {
+        return theme == null ? ThemePreference.SYSTEM : theme;
+    }
+
+    public void setTheme(ThemePreference theme) {
+        this.theme = theme == null ? ThemePreference.SYSTEM : theme;
     }
 
     public LocalDateTime getCreatedAt() {

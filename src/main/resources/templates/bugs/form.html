@@ -278,6 +278,16 @@
                     </label>
 
                     <label>
+                        <span>Labels <span class="hint">— comma separated</span></span>
+                        <input type="text" th:field="*{labelsText}" id="labelsText"
+                               list="label-options" placeholder="e.g. login, regression"
+                               autocomplete="off" autocapitalize="none" spellcheck="false">
+                        <datalist id="label-options">
+                            <option th:each="l : ${labels}" th:value="${l}"></option>
+                        </datalist>
+                    </label>
+
+                    <label>
                         <span>Blocked by <span class="hint">— an open bug in the way</span></span>
                         <select th:field="*{blockedBy}" id="blockedBy">
                             <option value="">— Not blocked —</option>

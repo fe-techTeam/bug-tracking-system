@@ -2,6 +2,7 @@ package com.bugtracking.controller;
 
 import com.bugtracking.config.AttachmentProperties;
 import com.bugtracking.service.AttachmentService;
+import com.bugtracking.service.SavedFilterService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolation;
@@ -51,6 +52,17 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", message));
         }
         return page(model, request, "Bug not found", message);
+    }
+
+    /** Deleting someone else's saved filter, not a bug the caller could fix by retrying. */
+    @ExceptionHandler(SavedFilterService.NotOwnerException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Object handleNotOwner(SavedFilterService.NotOwnerException ex, HttpServletRequest request, Model model) {
+        String message = "Only whoever saved this filter can delete it.";
+        if (isApi(request)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", message));
+        }
+        return page(model, request, "That is not yours to delete", message);
     }
 
     /** A file the caller could fix by choosing a different one. */

@@ -3,11 +3,13 @@ package com.bugtracking.model;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -132,6 +134,12 @@ public class Bug {
     @OrderColumn(name = "position")
     @Column(name = "assignee", length = 80)
     private List<String> assignees = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "bug_labels", joinColumns = @JoinColumn(name = "bug_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "label", length = 40)
+    private List<String> labels = new ArrayList<>();
 
     /**
      * The open bug that has to be dealt with before this one can move, if any.
@@ -381,6 +389,46 @@ public class Bug {
     /** Due today — worth saying differently from "due in nine days". */
     public boolean isDueToday() {
         return dueDate != null && dueDate.isEqual(LocalDate.now());
+    }
+
+    public List<String> getLabels() {
+        return labels;
+    }
+
+    public void setLabels(List<String> values) {
+        List<String> clean = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        if (values != null) {
+            for (String value : values) {
+                if (value == null) {
+                    continue;
+                }
+                String label = value.trim();
+                if (label.length() > 40) {
+                    label = label.substring(0, 40).trim();
+                }
+                if (!label.isEmpty() && seen.add(label.toLowerCase(Locale.ROOT))) {
+                    clean.add(label);
+                }
+            }
+        }
+        this.labels = clean;
+    }
+
+    @Transient
+    @JsonIgnore
+    public String getLabelsText() {
+        return String.join(", ", labels);
+    }
+
+    public void setLabelsText(String text) {
+        setLabels(text == null ? List.of() : Arrays.asList(text.split(",")));
+    }
+
+    @Transient
+    @JsonIgnore
+    public String getLabelsLabel() {
+        return labels.isEmpty() ? null : String.join(", ", labels);
     }
 
     public LocalDateTime getDeletedAt() {

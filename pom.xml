@@ -88,6 +88,12 @@
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- Test scope only, so it never reaches the runtime classpath: the JPA tests need a database. -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
 
     <!-- Versioned schema migrations (src/main/resources/db/migration/postgres),
          applied on every start. They own the schema; Hibernate only validates. -->

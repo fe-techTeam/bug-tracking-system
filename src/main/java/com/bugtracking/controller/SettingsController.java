@@ -2,6 +2,7 @@ package com.bugtracking.controller;
 
 import com.bugtracking.model.TeamMember;
 import com.bugtracking.service.ProjectService;
+import com.bugtracking.service.SavedFilterService;
 import com.bugtracking.service.TeamMemberService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -40,14 +41,17 @@ import java.util.Set;
 @RequestMapping("/settings")
 public class SettingsController {
 
-    private static final Set<String> TABS = Set.of("projects", "team");
+    private static final Set<String> TABS = Set.of("projects", "team", "filters");
 
     private final ProjectService projects;
     private final TeamMemberService team;
+    private final SavedFilterService savedFilters;
 
-    public SettingsController(ProjectService projects, TeamMemberService team) {
+    public SettingsController(ProjectService projects, TeamMemberService team,
+                              SavedFilterService savedFilters) {
         this.projects = projects;
         this.team = team;
+        this.savedFilters = savedFilters;
     }
 
     @GetMapping
@@ -92,6 +96,7 @@ public class SettingsController {
         // together here would undo that in the one place people read it.
         model.addAttribute("guests", team.guests());
         model.addAttribute("activeProjects", projects.active());
+        model.addAttribute("filters", savedFilters.all());
         return "settings";
     }
 }

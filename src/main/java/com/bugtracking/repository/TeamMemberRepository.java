@@ -40,4 +40,6 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     List<TeamMember> findByNameIgnoreCase(String name);
 
     boolean existsByEmailIgnoreCase(String email);
+
+    Optional<TeamMember> findFirstByNameIgnoreCase(String name);
 }

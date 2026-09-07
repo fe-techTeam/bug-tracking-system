@@ -61,6 +61,9 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
                        WHERE ab.id = b.id AND LOWER(a) = LOWER(CAST(:assignee AS string))))
               AND (:reporter IS NULL OR LOWER(b.reportedBy) = LOWER(CAST(:reporter AS string)))
               AND (:viaGuest IS NULL OR b.viaGuest = :viaGuest)
+              AND (:label IS NULL OR EXISTS (
+                       SELECT l FROM Bug lb JOIN lb.labels l
+                       WHERE lb.id = b.id AND LOWER(l) = LOWER(CAST(:label AS string))))
               AND (:keyword IS NULL
                    OR LOWER(b.title) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
                    OR LOWER(b.description) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
@@ -80,6 +83,7 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
                      @Param("assignee") String assignee,
                      @Param("reporter") String reporter,
                      @Param("viaGuest") Boolean viaGuest,
+                     @Param("label") String label,
                      @Param("keyword") String keyword,
                      @Param("keywordId") Long keywordId);
 
@@ -94,6 +98,14 @@ public interface BugRepository extends JpaRepository<Bug, Long> {
      * client see this bug" one answer rather than one per screen.
      */
     List<Bug> findByGuestIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long guestId);
+
+    @Query("""
+            SELECT DISTINCT l FROM Bug b JOIN b.labels l
+            WHERE b.deletedAt IS NULL
+              AND (:project IS NULL OR LOWER(b.project) = LOWER(CAST(:project AS string)))
+            ORDER BY l
+            """)
+    List<String> distinctLabels(@Param("project") String project);
 
     /** Every live bug on one project, newest first — the input to a dashboard. */
     List<Bug> findByProjectIgnoreCaseAndDeletedAtIsNullOrderByCreatedAtDesc(String project);

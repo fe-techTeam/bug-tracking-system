@@ -31,6 +31,9 @@ public class GuestRateLimit {
     /** Replies, which are cheaper and more conversational, so a higher ceiling. */
     private static final int REPLIES_PER_HOUR = 40;
 
+    /** Reports one address may raise through a public link in an hour. */
+    private static final int PUBLIC_REPORTS_PER_HOUR = 12;
+
     private static final Duration WINDOW = Duration.ofHours(1);
 
     /** Thrown when somebody has to wait. The message is what they are shown. */
@@ -58,6 +61,12 @@ public class GuestRateLimit {
      * lets somebody spend a whole allowance at 10:59 and a second one at 11:00,
      * which is the burst this exists to stop.
      */
+    void checkPublic(String clientIp) {
+        check("public:" + clientIp, PUBLIC_REPORTS_PER_HOUR,
+                "That is a lot of reports in one hour from this connection."
+                        + " Give it a few minutes.");
+    }
+
     private void check(String key, int allowed, String message) {
         long now = System.currentTimeMillis();
         long cutoff = now - WINDOW.toMillis();

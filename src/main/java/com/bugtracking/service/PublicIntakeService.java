@@ -2,6 +2,7 @@ package com.bugtracking.service;
 
 import com.bugtracking.config.EmailProperties;
 import com.bugtracking.model.Bug;
+import com.bugtracking.model.BugSource;
 import com.bugtracking.model.Project;
 import com.bugtracking.model.PublicTokens;
 import com.bugtracking.repository.ProjectRepository;
@@ -75,6 +76,7 @@ public class PublicIntakeService {
         bug.setReportedBy(name);
         bug.setReporterEmail(form.getReporterEmail().trim().toLowerCase(Locale.ROOT));
         bug.setViaPublic(true);
+        bug.setSource(BugSource.EXTERNAL);
 
         Bug saved = bugs.save(bug, name);
         String rejected = attach(saved.getId(), files, name);

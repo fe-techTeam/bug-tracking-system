@@ -203,6 +203,11 @@ public class Bug {
     @Column(name = "via_public", nullable = false)
     private boolean viaPublic = false;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 16)
+    private BugSource source = BugSource.INTERNAL;
+
     @Size(max = 200)
     @Column(name = "reporter_email", length = 200)
     private String reporterEmail;
@@ -506,6 +511,14 @@ public class Bug {
 
     public void setViaPublic(boolean viaPublic) {
         this.viaPublic = viaPublic;
+    }
+
+    public BugSource getSource() {
+        return source;
+    }
+
+    public void setSource(BugSource source) {
+        this.source = source;
     }
 
     public String getReporterEmail() {

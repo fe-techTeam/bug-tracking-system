@@ -698,8 +698,7 @@
                                 <span class="avatar avatar-sm" th:if="${bug.reportedBy}"
                                       th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
                                 <span th:text="${bug.reportedBy} ?: '—'">Reporter</span>
-                                <span th:replace="~{fragments :: guestMark(${bug})}"></span>
-                                <span th:replace="~{fragments :: externalMark(${bug})}"></span>
+                                <span th:replace="~{fragments :: sourceMark(${bug}, true)}"></span>
                             </dd>
                         </div>
                         <!-- The only way back to a reporter with no account here. -->

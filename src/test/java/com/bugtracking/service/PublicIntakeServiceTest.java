@@ -2,6 +2,7 @@ package com.bugtracking.service;
 
 import com.bugtracking.config.EmailProperties;
 import com.bugtracking.model.Bug;
+import com.bugtracking.model.BugSource;
 import com.bugtracking.model.Environment;
 import com.bugtracking.model.Project;
 import com.bugtracking.model.Severity;
@@ -82,6 +83,7 @@ class PublicIntakeServiceTest {
         assertEquals("priya@example.com", bug.getReporterEmail());
         assertEquals("Sign-in swallows the first click", bug.getTitle());
         assertTrue(bug.isViaPublic());
+        assertEquals(BugSource.EXTERNAL, bug.getSource());
         assertFalse(bug.isViaGuest());
         assertNull(bug.getGuestId());
         assertTrue(bug.getAssignees().isEmpty());

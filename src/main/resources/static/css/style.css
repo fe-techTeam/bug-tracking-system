@@ -5977,26 +5977,28 @@ a.tm-name:hover { color: var(--accent); }
 
 /* ---------- the mark ---------- */
 
-/* A diamond beside a name. It sits inside .client-chip, a board card's row of
-   marks, a filter row and the rail, so it carries no margin of its own — every
-   one of those is already a flex row with its own gap. */
-.guest-mark,
-.public-mark {
+/* One mark for where a bug came from. It sits inside .client-chip, a board
+   card's row of marks, a filter row, a table cell and the rail, so it carries
+   no margin of its own — every one of those is already a flex row with its own
+   gap. The colour is the only thing that changes between the three. */
+.source-mark {
     display: inline-flex;
     align-items: center;
-    color: var(--muted);
+    gap: 5px;
+    color: var(--c, var(--muted));
 }
-.guest-mark svg.i,
-.public-mark svg.i { width: 11px; height: 11px; }
+.source-mark svg.i { width: 11px; height: 11px; }
+
+.src-INTERNAL { --c: var(--muted); }
+.src-CLIENT   { --c: var(--accent); }
+.src-EXTERNAL { --c: var(--sev-MEDIUM); }
 
 /* Filled rather than outlined once it is the thing you picked, so an active
    filter reads at a glance rather than by comparing two 11px outlines. */
-.fmenu-opt.is-active .guest-mark,
-.fmenu-opt.is-active .public-mark,
-.chip .guest-mark,
-.chip .public-mark { color: var(--accent); }
-.fmenu-opt.is-active .guest-mark svg.i,
-.chip .guest-mark svg.i { fill: currentColor; }
+.fmenu-opt.is-active .source-mark,
+.chip .source-mark { --c: var(--accent); }
+.fmenu-opt.is-active .src-CLIENT svg.i,
+.chip .src-CLIENT svg.i { fill: currentColor; }
 
 /* The board's filter menu columns are sized to their longest name; this one
    holds a few short ones and would otherwise take a person's width. */

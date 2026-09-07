@@ -24,8 +24,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = PublicIntakeApiController.class,
@@ -68,6 +70,13 @@ class PublicIntakeApiControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.bugId").value(42))
                 .andExpect(jsonPath("$.rejected").doesNotExist());
+    }
+
+    @Test
+    void theRestOfTheApiIsStillClosed() throws Exception {
+        mvc.perform(get("/api/bugs"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("http://localhost/login"));
     }
 
     @Test

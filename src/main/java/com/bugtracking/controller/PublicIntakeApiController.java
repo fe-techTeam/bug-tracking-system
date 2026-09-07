@@ -1,6 +1,5 @@
 package com.bugtracking.controller;
 
-import com.bugtracking.service.AttachmentService;
 import com.bugtracking.service.GuestRateLimit;
 import com.bugtracking.service.GuestService;
 import com.bugtracking.service.PublicIntakeService;
@@ -59,7 +58,7 @@ public class PublicIntakeApiController {
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
-    // Handled here rather than in GlobalExceptionHandler, which answers with the app's HTML error page.
+    // Handled here because GlobalExceptionHandler knows neither of these two; a rejected file it does answer as JSON already.
     @ExceptionHandler(PublicIntakeService.UnknownLinkException.class)
     public ResponseEntity<Map<String, Object>> unknownLink() {
         return unavailable();
@@ -68,11 +67,6 @@ public class PublicIntakeApiController {
     @ExceptionHandler(GuestRateLimit.TooOftenException.class)
     public ResponseEntity<Map<String, Object>> tooOften(RuntimeException e) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error(e.getMessage()));
-    }
-
-    @ExceptionHandler({AttachmentService.RejectedFileException.class, IllegalArgumentException.class})
-    public ResponseEntity<Map<String, Object>> refused(RuntimeException e) {
-        return ResponseEntity.badRequest().body(error(e.getMessage()));
     }
 
     private static ResponseEntity<Map<String, Object>> unavailable() {

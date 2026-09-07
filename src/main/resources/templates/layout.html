@@ -327,6 +327,14 @@
             </div>
         </div>
 
+        <!-- Copied, never shown: the token in that URL is the whole grant. -->
+        <button type="button" class="icon-btn" id="copy-public-link" th:if="${publicLink != null}"
+                th:attr="data-copy-url=${publicLink}"
+                title="Copy this project's public report link"
+                aria-label="Copy this project's public report link">
+            <svg class="i" aria-hidden="true"><use href="#i-link"/></svg>
+        </button>
+
         <nav class="nav-links">
             <!-- "Home", not "Board": the board is one of three ways to read the
                  same bugs, and naming the way in after one of them made the

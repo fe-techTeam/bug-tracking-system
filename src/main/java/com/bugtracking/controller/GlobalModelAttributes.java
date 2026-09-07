@@ -6,6 +6,7 @@ import com.bugtracking.service.BoardColumns;
 import com.bugtracking.service.BugService;
 import com.bugtracking.service.NotificationService;
 import com.bugtracking.service.ProjectService;
+import com.bugtracking.service.PublicIntakeService;
 import com.bugtracking.service.TeamMemberService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,17 +44,20 @@ public class GlobalModelAttributes {
     private final BugService bugs;
     private final BoardColumnService columns;
     private final TeamMemberService team;
+    private final PublicIntakeService intake;
 
     public GlobalModelAttributes(NotificationService notifications,
                                  ProjectService projects,
                                  BugService bugs,
                                  BoardColumnService columns,
-                                 TeamMemberService team) {
+                                 TeamMemberService team,
+                                 PublicIntakeService intake) {
         this.notifications = notifications;
         this.projects = projects;
         this.bugs = bugs;
         this.columns = columns;
         this.team = team;
+        this.intake = intake;
     }
 
     /**
@@ -128,6 +132,17 @@ public class GlobalModelAttributes {
         }
         Object remembered = session.getAttribute(PROJECT_KEY);
         return remembered instanceof String name && !name.isBlank() ? name : null;
+    }
+
+    /** The selected project's public report link, for the navbar's copy button. */
+    @ModelAttribute("publicLink")
+    public String publicLink(HttpServletRequest request, HttpSession session) {
+        if (chromeless(request)) {
+            return null;
+        }
+        return projects.findByName(currentProject(request, session))
+                .map(intake::publicUrl)
+                .orElse(null);
     }
 
     /**

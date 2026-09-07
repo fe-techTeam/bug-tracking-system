@@ -33,6 +33,9 @@ public class PublicIntakeService {
     private final EmailProperties mail;
     private final GuestRateLimit limit;
 
+    private static final int DESCRIPTION_LIMIT = 4000;
+    private static final String BROWSER_LINE = "\n\nBrowser: ";
+
     public PublicIntakeService(ProjectRepository projects,
                                BugService bugs,
                                AttachmentService attachments,
@@ -99,10 +102,19 @@ public class PublicIntakeService {
     // The browser line follows Jira's issue collector: the one fact a stranger never thinks to give.
     private static String withBrowser(String description, String userAgent) {
         String body = description == null ? "" : description.trim();
+        if (body.length() > DESCRIPTION_LIMIT) {
+            body = body.substring(0, DESCRIPTION_LIMIT);
+        }
         if (userAgent == null || userAgent.isBlank()) {
             return body;
         }
-        return body + "\n\nBrowser: " + userAgent.trim();
+        String suffix = BROWSER_LINE + userAgent.trim();
+        int room = DESCRIPTION_LIMIT - body.length();
+        if (room < suffix.length()) {
+            // the typed report is the part a stranger cannot retype, so the browser line gives way to it
+            suffix = room > BROWSER_LINE.length() ? suffix.substring(0, room) : "";
+        }
+        return body + suffix;
     }
 
     // Refusals are collected rather than thrown: this class is transactional, so a bad file would take the report with it.

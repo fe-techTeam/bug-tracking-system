@@ -89,6 +89,33 @@ class PublicIntakeServiceTest {
     }
 
     @Test
+    void aMaxLengthDescriptionStillFitsWithTheBrowserLine() {
+        PublicReport r = report();
+        r.setDescription("x".repeat(4000));
+
+        intake.raise("tok-acme", r, null, "10.0.0.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
+
+        ArgumentCaptor<Bug> saved = ArgumentCaptor.forClass(Bug.class);
+        verify(bugs).save(saved.capture(), anyString());
+        assertEquals(4000, saved.getValue().getDescription().length());
+        assertTrue(saved.getValue().getDescription().startsWith("x".repeat(3000)));
+    }
+
+    @Test
+    void aNearlyFullDescriptionKeepsWhatFitsOfTheBrowserLine() {
+        PublicReport r = report();
+        r.setDescription("x".repeat(3970));
+
+        intake.raise("tok-acme", r, null, "10.0.0.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
+
+        ArgumentCaptor<Bug> saved = ArgumentCaptor.forClass(Bug.class);
+        verify(bugs).save(saved.capture(), anyString());
+        String description = saved.getValue().getDescription();
+        assertEquals(4000, description.length());
+        assertTrue(description.contains("\n\nBrowser: Mozilla"));
+    }
+
+    @Test
     void tellsTheProjectTeam() {
         intake.raise("tok-acme", report(), null, "10.0.0.1", null);
         verify(notifications).notify(eq(42L), eq("public"), eq("Ana"),

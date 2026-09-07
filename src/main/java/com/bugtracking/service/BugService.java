@@ -2,6 +2,7 @@ package com.bugtracking.service;
 
 import com.bugtracking.model.BoardColumn;
 import com.bugtracking.model.Bug;
+import com.bugtracking.model.BugSource;
 import com.bugtracking.model.ColumnNotify;
 import com.bugtracking.model.Environment;
 import com.bugtracking.model.Severity;
@@ -66,7 +67,7 @@ public class BugService {
                              Environment environment, String assignee, String reporter,
                              String keyword, String sort) {
         return findAll(project, status, severity, environment, assignee, reporter,
-                null, null, null, keyword, sort);
+                null, null, null, null, keyword, sort);
     }
 
     /**
@@ -77,10 +78,11 @@ public class BugService {
     @Transactional(readOnly = true)
     public List<Bug> findAll(String project, String status, Severity severity,
                              Environment environment, String assignee, String reporter,
-                             Boolean viaGuest, String label, String due, String keyword, String sort) {
+                             Boolean viaGuest, Boolean viaPublic, String label, String due,
+                             String keyword, String sort) {
         String trimmed = blankToNull(keyword);
         List<Bug> found = repository.search(blankToNull(project), status, severity,
-                environment, blankToNull(assignee), blankToNull(reporter), viaGuest,
+                environment, blankToNull(assignee), blankToNull(reporter), viaGuest, viaPublic,
                 blankToNull(label),
                 trimmed, idIn(trimmed));
         return sorted(dueFiltered(found, blankToNull(due)), sort);
@@ -112,6 +114,15 @@ public class BugService {
         return scope == null
                 ? repository.countByViaGuestTrueAndDeletedAtIsNull()
                 : repository.countByProjectIgnoreCaseAndViaGuestTrueAndDeletedAtIsNull(scope);
+    }
+
+    /** How many of a project's live bugs came in through the public link. */
+    @Transactional(readOnly = true)
+    public long publicRaisedIn(String project) {
+        String scope = blankToNull(project);
+        return scope == null
+                ? repository.countByViaPublicTrueAndDeletedAtIsNull()
+                : repository.countByProjectIgnoreCaseAndViaPublicTrueAndDeletedAtIsNull(scope);
     }
 
     @Transactional(readOnly = true)
@@ -234,6 +245,7 @@ public class BugService {
         // this board becomes the board's first column rather than a bug that
         // renders nowhere.
         bug.setStatus(columns.keyOn(bug.getProject(), bug.getStatus()));
+        bug.setSource(sourceOf(bug));
 
         Bug saved = repository.save(bug);
         BoardColumns board = columns.snapshot();
@@ -298,6 +310,7 @@ public class BugService {
         existing.setAssignees(changes.getAssignees());
         existing.setLabels(changes.getLabels());
         existing.setBlockedBy(validBlocker(id, changes.getBlockedBy()));
+        existing.setSource(sourceOf(existing));
 
         Bug saved = repository.save(existing);
         String by = BugHistoryService.actor(actor);
@@ -322,6 +335,13 @@ public class BugService {
             notifyStatusChange(saved, board, told);
         }
         return saved;
+    }
+
+    // Derived rather than taken: the JSON API binds whatever it is handed, and a
+    // source disagreeing with the flags would show one thing and count another.
+    private BugSource sourceOf(Bug bug) {
+        return bug.isViaPublic() ? BugSource.EXTERNAL
+                : bug.isViaGuest() ? BugSource.CLIENT : BugSource.INTERNAL;
     }
 
     public Bug changeStatus(Long id, String status) {

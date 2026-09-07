@@ -95,12 +95,20 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/login", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                    // The public intake form. The token in the URL is the whole
+                    // grant, and PublicIntakeService is what checks it: an
+                    // unknown or hidden project's link answers 404, never a
+                    // redirect to a sign-in page a stranger has no account for.
+                    // Nothing under /public reads a session or names a person.
+                    .requestMatchers("/public/**").permitAll()
                     // The error page has to be reachable by whoever hit the
                     // error, signed in or not - a 404 on a stylesheet is served
                     // to an anonymous request, and answering it with a redirect
                     // to /login would say "sign in" about a missing file.
                     .requestMatchers("/error").permitAll()
-                    // The JSON API used to be permitAll, which meant an
+                    // Before /api/** on purpose: first match wins, and this route's grant is the project's public token, not a session.
+                    .requestMatchers("/api/public/**").permitAll()
+                    // The rest of the JSON API used to be permitAll, which meant an
                     // unauthenticated GET /api/bugs returned every bug on every
                     // project and /api/projects/*/team returned the roster. That
                     // was survivable while everybody with the URL was already
@@ -142,7 +150,8 @@ public class SecurityConfig {
                     // documents area (/projects/{id}/docs/**) and a project's
                     // own team list with it, and both of those are daily work.
                     .requestMatchers(HttpMethod.POST,
-                            "/projects", "/projects/*/active", "/projects/*/delete").hasRole("ADMIN")
+                            "/projects", "/projects/*/active", "/projects/*/delete",
+                            "/projects/*/public-link").hasRole("ADMIN")
                     // Handing somebody outside the company a way in is setup of
                     // the most consequential kind, so it sits with the roster.
                     .requestMatchers(HttpMethod.POST,
@@ -181,10 +190,13 @@ public class SecurityConfig {
                     .logoutSuccessUrl("/login?logout")
                     .invalidateHttpSession(true)
                     .deleteCookies("JSESSIONID")
-                    .permitAll());
+                    .permitAll())
 
-        // CSRF is left at its default, which is on for every state-changing
-        // request including /api/**. That used to carry .ignoringRequestMatchers
+            // Exempt because an external app holds no session here, so there is no cookie for a forged request to ride on.
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/public/**"));
+
+        // CSRF is otherwise left at its default, which is on for every
+        // state-changing request including the rest of /api/**. That used to carry .ignoringRequestMatchers
         // ("/api/**"), on the grounds that the API had no browser session to
         // ride on; closing it to ROLE_USER above gave it one, and an exempt
         // endpoint that trusts a session cookie is the definition of CSRF. Both

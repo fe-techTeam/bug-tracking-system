@@ -3,6 +3,7 @@ package com.bugtracking.service;
 import com.bugtracking.config.AccountPrincipal;
 import com.bugtracking.model.Attachment;
 import com.bugtracking.model.Bug;
+import com.bugtracking.model.BugSource;
 import com.bugtracking.model.Comment;
 import com.bugtracking.model.Project;
 import com.bugtracking.model.TeamMember;
@@ -233,6 +234,7 @@ public class GuestService {
         bug.setReportedBy(guest.getName());
         bug.setGuestId(guest.getId());
         bug.setViaGuest(true);
+        bug.setSource(BugSource.CLIENT);
 
         Bug saved = bugService.save(bug, guest.getName());
         String rejected = attach(saved.getId(), null, files, guest.getName());

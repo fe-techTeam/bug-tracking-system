@@ -71,6 +71,11 @@ public class Project {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** The whole grant behind /public/{token}, so it is never serialised anywhere. */
+    @JsonIgnore
+    @Column(name = "public_token", nullable = false, length = 32, unique = true)
+    private String publicToken;
+
     public Project() {
     }
 
@@ -81,6 +86,9 @@ public class Project {
     @PrePersist
     void onCreate() {
         this.createdAt = LocalDateTime.now();
+        if (this.publicToken == null) {
+            this.publicToken = PublicTokens.fresh();
+        }
     }
 
     public Long getId() {
@@ -122,5 +130,14 @@ public class Project {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    @JsonIgnore
+    public String getPublicToken() {
+        return publicToken;
+    }
+
+    public void setPublicToken(String publicToken) {
+        this.publicToken = publicToken;
     }
 }

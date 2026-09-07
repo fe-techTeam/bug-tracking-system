@@ -135,16 +135,27 @@
                             </a>
                             <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('source', 'guest')}}"
                                th:classappend="${source == 'guest'} ? 'is-active' : ''">
-                                <span class="guest-mark" aria-hidden="true">
+                                <span class="source-mark src-CLIENT" aria-hidden="true">
                                     <svg class="i"><use href="#i-guest"/></svg>
                                 </span>
                                 <span>A client</span>
                                 <span class="opt-count num" th:if="${guestRaised > 0}"
                                       th:text="${guestRaised}">4</span>
                             </a>
+                            <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('source', 'public')}}"
+                               th:classappend="${source == 'public'} ? 'is-active' : ''">
+                                <span class="source-mark src-EXTERNAL" aria-hidden="true">
+                                    <svg class="i"><use href="#i-globe"/></svg>
+                                </span>
+                                <span>The public link</span>
+                                <span class="opt-count num" th:if="${publicRaised > 0}"
+                                      th:text="${publicRaised}">2</span>
+                            </a>
                             <a class="fmenu-opt" th:href="@{${'/bugs' + q.toggle('source', 'team')}}"
                                th:classappend="${source == 'team'} ? 'is-active' : ''">
-                                <svg class="i" aria-hidden="true"><use href="#i-users"/></svg>
+                                <span class="source-mark src-INTERNAL" aria-hidden="true">
+                                    <svg class="i"><use href="#i-users"/></svg>
+                                </span>
                                 <span>The team</span><span class="opt-count"></span>
                             </a>
                         </div>
@@ -393,10 +404,16 @@
 
         <a class="chip" th:if="${source != null}"
            th:href="@{${'/bugs' + q.without('source')}}">
-            <span class="guest-mark" aria-hidden="true" th:if="${source == 'guest'}">
+            <span class="source-mark src-CLIENT" aria-hidden="true" th:if="${source == 'guest'}">
                 <svg class="i"><use href="#i-guest"/></svg>
             </span>
-            <span>from <b th:text="${source == 'guest'} ? 'a client' : 'the team'">a client</b></span>
+            <span class="source-mark src-EXTERNAL" aria-hidden="true" th:if="${source == 'public'}">
+                <svg class="i"><use href="#i-globe"/></svg>
+            </span>
+            <span class="source-mark src-INTERNAL" aria-hidden="true" th:if="${source == 'team'}">
+                <svg class="i"><use href="#i-users"/></svg>
+            </span>
+            <span>from <b th:text="${source == 'guest'} ? 'a client' : (${source == 'public'} ? 'the public link' : 'the team')">a client</b></span>
             <span class="x" aria-hidden="true"><svg class="i"><use href="#i-x"/></svg></span>
         </a>
 
@@ -721,9 +738,7 @@
                        th:text="${bug.title}"
                        th:attr="aria-label='BUG-' + ${bug.id} + ': ' + ${bug.title}">Sign-in swallows the first click</a>
 
-                    <p class="kcard-note"
-                       th:if="${files != null or said != null or blocker != null
-                               or bug.dueDate != null or bug.viaGuest}">
+                    <p class="kcard-note">
                         <!-- A count, drawn the way the comment count beside it
                              already is: the glyph says what it counts, so the
                              row reads as marks on a card rather than as a
@@ -744,7 +759,7 @@
                              card, the date is about the work itself. -->
                         <span th:replace="~{fragments :: due(${bug}, ${cols}, true)}"></span>
 
-                        <span th:replace="~{fragments :: guestMark(${bug})}"></span>
+                        <span th:replace="~{fragments :: sourceMark(${bug}, false)}"></span>
 
                         <!-- Only while the blocker is still open: a bug waiting
                              on something already fixed is not blocked. -->
@@ -948,6 +963,7 @@
                     <th>Labels</th>
                     <th>Assigned</th>
                     <th>Raised by</th>
+                    <th>Source</th>
                     <th th:replace="~{fragments :: sortHead('due', '-due', 'Due', '')}"></th>
                     <th th:replace="~{fragments :: sortHead('oldest', 'newest', 'Reported', '')}"></th>
                     <th th:replace="~{fragments :: sortHead('severity', '-severity', 'Severity', 'sev')}"></th>
@@ -1041,9 +1057,12 @@
                         <span class="client-chip" th:if="${bug.reportedBy}">
                             <span class="avatar avatar-sm" th:attr="data-avatar=${bug.reportedBy}" aria-hidden="true"></span>
                             <span class="client-name" th:text="${bug.reportedBy}">qa-team</span>
-                            <span th:replace="~{fragments :: guestMark(${bug})}"></span>
                         </span>
                         <span class="muted" th:unless="${bug.reportedBy}">—</span>
+                    </td>
+
+                    <td data-label="Source">
+                        <span th:replace="~{fragments :: sourceMark(${bug}, true)}"></span>
                     </td>
 
                     <td data-label="Due">

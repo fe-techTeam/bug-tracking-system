@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{public/layout :: page('Report a bug', ~{::section})}">
+<body>
+<section>
+
+    <header class="portal-head">
+        <div>
+            <h1>Report a bug</h1>
+            <p class="sub">
+                Tell the <b th:text="${project.name}">Godrej</b> team what went wrong.
+                Somebody picks it up from here and can reply to your email.
+            </p>
+        </div>
+    </header>
+
+    <!-- One column, and the two identity fields first: this page is open to
+         somebody the app has never met, so it asks who you are before it asks
+         what broke. Everything below is the portal's report form unchanged. -->
+    <form class="panel portal-form" method="post" th:action="@{/public/{t}(t=${project.publicToken})}"
+          th:object="${report}" enctype="multipart/form-data" id="report-form">
+        <div class="panel-pad">
+
+            <div class="portal-pair">
+                <label>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-user"/></svg>
+                        Your name <span class="req">*</span>
+                    </span>
+                    <input type="text" th:field="*{reporterName}" id="reporterName"
+                           placeholder="Priya Nair" autocomplete="name" maxlength="80"
+                           enterkeyhint="next" autocapitalize="words">
+                    <span class="field-error" th:if="${#fields.hasErrors('reporterName')}"
+                          th:errors="*{reporterName}">Name error</span>
+                </label>
+
+                <label>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-mail"/></svg>
+                        Your email <span class="req">*</span>
+                        <span class="hint">— so the team can reply</span>
+                    </span>
+                    <input type="email" th:field="*{reporterEmail}" id="reporterEmail"
+                           placeholder="priya@example.com" autocomplete="email" maxlength="200"
+                           enterkeyhint="next" inputmode="email">
+                    <span class="field-error" th:if="${#fields.hasErrors('reporterEmail')}"
+                          th:errors="*{reporterEmail}">Email error</span>
+                </label>
+            </div>
+
+            <label style="margin-top:16px">
+                <span>
+                    <svg class="i" aria-hidden="true"><use href="#i-pen"/></svg>
+                    What is wrong <span class="req">*</span>
+                    <span class="hint">— one line, as you would say it out loud</span>
+                </span>
+                <input type="text" th:field="*{title}" id="title" class="input-lg"
+                       placeholder="Sign-in swallows the first click" autocomplete="off"
+                       enterkeyhint="next" autocapitalize="sentences" maxlength="150">
+                <span class="field-error" th:if="${#fields.hasErrors('title')}"
+                      th:errors="*{title}">Title error</span>
+            </label>
+
+            <label style="margin-top:16px">
+                <span>
+                    <svg class="i" aria-hidden="true"><use href="#i-file-text"/></svg>
+                    What happened <span class="req">*</span>
+                    <span class="hint">— where you were, what you did, what you expected instead</span>
+                </span>
+                <textarea rows="12" th:field="*{description}" id="description" class="detail-box"
+                          placeholder="What happens, and where.&#10;&#10;How to see it:&#10;1. Open ...&#10;2. Click ...&#10;3. Observe ...&#10;&#10;Expected: ...&#10;Actual: ..."
+                          autocapitalize="sentences"></textarea>
+                <span class="field-error" th:if="${#fields.hasErrors('description')}"
+                      th:errors="*{description}">Description error</span>
+            </label>
+
+            <div class="portal-pair" style="margin-top:16px">
+                <label>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-chart"/></svg>
+                        How bad is it <span class="req">*</span>
+                    </span>
+                    <select th:field="*{severity}" id="severity">
+                        <option th:each="s : ${severities}" th:value="${s}" th:text="${s.label}">High</option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>
+                        <svg class="i" aria-hidden="true"><use href="#i-board"/></svg>
+                        Where did you see it <span class="req">*</span>
+                    </span>
+                    <select th:field="*{environment}" id="environment">
+                        <option th:each="e : ${environments}" th:value="${e}" th:text="${e.label}">Production</option>
+                    </select>
+                </label>
+            </div>
+
+            <div style="margin-top:20px">
+                <label class="file-drop" for="files">
+                    <svg class="i" aria-hidden="true"><use href="#i-paperclip"/></svg>
+                    <span class="file-drop-text" id="file-name">
+                        Add a screenshot, a screen recording or a PDF
+                    </span>
+                    <input type="file" name="files" id="files" multiple
+                           accept="image/*,video/*,application/pdf">
+                </label>
+                <p class="hint" style="margin-top:8px"
+                   th:text="'Up to ' + ${maxFiles} + ' files. A picture of the screen usually saves a round trip.'">
+                    Up to 3 files.</p>
+                <!-- A browser will not hand the same file over twice, so a
+                     rejected save empties this control. Say so rather than let
+                     it look full. -->
+                <p class="field-error" th:if="${#fields.hasAnyErrors()}" style="margin-top:8px">
+                    Your file choice was cleared when the form came back — pick it again before you send.
+                </p>
+            </div>
+        </div>
+
+        <div class="panel-foot">
+            <button type="submit" class="btn btn-primary" id="send-report">Send it</button>
+        </div>
+    </form>
+
+</section>
+</body>
+</html>

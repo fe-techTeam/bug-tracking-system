@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{public/layout :: page('Sent', ~{::section})}">
+<body>
+<section>
+    <div class="portal-empty">
+        <h1>Thanks, that is with the team.</h1>
+        <p th:if="${bugId != null}">
+            It is logged as <b class="mono" th:text="'BUG-' + ${bugId}">BUG-42</b>.
+            Somebody on <b th:text="${project.name}">Godrej</b> will reply to the email you gave.
+        </p>
+        <p th:if="${bugId == null}">
+            Somebody on <b th:text="${project.name}">Godrej</b> will reply to the email you gave.
+        </p>
+        <a class="btn btn-ghost" th:href="@{/public/{t}(t=${project.publicToken})}">Report another</a>
+    </div>
+</section>
+</body>
+</html>

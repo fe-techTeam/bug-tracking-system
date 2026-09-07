@@ -1688,6 +1688,27 @@
     var toast = document.getElementById("flash-message");
     if (toast) wireToast(toast);
 
+    /* ---------- copy a URL a button is carrying ----------
+       A public link is never printed on the page — it is a grant, and a grant
+       on screen is one somebody reads over your shoulder — so the button holds
+       it and the clipboard is the only place it lands. window.BT.copyText is
+       the shared writer, which also covers the LAN address where
+       navigator.clipboard does not exist; the prompt is the last resort. */
+    document.addEventListener("click", function (e) {
+        var btn = e.target.closest && e.target.closest("[data-copy-url]");
+        if (!btn) return;
+        var url = btn.getAttribute("data-copy-url");
+        if (!url) return;
+        var copier = (window.BT && window.BT.copyText)
+            || function (text) { return navigator.clipboard.writeText(text); };
+        copier(url).then(function () {
+            flash("Public link copied");
+            say("Public link copied");
+        }).catch(function () {
+            window.prompt("Copy this link", url);
+        });
+    });
+
     /* ---------- what a screen reader gets from something that only animates ----------
        Cleared first, because a live region that is handed the same string
        twice announces it once. */

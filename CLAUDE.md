@@ -114,7 +114,8 @@ in the migrations — and the older ones still carry H2-era SQL that is inert on
   `GET /api/bugs` returned every bug on every project; it is closed because a client now
   holds a session on this origin. It is no longer CSRF-exempt either, so the two `fetch`
   calls in `app.js` send the token from `layout.html`'s meta tag. HTML forms need
-  `th:action` to get theirs.
+  `th:action` to get theirs. The one exception is `/api/public/**` — matched before `/api/**`, it is
+  the single `permitAll`, CSRF-exempt API path, granted by the project's public token alone.
 - **Email mirrors the bell; it never decides anything.** `NotificationService` says who hears
   what and `EmailService` carries it out, after the transaction commits and on its own
   thread. If a change should email somebody it does not notify, add the *notification*.

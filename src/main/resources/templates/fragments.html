@@ -371,19 +371,21 @@
                            : ${#temporals.format(bug.dueDate, 'd MMM yyyy')}">12 Sep</span>
 </span>
 
-<!-- Where a report came from, when it came from outside.
+<!-- Where a report came from — one mark with three faces, so the answer is
+     always in the same place and always read the same way.
 
-     A mark rather than a word, because it sits in the middle of a row that is
-     already a name and a date, and "client" spelled out there reads as part of
-     the name. It carries its own title and its own screen-reader text, so what
-     it means is one hover or one tab-stop away and never guessed at.
-
-     Nothing is drawn for a bug the team raised: an absent mark is the normal
-     case, and marking both would make the pair meaningless. -->
-<span th:fragment="guestMark(bug)" class="guest-mark" th:if="${bug.viaGuest}"
-      title="Raised by a client, from outside">
-    <svg class="i" aria-hidden="true"><use href="#i-guest"/></svg>
-    <span class="sr-only">Raised by a client</span>
+     `label` off is the card and the middle of a row: the icon alone, because a
+     word there reads as part of the name beside it. The title and the sr-only
+     text carry the meaning either way, one hover or one tab-stop away. -->
+<span th:fragment="sourceMark(bug, label)" class="source-mark"
+      th:with="src=${bug.source.name()},
+               icon=${src == 'CLIENT' ? '#i-guest' : (src == 'EXTERNAL' ? '#i-globe' : '#i-users')},
+               tip=${src == 'CLIENT' ? 'Raised by a client, from outside'
+                    : (src == 'EXTERNAL' ? 'Raised from the public link' : 'Raised by the team')}"
+      th:classappend="'src-' + ${src}" th:title="${tip}">
+    <svg class="i" aria-hidden="true"><use th:attr="href=${icon}" href="#i-users"/></svg>
+    <span th:if="${label}" th:text="${bug.source.label}">Client</span>
+    <span class="sr-only" th:unless="${label}" th:text="${tip}">Raised by a client, from outside</span>
 </span>
 
 <!-- A sortable heading on the bug list.

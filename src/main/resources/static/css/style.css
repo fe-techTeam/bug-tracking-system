@@ -2266,6 +2266,7 @@ a.pill-label:hover { background: color-mix(in oklab, var(--c) 22%, transparent);
 .rail-fact dt { color: var(--muted); font-size: 11.5px; }
 .rail-fact dd { margin: 0; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .rail-fact dd > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-mail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pre { white-space: pre-wrap; font-size: 13.5px; color: var(--text-2); }
 
@@ -5976,25 +5977,31 @@ a.tm-name:hover { color: var(--accent); }
 
 /* ---------- the mark ---------- */
 
-/* A diamond beside a name. It sits inside .client-chip, a board card's row of
-   marks, a filter row and the rail, so it carries no margin of its own — every
-   one of those is already a flex row with its own gap. */
-.guest-mark {
+/* One mark for where a bug came from. It sits inside .client-chip, a board
+   card's row of marks, a filter row, a table cell and the rail, so it carries
+   no margin of its own — every one of those is already a flex row with its own
+   gap. The colour is the only thing that changes between the three. */
+.source-mark {
     display: inline-flex;
     align-items: center;
-    color: var(--muted);
+    gap: 5px;
+    color: var(--c, var(--muted));
 }
-.guest-mark svg.i { width: 11px; height: 11px; }
+.source-mark svg.i { width: 11px; height: 11px; }
+
+.src-INTERNAL { --c: var(--muted); }
+.src-CLIENT   { --c: var(--accent); }
+.src-EXTERNAL { --c: var(--sev-MEDIUM); }
 
 /* Filled rather than outlined once it is the thing you picked, so an active
    filter reads at a glance rather than by comparing two 11px outlines. */
-.fmenu-opt.is-active .guest-mark,
-.chip .guest-mark { color: var(--accent); }
-.fmenu-opt.is-active .guest-mark svg.i,
-.chip .guest-mark svg.i { fill: currentColor; }
+.fmenu-opt.is-active .source-mark,
+.chip .source-mark { --c: var(--accent); }
+.fmenu-opt.is-active .source-mark svg.i,
+.chip .source-mark svg.i { fill: currentColor; }
 
 /* The board's filter menu columns are sized to their longest name; this one
-   holds three short ones and would otherwise take a person's width. */
+   holds a few short ones and would otherwise take a person's width. */
 .fmenu-col-sm { min-width: 148px; }
 
 /* The project a client reports on, in the roster's client table. Selects are

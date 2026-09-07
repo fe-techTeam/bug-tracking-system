@@ -1,6 +1,7 @@
 package com.bugtracking.controller;
 
 import com.bugtracking.service.ProjectService;
+import com.bugtracking.service.PublicIntakeService;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,9 +23,11 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService service;
+    private final PublicIntakeService intake;
 
-    public ProjectController(ProjectService service) {
+    public ProjectController(ProjectService service, PublicIntakeService intake) {
         this.service = service;
+        this.intake = intake;
     }
 
     /** Kept so old links and bookmarks still arrive somewhere useful. */
@@ -87,6 +90,20 @@ public class ProjectController {
         flash.addFlashAttribute("message", active
                 ? project.getName() + " is active again."
                 : project.getName() + " is hidden from the switcher and dropdowns.");
+        return "redirect:/settings";
+    }
+
+    /**
+     * Makes a new public link for a project and drops the old one.
+     *
+     * <p>The token in that URL is the whole grant, so this is how a link that
+     * has been forwarded somewhere it should not have been is taken back. The
+     * new one is not flashed: it is copied from the row, never read aloud.
+     */
+    @PostMapping("/{id}/public-link")
+    public String regeneratePublicLink(@PathVariable Long id, RedirectAttributes flash) {
+        intake.regenerate(id);
+        flash.addFlashAttribute("message", "The old public link no longer works. Copy the new one from the row.");
         return "redirect:/settings";
     }
 

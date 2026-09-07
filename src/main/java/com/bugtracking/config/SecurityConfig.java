@@ -148,7 +148,8 @@ public class SecurityConfig {
                     // documents area (/projects/{id}/docs/**) and a project's
                     // own team list with it, and both of those are daily work.
                     .requestMatchers(HttpMethod.POST,
-                            "/projects", "/projects/*/active", "/projects/*/delete").hasRole("ADMIN")
+                            "/projects", "/projects/*/active", "/projects/*/delete",
+                            "/projects/*/public-link").hasRole("ADMIN")
                     // Handing somebody outside the company a way in is setup of
                     // the most consequential kind, so it sits with the roster.
                     .requestMatchers(HttpMethod.POST,

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:replace="~{layout :: page('Settings', ~{::section})}">
 <body>
 <section th:with="me=${#authentication.name}">
@@ -217,7 +218,22 @@
                                 <span class="badge" th:unless="${p.active}" style="--c: var(--muted)">Hidden</span>
                             </td>
                             <td data-label="Actions" style="text-align:right" th:with="used=${usage.get(p.id)}">
-                                <div class="inline-form" style="justify-content:flex-end">
+                                <div class="inline-form" style="justify-content:flex-end;flex-wrap:wrap">
+                                    <!-- Copied, never shown: the token in that URL is the
+                                         whole grant, so a link on screen is a link over
+                                         somebody's shoulder. -->
+                                    <button type="button" class="btn btn-sm btn-ghost"
+                                            th:attr="data-copy-url=${publicLinks.get(p.id)},aria-label='Copy the public report link for ' + ${p.name}"
+                                            title="Anyone with this link can report a bug on this project without signing in">
+                                        <svg class="i" aria-hidden="true"><use href="#i-link"/></svg>
+                                        <span>Copy link</span>
+                                    </button>
+                                    <form method="post" th:action="@{/projects/{id}/public-link(id=${p.id})}"
+                                          class="inline-form" sec:authorize="hasRole('ADMIN')"
+                                          th:attr="data-confirm='Anyone holding the current link for ' + ${p.name} + ' loses it. Make a new one?'">
+                                        <button type="submit" class="btn btn-sm btn-ghost"
+                                                th:attr="aria-label='Make a new public link for ' + ${p.name}">New link</button>
+                                    </form>
                                     <!-- Every row's buttons read the same out of context,
                                          so each one says which project it acts on. -->
                                     <form method="post" th:action="@{/projects/{id}/active(id=${p.id})}" class="inline-form">
@@ -243,7 +259,9 @@
 
             <p class="hint">
                 Hiding a project keeps every bug on it exactly as it is — it just stops being offered for
-                new ones. A project with bugs cannot be removed, only hidden.
+                new ones. A project with bugs cannot be removed, only hidden. Every project also has a
+                public link where anyone can report a bug without signing in; make a new one if the old
+                link reaches somebody it should not.
             </p>
         </div>
 

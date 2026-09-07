@@ -1,7 +1,9 @@
 package com.bugtracking.controller;
 
+import com.bugtracking.model.Project;
 import com.bugtracking.model.TeamMember;
 import com.bugtracking.service.ProjectService;
+import com.bugtracking.service.PublicIntakeService;
 import com.bugtracking.service.SavedFilterService;
 import com.bugtracking.service.TeamMemberService;
 import org.springframework.stereotype.Controller;
@@ -10,7 +12,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -46,12 +50,14 @@ public class SettingsController {
     private final ProjectService projects;
     private final TeamMemberService team;
     private final SavedFilterService savedFilters;
+    private final PublicIntakeService intake;
 
     public SettingsController(ProjectService projects, TeamMemberService team,
-                              SavedFilterService savedFilters) {
+                              SavedFilterService savedFilters, PublicIntakeService intake) {
         this.projects = projects;
         this.team = team;
         this.savedFilters = savedFilters;
+        this.intake = intake;
     }
 
     @GetMapping
@@ -62,8 +68,16 @@ public class SettingsController {
         // A query param rather than script, so the tabs survive JS being off.
         String active = tab != null && TABS.contains(tab) ? tab : "projects";
         model.addAttribute("tab", active);
-        model.addAttribute("projects", projects.all());
+        List<Project> all = projects.all();
+        model.addAttribute("projects", all);
         model.addAttribute("usage", projects.usageByProjectId());
+        // The token itself is never rendered; the row carries the whole URL for
+        // the copy button and nothing on the page reads it back.
+        Map<Long, String> publicLinks = new LinkedHashMap<>();
+        for (Project p : all) {
+            publicLinks.put(p.getId(), intake.publicUrl(p));
+        }
+        model.addAttribute("publicLinks", publicLinks);
         // Who is on each project, and the same as ids for the tick boxes. Two
         // maps rather than a walk into project.members: the collection is lazy
         // and open-in-view is off, so a template cannot load it itself.

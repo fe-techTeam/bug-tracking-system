@@ -32,7 +32,7 @@ class BugRepositoryLabelsTest {
     void filtersByLabelIgnoringCase() {
         bug("one", "Login");
         bug("two", "payments");
-        List<Bug> found = bugs.search(null, null, null, null, null, null, "login", null, null);
+        List<Bug> found = bugs.search(null, null, null, null, null, null, null, "login", null, null);
         assertEquals(1, found.size());
         assertEquals("one", found.get(0).getTitle());
     }

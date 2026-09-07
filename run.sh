@@ -241,7 +241,9 @@ setup_flyway_env() {
 
   local host port name user pass
   host=$(env_value SUPABASE_DB_HOST)
-  port=$(env_value SUPABASE_DB_PORT)
+  # The session pooler, not SUPABASE_DB_PORT: the app runs on the transaction
+  # pooler, where Flyway's migration lock would not survive between statements.
+  port=$(env_value SUPABASE_DB_MIGRATION_PORT)
   name=$(env_value SUPABASE_DB_NAME)
   user=$(env_value SUPABASE_DB_USER)
   pass=$(env_value SUPABASE_DB_PASSWORD)

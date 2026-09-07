@@ -1,5 +1,7 @@
 package com.bugtracking.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -26,6 +28,8 @@ import java.util.Map;
  */
 @Component
 public class SupabaseConnectionCheck implements BeanFactoryPostProcessor, EnvironmentAware {
+
+    private static final Logger log = LoggerFactory.getLogger(SupabaseConnectionCheck.class);
 
     /** Property to check, and the .env key a reader should go and fill in. */
     private static final Map<String, String> REQUIRED = new LinkedHashMap<>();
@@ -73,6 +77,23 @@ public class SupabaseConnectionCheck implements BeanFactoryPostProcessor, Enviro
                             + "(Dashboard > Project Settings > Database > Connection string > JDBC). "
                             + "There is no local database to fall back to - that is deliberate, so a "
                             + "checkout cannot quietly collect projects nobody else can see.");
+        }
+
+        warnIfOnSessionPooler();
+    }
+
+    // .env is gitignored, so pulling the move to the transaction pooler does not
+    // move anybody: a checkout keeps its own SUPABASE_DB_PORT and goes on holding
+    // session slots that the whole project shares, with nothing to show for it.
+    private void warnIfOnSessionPooler() {
+        String url = environment.getProperty("spring.datasource.url", "");
+        if (url.contains(":5432/")) {
+            log.warn("SUPABASE_DB_PORT is 5432, the session pooler. This app will hold its "
+                    + "whole connection pool open against the fifteen session slots the project "
+                    + "shares, for as long as it runs - two developers doing that exhaust them "
+                    + "and everybody else gets 'max clients reached in session mode'. Set "
+                    + "SUPABASE_DB_PORT=6543 in .env to use the transaction pooler instead; "
+                    + "migrations keep using 5432 on a connection of their own.");
         }
     }
 }

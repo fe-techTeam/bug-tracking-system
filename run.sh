@@ -239,7 +239,7 @@ setup_flyway_env() {
   [[ -f .env ]] || die \
 "No .env file. Copy .env.example to .env and fill in the SUPABASE_DB_* block."
 
-  local host port name user pass
+  local host port name user pass sslmode
   host=$(env_value SUPABASE_DB_HOST)
   # The session pooler, not SUPABASE_DB_PORT: the app runs on the transaction
   # pooler, where Flyway's migration lock would not survive between statements.
@@ -247,6 +247,7 @@ setup_flyway_env() {
   name=$(env_value SUPABASE_DB_NAME)
   user=$(env_value SUPABASE_DB_USER)
   pass=$(env_value SUPABASE_DB_PASSWORD)
+  sslmode=$(env_value SUPABASE_DB_SSLMODE)
 
   [[ -n "$host" && "$host" != *'<'* ]] || die \
 "SUPABASE_DB_HOST in .env is missing or still a placeholder.
@@ -256,7 +257,7 @@ Dashboard > Project Settings > Database > Connection string > JDBC."
 
   # Environment variables outrank the plugin's pom configuration, so the
   # credentials never have to appear in pom.xml or on the command line.
-  export FLYWAY_URL="jdbc:postgresql://$host:${port:-5432}/${name:-postgres}?sslmode=require"
+  export FLYWAY_URL="jdbc:postgresql://$host:${port:-5432}/${name:-postgres}?sslmode=${sslmode:-require}"
   export FLYWAY_USER="$user"
   export FLYWAY_PASSWORD="$pass"
 }
